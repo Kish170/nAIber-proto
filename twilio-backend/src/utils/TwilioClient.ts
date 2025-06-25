@@ -10,8 +10,8 @@ const accountSid = process.env.TWILIO_ACCOUNT_SID;
 const authToken = process.env.TWILIO_AUTH_TOKEN;
 
 if (!accountSid || !authToken) {
-  console.error('Missing required Twilio environment variables. Check TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN in .env file.');
-  throw new Error('Twilio configuration error: Missing required environment variables');
+    console.error('Missing required Twilio environment variables. Check TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN in .env file.');
+    throw new Error('Twilio configuration error: Missing required environment variables');
 }
 
 const client = twilio(accountSid, authToken);
