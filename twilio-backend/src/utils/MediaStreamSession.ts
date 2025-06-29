@@ -1,38 +1,50 @@
 import { WebSocket } from 'ws';
-import { createClient, ListenLiveClient, LiveTranscriptionEvents } from "@deepgram/sdk";
+import { TwilioMediaMessage } from '../types/Types';
+import { QuestionManager } from '../services/QuestionManager';
+import { DeepgramSTT } from './DeepgramSTT';
+import { ElevenLabsTTS } from './ElevenLabsTTS';
 
-const deepgramClient = createClient(process.env.DEEPGRAM_API_KEY || '');
-
-interface TwilioMediaMessage {
-  event: string;
-  media?: { payload: string };
-  mark?: any;
-  streamSid?: string;
-}
+const VoiceResponse = require('twilio').twiml.VoiceResponse;
 
 export class MediaStreamSession {
   private ws: WebSocket;
-  private deepgram: ListenLiveClient;
-  private keepAlive!: NodeJS.Timeout;
+  private deepgram: DeepgramSTT;
+  private elevenlabs: ElevenLabsTTS;
+  private questionManager: QuestionManager;
+  private currentQuestionIndex: number;
+  private streamSid!: String;
+  private responses: string[];
 
   constructor(ws: WebSocket) {
     this.ws = ws;
-    this.deepgram = deepgramClient.listen.live({
-      model: 'nova-3',
-      smart_format: true,
-      language: 'en-US',
-      endpointing: 200,
-      encoding: 'mulaw',
-      sample_rate: 8000
-    });
+    this.deepgram = new DeepgramSTT();
+    this.elevenlabs = new ElevenLabsTTS();
+    this.questionManager = new QuestionManager();
+    this.currentQuestionIndex = 0;
+    this.responses = [];
     this.setupListeners();
   }
 
-  public handleMessage(message: string) {
+  private async askQuestion() {
+    if (this.questionManager.isComplete(this.currentQuestionIndex)) {
+      this.ws.send(JSON.stringify({ message: "All questions answered. Thank you!", complete: true }));
+      console.log('All questions answered, closing connection.');
+      this.close();
+    } else {
+      const question = this.questionManager.getQuestion(this.currentQuestionIndex);
+      console.log(`Asking question ${this.currentQuestionIndex + 1}: ${question}`);
+      this.elevenlabs.textToSpeech(question, this.ws, this.streamSid)
+      this.ws.send(JSON.stringify({ question: question, index: this.currentQuestionIndex }));
+    }
+  }
+
+  public async handleMessage(message: string) {
     try {
       const data = JSON.parse(message) as TwilioMediaMessage;
 
       switch (data.event) {
+        case 'start':
+          this.streamSid = data.streamSid|| '';
         case 'media':
           this.handleMedia(data);
           break;
@@ -51,55 +63,25 @@ export class MediaStreamSession {
     const payload = data.media?.payload;
     if (payload) {
       const message = Buffer.from(payload, 'base64');
-      if (this.deepgram.getReadyState() === 1 /* OPEN */) {
-        console.log("ws: data sent to deepgram");
-        this.deepgram.send(message);
-      } else if (this.deepgram.getReadyState() >= 2 /* 2 = CLOSING, 3 = CLOSED */) {
-        console.log("ws: data couldn't be sent to deepgram");
-        console.log("ws: retrying connection to deepgram");
-        /* Attempt to reopen the Deepgram connection */
-        this.close()
-        this.deepgram = deepgramClient.listen.live({ smart_format: true, model: 'nova-3' });
-        this.setupListeners()
-      } else {
-        console.log("ws: data couldn't be sent to deepgram");
-      }
+      this.deepgram.send(message);
     }
   }
 
   private setupListeners() {
-    this.keepAlive = setInterval(() => {
-      this.deepgram.keepAlive();
-    }, 10000);
-
-    this.deepgram.addListener(LiveTranscriptionEvents.Open, () => {
-      console.log('Deepgram connected');
-    });
-
-    this.deepgram.addListener(LiveTranscriptionEvents.Transcript, (transcript) => {
+    this.deepgram.addTranscriptListener((transcript) => {
       const alt = transcript.channel?.alternatives?.[0];
       const text = alt?.transcript;
       if (transcript.is_final && text) {
-        console.log(`Transcript: ${text}`);
-        this.ws.send(JSON.stringify({ transcript: text }));
-
-        // TODO: Process input (LangChain, database, etc.)
+        console.log(`Transcript for question ${this.currentQuestionIndex + 1}: ${text}`);
+        this.responses.push(text);
+        this.ws.send(JSON.stringify({ transcript: text, index: this.currentQuestionIndex }));
+        this.currentQuestionIndex++;
+        this.askQuestion();
       }
-    });
-
-    this.deepgram.addListener(LiveTranscriptionEvents.Error, (err) => {
-      console.error('Deepgram error:', err);
-    });
-
-    this.deepgram.addListener(LiveTranscriptionEvents.Close, () => {
-      console.log('Deepgram connection closed');
-      clearInterval(this.keepAlive);
     });
   }
 
   public close() {
-    this.deepgram.requestClose();
-    this.deepgram.removeAllListeners
-    clearInterval(this.keepAlive);
+    this.deepgram.close();
   }
 }
