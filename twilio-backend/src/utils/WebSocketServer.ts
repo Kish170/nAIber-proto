@@ -1,6 +1,6 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import http from 'http';
-import { MediaStreamSession } from './MediaStreamSession';
+import { MediaStreamSession } from '../services/MediaStreamSession';
 
 export const initializeWebSocketServer = (server: http.Server): void => {
   const wss = new WebSocketServer({ server, path: '/twiml' });

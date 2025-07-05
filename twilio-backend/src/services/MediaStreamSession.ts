@@ -1,8 +1,8 @@
 import { WebSocket } from 'ws';
 import { TwilioMediaMessage } from '../types/Types';
-import { QuestionManager } from '../services/QuestionManager';
-import { DeepgramSTT } from './DeepgramSTT';
-import { ElevenLabsTTS } from './ElevenLabsTTS';
+import { QuestionManager } from './QuestionManager';
+import { DeepgramSTT } from '../utils/DeepgramSTT';
+import { ElevenLabsTTS } from '../utils/ElevenLabsTTS';
 
 const VoiceResponse = require('twilio').twiml.VoiceResponse;
 
@@ -22,7 +22,9 @@ export class MediaStreamSession {
     this.questionManager = new QuestionManager();
     this.currentQuestionIndex = 0;
     this.responses = [];
+    this.streamSid = '';
     this.setupListeners();
+    this.askQuestion();
   }
 
   private async askQuestion() {
@@ -31,10 +33,17 @@ export class MediaStreamSession {
       console.log('All questions answered, closing connection.');
       this.close();
     } else {
-      const question = this.questionManager.getQuestion(this.currentQuestionIndex);
-      console.log(`Asking question ${this.currentQuestionIndex + 1}: ${question}`);
-      this.elevenlabs.textToSpeech(question, this.ws, this.streamSid)
-      this.ws.send(JSON.stringify({ question: question, index: this.currentQuestionIndex }));
+      const questionObj = this.questionManager.getNextQuestion(this.currentQuestionIndex);
+      if (questionObj) {
+        const question = questionObj.text;
+        this.elevenlabs.textToSpeech(question, this.ws, this.streamSid);
+        console.log(`Asking question ${this.currentQuestionIndex}: ${question}`);
+        this.ws.send(JSON.stringify({ question: question, index: this.currentQuestionIndex }));
+      } else {
+        this.ws.send(JSON.stringify({ message: "No more questions available.", complete: true }));
+        console.log('No more questions available, closing connection.');
+        this.close();
+      }
     }
   }
 
@@ -44,7 +53,10 @@ export class MediaStreamSession {
 
       switch (data.event) {
         case 'start':
-          this.streamSid = data.streamSid|| '';
+          this.streamSid = data.streamSid || '';
+          if (this.currentQuestionIndex === 0) {
+            this.askQuestion();
+          }
         case 'media':
           this.handleMedia(data);
           break;
@@ -68,20 +80,31 @@ export class MediaStreamSession {
   }
 
   private setupListeners() {
-    this.deepgram.addTranscriptListener((transcript) => {
+    this.deepgram.addTranscriptListener(async (transcript) => {
       const alt = transcript.channel?.alternatives?.[0];
       const text = alt?.transcript;
       if (transcript.is_final && text) {
         console.log(`Transcript for question ${this.currentQuestionIndex + 1}: ${text}`);
         this.responses.push(text);
-        this.ws.send(JSON.stringify({ transcript: text, index: this.currentQuestionIndex }));
-        this.currentQuestionIndex++;
+        const currentQuestion = this.questionManager.getNextQuestion(this.currentQuestionIndex);
+        if (currentQuestion) {
+          const isValid = await this.questionManager.storeResponse(currentQuestion, text);
+          if (isValid) {
+            this.ws.send(JSON.stringify({ transcript: text, index: this.currentQuestionIndex, valid: true }));
+            this.currentQuestionIndex++;
+          } else {
+            this.ws.send(JSON.stringify({ transcript: text, index: this.currentQuestionIndex, valid: false, message: "Response was not valid. Please answer again." }));
+            // Re-ask the same question if the response is not valid
+          }
+        }
         this.askQuestion();
       }
     });
   }
 
   public close() {
+    this.questionManager.getResponses()
+    this.questionManager.clearResponses()
     this.deepgram.close();
   }
 }
