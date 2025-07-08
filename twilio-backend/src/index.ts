@@ -6,7 +6,7 @@ import MediaStreamRoute from './routes/MediaStreamRoute'
 import path from 'path';
 import { initializeWebSocketServer } from './utils/WebSocketServer';
 import http from 'http';
-dotenv.config({ path: path.resolve(__dirname, '../.env') });
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 const app = express();
 app.use(express.urlencoded({ extended: false })); // <-- this is critical
