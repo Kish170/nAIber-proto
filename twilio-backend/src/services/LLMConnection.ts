@@ -2,7 +2,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { OpenAIResponse } from '../types/Types';
 
-dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
 
 
 export async function callOpenAI(

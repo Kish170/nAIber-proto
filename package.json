@@ -4,11 +4,13 @@
     "@aws-sdk/credential-providers": "^3.840.0",
     "@deepgram/sdk": "^4.7.0",
     "@elevenlabs/elevenlabs-js": "^2.4.1",
+    "@prisma/client": "^6.11.1",
     "@types/express-ws": "^3.0.5",
     "@types/ws": "^8.18.1",
     "dotenv": "^16.6.1",
     "express": "^4.21.2",
     "express-ws": "^5.0.2",
+    "prisma": "^6.11.1",
     "tsx": "^4.20.3",
     "twilio": "^5.7.1",
     "ws": "^8.18.3"
