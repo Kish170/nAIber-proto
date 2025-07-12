@@ -1,5 +1,5 @@
-import { BasicInfo } from '../types/Types';
-import { CheckInFrequency, PrismaClient } from '../../../generated/prisma'
+import { BasicInfo } from '../../types/Types';
+import { CheckInFrequency, PrismaClient } from '../../../../generated/prisma'
 
 const prismaClient = new PrismaClient()
 
