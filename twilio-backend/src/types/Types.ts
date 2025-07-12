@@ -1,5 +1,7 @@
 import { Gender, Relationship, CheckInFrequency, Severity, HealthCategory, MedicationCategory } from '../../../generated/prisma'
 import { BaseMessage } from '@langchain/core/messages'
+import { ToolNode } from '@langchain/langgraph/prebuilt'
+import { Annotation } from '@langchain/langgraph'
 
 export type OnboardingInfo = {
   name?: string;
@@ -56,3 +58,13 @@ export interface AgentState {
   currentStep?: string
   collectedData?: any
 }
+
+export const AgentState = Annotation.Root({
+    messages: Annotation<BaseMessage[]>({
+      reducer: (x, y) => x.concat(y),
+    }),
+    userId: Annotation<string>(),
+    currentStep: Annotation<string>(), // current question being asked
+    collectedData: Annotation<string[]>() // questions asked and answer recieved
+})
+

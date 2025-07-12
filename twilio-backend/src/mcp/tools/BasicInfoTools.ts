@@ -4,7 +4,7 @@ import { BasicInfoCRUD } from '../CRUD/BasicInfo'
 
 const basicInfoCRUD = new BasicInfoCRUD()
 
-export const createUserTool = new DynamicStructuredTool({
+const createUserTool = new DynamicStructuredTool({
     name: "createUser",
     description: "Creates a new user with basic info", 
     schema: z.object({
@@ -16,8 +16,9 @@ export const createUserTool = new DynamicStructuredTool({
         checkInFrequency: z.string().optional()
     }),
     func: async (args: any) => { 
+        const { userData } = args
         try {
-            const result = await basicInfoCRUD.createUser(args);
+            const result = await basicInfoCRUD.createUser(userData);
             return `Successfully created user with ID: ${result.id}`;
         } catch (error: any) {
             return "Error creating user: " + error.message;
@@ -25,7 +26,7 @@ export const createUserTool = new DynamicStructuredTool({
     }
 }) as any; 
 
-export const updateBasicInfoTool = new DynamicStructuredTool({
+const updateBasicInfoTool = new DynamicStructuredTool({
     name: "updateBasicInfo",
     description: "Updates a specific field for an existing user", 
     schema: z.object({
@@ -43,3 +44,5 @@ export const updateBasicInfoTool = new DynamicStructuredTool({
         }
     }
 }) as any;
+
+export const agentTools = [createUserTool, updateBasicInfoTool]
