@@ -1,31 +1,34 @@
 import express from 'express';
 import dotenv from 'dotenv';
-import OutboundRoute from './routes/OutboundRoute'
-import OnboardingRoute from './routes/OnboardingRoute'
-import MediaStreamRoute from './routes/MediaStreamRoute'
+import ElevenLabsWebhook from './routes/ElevenLabsWebhook'
+import TwilioOutbound from './routes/TwilioOutbound'
+import TwimlRouter from './routes/TwimlRouter'
+import { WebSocketServer } from 'ws';
 import path from 'path';
-import { initializeWebSocketServer } from './utils/WebSocketServer';
 import http from 'http';
+import { setupOutboundMediaStream } from './ws/OutboundMediaStream';
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 const app = express();
-app.use(express.urlencoded({ extended: false })); // <-- this is critical
+app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
 
-
 app.get('/', (req, res) => {
-  res.send('Hello from Twilio backend!');
+  res.send('Hello from nAIber backend! ElevenLabs Conversational AI integration ready.');
 });
 
-app.use('/api', OutboundRoute)
-
-app.use('/', OnboardingRoute)
-
-app.use('/', MediaStreamRoute)
+// API routes
+app.use('/api', ElevenLabsWebhook);
+app.use('/api', TwilioOutbound);
+app.use('/twiml', TwimlRouter)
 
 const PORT = process.env.PORT || 3000;
 const server = http.createServer(app);
 
-initializeWebSocketServer(server);
+const wss = new WebSocketServer({ server, path: '/outbound-media-stream' });
+setupOutboundMediaStream(wss);
 
-server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+server.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+  console.log(`ElevenLabs webhook available at: https://4973188fcbd8.ngrok-free.app/api/elevenlabs-webhook`);
+});
