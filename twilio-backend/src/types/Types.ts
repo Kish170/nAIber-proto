@@ -1,47 +1,4 @@
 import { Gender, Relationship, CheckInFrequency, Severity, HealthCategory, MedicationCategory } from '../../../generated/prisma'
-import { BaseMessage } from '@langchain/core/messages'
-import { ToolNode } from '@langchain/langgraph/prebuilt'
-import { Annotation } from '@langchain/langgraph'
-
-export type OnboardingInfo = {
-  name?: string;
-  age?: number;
-  location?: string;
-  caregiverName?: string;
-  medicationSchedule?: string;
-  emergencyContact?: string;
-};
-
-export interface TwilioMediaMessage {
-  event: string;
-  media?: { payload: string };
-  mark?: any;
-  streamSid?: string;
-}
-
-export interface OpenAIResponse {
-  success: boolean;
-  message: string;
-  usage?: {
-    prompt_tokens: number;
-    completion_tokens: number;
-    total_tokens: number;
-  };
-  error?: string;
-}
-
-export interface Question {
-  id: string; 
-  text: string; 
-  category?: string; 
-  isAnswered?: boolean;
-}
-
-export interface UserResponse {
-  questionId: string;
-  response: string | boolean | number;
-  timestamp: Date;
-}
 
 export interface BasicInfo {
   fullName?: string;
@@ -52,19 +9,60 @@ export interface BasicInfo {
   checkInFrequency?: CheckInFrequency;
 }
 
-export interface AgentState {
-  messages: BaseMessage[]
-  userId?: string
-  currentStep?: string
-  collectedData?: any
+// ElevenLabs webhook types
+export interface ElevenLabsWebhookRequest {
+  function_name: string;
+  parameters: Record<string, any>;
+  conversation_id: string;
 }
 
-export const AgentState = Annotation.Root({
-    messages: Annotation<BaseMessage[]>({
-      reducer: (x, y) => x.concat(y),
-    }),
-    userId: Annotation<string>(),
-    currentStep: Annotation<string>(), // current question being asked
-    collectedData: Annotation<string[]>() // questions asked and answer recieved
-})
+export interface ElevenLabsWebhookResponse {
+  success: boolean;
+  message: string;
+  data?: any;
+  error?: string;
+}
 
+export interface EmergencyContactData {
+  name: string;
+  phoneNumber: string;
+  relationship: Relationship;
+  userId: string;
+  email?: string;
+  isPrimary?: boolean;
+  address?: string;
+  notes?: string;
+}
+
+export interface HealthConditionData {
+  name: string;
+  category: HealthCategory;
+  description?: string;
+}
+
+export interface UserHealthConditionData {
+  userId: string;
+  healthConditionId: string;
+  severity?: Severity;
+  diagnosedAt?: Date;
+  notes?: string;
+  isActive?: boolean;
+}
+
+export interface MedicationData {
+  name: string;
+  genericName?: string;
+  category: MedicationCategory;
+}
+
+export interface UserMedicationData {
+  userId: string;
+  medicationId: string;
+  dosage: string;
+  frequency: string;
+  startedAt?: Date;
+  endedAt?: Date;
+  prescriber?: string;
+  notes?: string;
+  isActive?: boolean;
+}

@@ -14,7 +14,6 @@ export async function callOpenAI(
   const agentCheckpointer = new MemorySaver(); // incorporate later need this for memory management across multiple calls but right now focuse on memory management within a call
 
 
-
   if (!apiKey) {
     console.error('OpenAI API key is not defined in environment variables.');
     return {

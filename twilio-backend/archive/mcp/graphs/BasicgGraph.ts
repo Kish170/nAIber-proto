@@ -1,15 +1,10 @@
 import { START, StateGraph } from "@langchain/langgraph";
-import { ToolNode } from '@langchain/langgraph/prebuilt'
 import { AgentState } from "../../types/Types";
-import { agentTools } from "../tools/BasicInfoTools";
-import { callModel, shouldContinue } from "../tool_nodes/BasicNode";
-
-
-const toolNodes = new ToolNode<typeof AgentState.State>(agentTools);
+import { callModel, shouldContinue, executeTools } from "../tool_nodes/BasicNode";
 
 const workflow = new StateGraph(AgentState)
   .addNode("agent", callModel)
-  .addNode("tools", toolNodes)
+  .addNode("tools", executeTools)
   .addEdge(START, "agent")
   .addConditionalEdges(
     "agent",

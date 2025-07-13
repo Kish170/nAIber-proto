@@ -1,12 +1,18 @@
 import { OpenAIResponse, Question, UserResponse } from "../types/Types";
 import { callOpenAI } from "../mcp/LLMConnection";
-import { BaseMessage, HumanMessage, isAIMessage } from "@langchain/core/messages";
+import { BaseMessage, HumanMessage, SystemMessage, isAIMessage } from "@langchain/core/messages";
 import { GraphRecursionError } from "@langchain/langgraph";
 import { app } from '../mcp/graphs/BasicgGraph'
 
 export class QuestionManager {
   private questions: Question[] = [];
   private responses: UserResponse[] = [];
+  private currentState: any = {
+    messages: [],
+    userId: undefined,
+    currentStep: 'greeting',
+    collectedData: []
+  };
 
   constructor(questions?: Question[]) {
     this.questions = questions || [
@@ -23,27 +29,54 @@ export class QuestionManager {
   }
 
   public async validateResponse(userResponse: string): Promise<BaseMessage | null | undefined> {
+    // Handle initial greeting with SystemMessage when userResponse is empty
+    let newMessage: BaseMessage;
+    if (userResponse === "" && this.currentState.messages.length === 0) {
+      newMessage = new SystemMessage("Start the onboarding conversation by greeting the user and asking for their full name.");
+    } else {
+      newMessage = new HumanMessage(userResponse);
+    }
+    
     const input = {
-      messages: [
-        new HumanMessage(
-          `${userResponse}`
-        )
-      ],
+      messages: [...this.currentState.messages, newMessage],
+      userId: this.currentState.userId,
+      currentStep: this.currentState.currentStep,
+      collectedData: this.currentState.collectedData
     };
+
     try {
-      let finalOutput
+      let finalOutput;
+      console.log('Streaming graph execution with state:', {
+        messageCount: input.messages.length,
+        userId: input.userId,
+        currentStep: input.currentStep
+      });
+      
       for await (
         const output of await app.stream(input, {
           streamMode: "values",
-          recursionLimit: 20,
+          recursionLimit: 10,
         })
       ) {
-        finalOutput =  output.messages[output.messages.length - 1];
+        console.log('Graph output step:', {
+          messageCount: output.messages?.length,
+          userId: output.userId,
+          lastMessageType: output.messages?.[output.messages.length - 1]?.constructor.name
+        });
+        
+        // Update our current state with the latest output
+        this.currentState = output;
+        finalOutput = output.messages[output.messages.length - 1];
       }
-      return finalOutput
+      
+      return finalOutput;
     } catch (error) {
-        console.error(error);
-        return null
+        console.error('Error in validateResponse:', error);
+        return null;
     }
+  }
+
+  public getUserId(): string | undefined {
+    return this.currentState.userId;
   }
 }

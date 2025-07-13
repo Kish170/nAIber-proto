@@ -3,6 +3,7 @@ import { TwilioMediaMessage, UserResponse } from '../types/Types';
 import { QuestionManager } from './QuestionManager';
 import { DeepgramSTT } from '../utils/DeepgramSTT';
 import { ElevenLabsTTS } from '../utils/ElevenLabsTTS';
+import { SystemMessage } from '@langchain/core/messages';
 
 const VoiceResponse = require('twilio').twiml.VoiceResponse;
 
@@ -24,18 +25,28 @@ export class MediaStreamSession {
     this.responses = [];
     this.streamSid = '';
     this.setupListeners();
-    this.askQuestion("Greet the user and tell them about the process of creating a user for them");
+    this.askQuestion("");
   }
 
   private async askQuestion(userResponse: string) {
-    const modelResponse = await this.questionManager.validateResponse(userResponse)
-    if (modelResponse != null) {
-      const message = modelResponse.content.toString()
-      this.elevenlabs.textToSpeech(message, this.ws, this.streamSid);
-    } else {
-      this.ws.send(JSON.stringify({ message: "No more questions available.", complete: true }));
-      console.log('Closing connection.');
-      this.close();
+    try {
+      console.log(`Processing user response: "${userResponse}"`);
+      const modelResponse = await this.questionManager.validateResponse(userResponse);
+      
+      if (modelResponse != null) {
+        const message = modelResponse.content.toString();
+        console.log(`Agent response: "${message}"`);
+        console.log(`Current user ID: ${this.questionManager.getUserId()}`);
+        this.elevenlabs.textToSpeech(message, this.ws, this.streamSid);
+      } else {
+        console.log('No response from model, ending conversation');
+        this.ws.send(JSON.stringify({ message: "Thank you for completing the onboarding process!", complete: true }));
+        console.log('Closing connection.');
+        this.close();
+      }
+    } catch (error) {
+      console.error('Error in askQuestion:', error);
+      this.elevenlabs.textToSpeech("I'm sorry, I encountered an error. Let me try again.", this.ws, this.streamSid);
     }
   }
 
