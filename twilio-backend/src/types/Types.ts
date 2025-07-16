@@ -1,15 +1,15 @@
-import { Gender, Relationship, CheckInFrequency, Severity, HealthCategory, MedicationCategory } from '../../../generated/prisma'
+import { Gender, Relationship, CheckInFrequency, Severity, HealthCategory, MedicationCategory, MedicationFrequency } from '../../../generated/prisma'
 
 export interface BasicInfo {
-  fullName?: string;
+  fullName: string;
   age?: number;
   phoneNumber?: string;
   gender?: Gender;
   preferredCheckInTime?: string;
   checkInFrequency?: CheckInFrequency;
+  conversationID: string;
 }
 
-// ElevenLabs webhook types
 export interface ElevenLabsWebhookRequest {
   function_name: string;
   parameters: Record<string, any>;
@@ -59,7 +59,7 @@ export interface UserMedicationData {
   userId: string;
   medicationId: string;
   dosage: string;
-  frequency: string;
+  frequency: MedicationFrequency;
   startedAt?: Date;
   endedAt?: Date;
   prescriber?: string;

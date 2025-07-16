@@ -1,7 +1,7 @@
 // Simple test script for ElevenLabs webhook
 const axios = require('axios');
 
-const BASE_URL = 'https://4973188fcbd8.ngrok-free.app/api';
+const BASE_URL = 'https://c24176254ce7.ngrok-free.app/api';
 
 async function testWebhook() {
   console.log('Testing ElevenLabs webhook endpoints...\n');
@@ -98,7 +98,7 @@ async function testWebhook() {
         name: 'Metformin',
         category: 'DIABETES',
         dosage: '500mg',
-        frequency: 'Twice daily with meals',
+        frequency: 'ONCE_DAILY',
         prescriber: 'Dr. Smith',
         notes: 'Take with food to reduce stomach upset'
       },

@@ -3,7 +3,7 @@ import { BasicInfoCRUD } from '../CRUD/BasicInfo';
 import { EmergencyContactCRUD } from '../CRUD/EmergencyContact';
 import { HealthConditionsCRUD } from '../CRUD/HealthConditions';
 import { MedicationCRUD } from '../CRUD/Medication';
-import { Gender, CheckInFrequency, Relationship, HealthCategory, Severity, MedicationCategory, PrismaClient } from '../../../generated/prisma';
+import { Gender, CheckInFrequency, Relationship, HealthCategory, Severity, MedicationCategory, MedicationFrequency, PrismaClient } from '../../../generated/prisma';
 
 const router = express.Router();
 const basicInfoCRUD = new BasicInfoCRUD();
@@ -43,7 +43,9 @@ router.post('/elevenlabs-webhook', validateRequest, async (req, res) => {
   
   console.log(`ElevenLabs webhook called: ${function_name}`, {
     parameters,
-    conversation_id
+    conversation_id,
+    conversation_id_type: typeof conversation_id,
+    conversation_id_value: JSON.stringify(conversation_id)
   });
 
   try {
@@ -51,15 +53,15 @@ router.post('/elevenlabs-webhook', validateRequest, async (req, res) => {
     
     switch (function_name) {
       case 'create_user':
-        result = await handleCreateUser(parameters);
+        result = await handleCreateUser(parameters, conversation_id);
         break;
         
       case 'save_user_data':
-        result = await handleSaveUserData(parameters);
+        result = await handleSaveUserData(parameters, conversation_id);
         break;
         
       case 'create_emergency_contact':
-        result = await handleCreateEmergencyContact(parameters);
+        result = await handleCreateEmergencyContact(parameters, conversation_id);
         break;
         
       case 'check_missing_info':
@@ -67,7 +69,7 @@ router.post('/elevenlabs-webhook', validateRequest, async (req, res) => {
         break;
         
       case 'add_health_condition':
-        result = await handleAddHealthCondition(parameters);
+        result = await handleAddHealthCondition(parameters, conversation_id);
         break;
         
       case 'get_user_health_conditions':
@@ -75,7 +77,7 @@ router.post('/elevenlabs-webhook', validateRequest, async (req, res) => {
         break;
         
       case 'add_medication':
-        result = await handleAddMedication(parameters);
+        result = await handleAddMedication(parameters, conversation_id);
         break;
         
       case 'get_user_medications':
@@ -103,29 +105,30 @@ router.post('/elevenlabs-webhook', validateRequest, async (req, res) => {
   }
 });
 
-async function handleCreateUser(parameters: any) {
+async function handleCreateUser(parameters: any, conversationID: string) {
   const { fullName } = parameters;
   
-  if (!fullName) {
-    throw new Error('fullName is required');
+  if (!fullName || !conversationID) {
+    throw new Error('fullName and conversationID is required');
   }
   
-  const user = await basicInfoCRUD.createUser({ fullName });
+  const user = await basicInfoCRUD.createUser({ fullName, conversationID });
   
   return {
     success: true,
     message: `Successfully created user profile for ${fullName}`,
     data: {
       userId: user.id,
-      fullName: user.fullName
+      fullName: user.fullName,
+      conversationID: user.conversationID
     }
   };
 }
 
-async function handleSaveUserData(parameters: any) {
-  const { field, value, userId } = parameters;
+async function handleSaveUserData(parameters: any, conversationID: string) {
+  const { field, value } = parameters;
   
-  if (!field || value === undefined || !userId) {
+  if (!field || value === undefined || !conversationID) {
     throw new Error('field, value, and userId are required');
   }
   
@@ -156,7 +159,7 @@ async function handleSaveUserData(parameters: any) {
     }
   }
   
-  await basicInfoCRUD.updateUser(field, processedValue, userId);
+  await basicInfoCRUD.updateUser(field, processedValue, conversationID);
   
   return {
     success: true,
@@ -164,13 +167,14 @@ async function handleSaveUserData(parameters: any) {
     data: {
       field,
       value: processedValue,
-      userId
+      conversationID
     }
   };
 }
 
-async function handleCreateEmergencyContact(parameters: any) {
-  const { name, phoneNumber, relationship, userId } = parameters;
+async function handleCreateEmergencyContact(parameters: any, conversationID: string) {
+  const { name, phoneNumber, relationship, email, isPrimary, address, notes } = parameters;
+  const userId = await basicInfoCRUD.getUserID(conversationID)
   
   if (!name || !phoneNumber || !relationship || !userId) {
     throw new Error('name, phoneNumber, relationship, and userId are required');
@@ -183,11 +187,15 @@ async function handleCreateEmergencyContact(parameters: any) {
   }
   
   const emergencyContact = await emergencyContactCRUD.createEmergencyContact({
-    name,
-    phoneNumber,
-    relationship: upperRelationship as Relationship,
-    userId
-  });
+      name,
+      phoneNumber,
+      relationship: upperRelationship as Relationship,
+      userId,
+      email: email || undefined,
+      isPrimary: isPrimary || false,
+      address: address || undefined,
+      notes: notes || undefined
+    });
   
   return {
     success: true,
@@ -252,8 +260,9 @@ async function handleCheckMissingInfo(parameters: any) {
   };
 }
 
-async function handleAddHealthCondition(parameters: any) {
-  const { userId, name, category, severity, notes } = parameters;
+async function handleAddHealthCondition(parameters: any, conversationID: string) {
+  const { name, category, severity, notes } = parameters;
+  const userId = await basicInfoCRUD.getUserID(conversationID)
   
   if (!userId || !name || !category) {
     throw new Error('userId, name, and category are required');
@@ -279,7 +288,7 @@ async function handleAddHealthCondition(parameters: any) {
     name,
     upperCategory as HealthCategory
   );
-  
+
   const userHealthCondition = await healthConditionsCRUD.addUserHealthCondition({
     userId,
     healthConditionId: healthCondition.id,
@@ -324,9 +333,10 @@ async function handleGetUserHealthConditions(parameters: any) {
   };
 }
 
-async function handleAddMedication(parameters: any) {
-  const { userId, name, category, dosage, frequency, prescriber, notes } = parameters;
-  
+async function handleAddMedication(parameters: any, conversationID: string) {
+  const { name, category, dosage, frequency, prescriber, notes } = parameters;
+    const userId = await basicInfoCRUD.getUserID(conversationID)
+
   if (!userId || !name || !category || !dosage || !frequency) {
     throw new Error('userId, name, category, dosage, and frequency are required');
   }
@@ -335,6 +345,12 @@ async function handleAddMedication(parameters: any) {
   const upperCategory = category.toString().toUpperCase();
   if (!validCategories.includes(upperCategory)) {
     throw new Error(`Invalid medication category. Must be one of: ${validCategories.join(', ')}`);
+  }
+  
+  const validFrequencies = ['ONCE_DAILY', 'TWICE_DAILY', 'THREE_TIMES_DAILY', 'FOUR_TIMES_DAILY', 'EVERY_OTHER_DAY', 'WEEKLY', 'MONTHLY', 'AS_NEEDED', 'EVERY_4_HOURS', 'EVERY_6_HOURS', 'EVERY_8_HOURS', 'EVERY_12_HOURS', 'BEDTIME', 'WITH_MEALS', 'BEFORE_MEALS', 'AFTER_MEALS'];
+  const upperFrequency = frequency.toString().toUpperCase();
+  if (!validFrequencies.includes(upperFrequency)) {
+    throw new Error(`Invalid medication frequency. Must be one of: ${validFrequencies.join(', ')}`);
   }
   
   const medication = await medicationCRUD.findOrCreateMedication(
@@ -346,7 +362,7 @@ async function handleAddMedication(parameters: any) {
     userId,
     medicationId: medication.id,
     dosage,
-    frequency,
+    frequency: upperFrequency as MedicationFrequency,
     prescriber,
     notes
   });
@@ -356,7 +372,7 @@ async function handleAddMedication(parameters: any) {
     message: `Successfully added medication: ${name}`,
     data: {
       userMedicationId: userMedication.id,
-      medication: userMedication.medication,
+      medication: (userMedication as any).medication,
       dosage: userMedication.dosage,
       frequency: userMedication.frequency,
       prescriber: userMedication.prescriber,

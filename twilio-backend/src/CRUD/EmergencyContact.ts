@@ -15,7 +15,6 @@ export class EmergencyContactCRUD {
         isPrimary: data.isPrimary || false,
         address: data.address,
         notes: data.notes,
-        isActive: true
       }
     });
   }
@@ -24,7 +23,6 @@ export class EmergencyContactCRUD {
     return await prismaClient.emergencyContact.findMany({
       where: {
         userId: userId,
-        isActive: true
       },
       orderBy: {
         isPrimary: 'desc'
@@ -39,10 +37,10 @@ export class EmergencyContactCRUD {
     });
   }
 
-  async deleteEmergencyContact(contactId: string) {
-    return await prismaClient.emergencyContact.update({
-      where: { id: contactId },
-      data: { isActive: false }
-    });
-  }
+  // async deleteEmergencyContact(contactId: string) {
+  //   return await prismaClient.emergencyContact.update({
+  //     where: { id: contactId },
+  //     data: { isActive: false }
+  //   });
+  // }
 }
