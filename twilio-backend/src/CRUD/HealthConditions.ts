@@ -4,7 +4,6 @@ import { HealthConditionData, UserHealthConditionData } from '../types/Types';
 const prismaClient = new PrismaClient();
 
 export class HealthConditionsCRUD {
-  // Health Condition management
   async createHealthCondition(data: HealthConditionData) {
     return await prismaClient.healthCondition.create({
       data: {

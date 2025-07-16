@@ -1,4 +1,4 @@
-import { MedicationCategory, PrismaClient } from '../../../generated/prisma';
+import { MedicationCategory, MedicationFrequency, PrismaClient } from '../../../generated/prisma';
 import { MedicationData, UserMedicationData } from '../types/Types';
 
 const prismaClient = new PrismaClient();
@@ -80,9 +80,18 @@ export class MedicationCRUD {
   }
 
   async updateUserMedication(userMedicationId: string, data: Partial<UserMedicationData>) {
+    const updateData: any = {};
+    if (data.dosage !== undefined) updateData.dosage = data.dosage;
+    if (data.frequency !== undefined) updateData.frequency = data.frequency;
+    if (data.startedAt !== undefined) updateData.startedAt = data.startedAt;
+    if (data.endedAt !== undefined) updateData.endedAt = data.endedAt;
+    if (data.prescriber !== undefined) updateData.prescriber = data.prescriber;
+    if (data.notes !== undefined) updateData.notes = data.notes;
+    if (data.isActive !== undefined) updateData.isActive = data.isActive;
+
     return await prismaClient.userMedication.update({
       where: { id: userMedicationId },
-      data: data,
+      data: updateData,
       include: {
         medication: true
       }
