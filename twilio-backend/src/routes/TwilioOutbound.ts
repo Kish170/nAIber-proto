@@ -1,5 +1,4 @@
 import express from 'express';
-import WebSocket from "ws";
 import dotenv from "dotenv";
 import Twilio from "twilio";
 import path from 'path'
@@ -16,51 +15,62 @@ if (!accountSid || !authToken) {
     throw new Error('Twilio configuration error: Missing required environment variables');
 }
 
-async function getSignedUrl() {
+router.post("/call/onboarding", async (req, res) => {
   try {
-    const response = await fetch(
-      `https://api.elevenlabs.io/v1/convai/conversation/get_signed_url?agent_id=${process.env.ELEVENLABS_AGENT_ID}`,
-      {
-        method: "GET",
-        headers: {
-          "xi-api-key": `${process.env.ELEVENLABS_API_KEY}`,
-        },
-      }
+    const { to } = req.body;
+    const targetNumber = to || "+16476191727";
+    
+    const result = await makeCall(
+      targetNumber, 
+      process.env.ELEVENLABS_ONBOARDING_AGENT_ID!
     );
-
-    if (!response.ok) {
-      throw new Error(`Failed to get signed URL: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    return data.signed_url;
+    
+    res.json(result);
   } catch (error) {
-    console.error("Error getting signed URL:", error);
-    throw error;
+    console.error("Error initiating onboarding call:", error);
+    res.json({ success: false, error: "Failed to initiate onboarding call" });
   }
-}
+});
 
-router.post("/call",async (req, res) => {
+// Route 2: PoL check calls
+router.post("/call/pol-check", async (req, res) => {
+  try {
+    const { to } = req.body;
+    const targetNumber = to || "+16476191727";
+    
+    const result = await makeCall(
+      targetNumber, 
+      process.env.ELEVENLABS_POL_AGENT_ID!
+    );
+    
+    res.json(result);
+  } catch (error) {
+    console.error("Error initiating PoL call:", error);
+    res.json({ success: false, error: "Failed to initiate PoL call" });
+  }
+});
 
+async function makeCall(to: string, agentID: string) {
   try {
     const call = await twilioClient.calls.create({
       from: `${process.env.TWILIO_NUMBER}`,
       to: "+16476191727",
-      url: `${process.env.TWILIO_URL}`
+      url: `${process.env.TWILIO_URL}?agent_id=${agentID}`
     });
 
-    res.send({
+    return {
       success: true,
       message: "Call initiated",
       callSid: call.sid,
-    });
+    }
   } catch (error) {
     console.error("Error initiating outbound call:", error);
-    res.send({
+    return {
       success: false,
       error: "Failed to initiate call",
-    });
+    }
   }
-});
+}
 
-export default router;
+export default router
+
