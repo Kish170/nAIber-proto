@@ -1,9 +1,9 @@
 import express from 'express';
-import { BasicInfoCRUD } from '../CRUD/BasicInfo';
-import { EmergencyContactCRUD } from '../CRUD/EmergencyContact';
-import { HealthConditionsCRUD } from '../CRUD/HealthConditions';
-import { MedicationCRUD } from '../CRUD/Medication';
-import { Gender, CheckInFrequency, Relationship, HealthCategory, Severity, MedicationCategory, MedicationFrequency, PrismaClient } from '../../../generated/prisma';
+import { BasicInfoCRUD } from '../../CRUD/BasicInfo';
+import { EmergencyContactCRUD } from '../../CRUD/EmergencyContact';
+import { HealthConditionsCRUD } from '../../CRUD/HealthConditions';
+import { MedicationCRUD } from '../../CRUD/Medication';
+import { Gender, CheckInFrequency, Relationship, HealthCategory, Severity, MedicationCategory, MedicationFrequency, PrismaClient } from '../../../../generated/prisma';
 
 const router = express.Router();
 const basicInfoCRUD = new BasicInfoCRUD();
@@ -174,7 +174,7 @@ async function handleSaveUserData(parameters: any, conversationID: string) {
 
 async function handleCreateEmergencyContact(parameters: any, conversationID: string) {
   const { name, phoneNumber, relationship, email, isPrimary, address, notes } = parameters;
-  const userId = await basicInfoCRUD.getUserID(conversationID)
+  const userId = await basicInfoCRUD.getUserID({conversationId: conversationID})
   
   if (!name || !phoneNumber || !relationship || !userId) {
     throw new Error('name, phoneNumber, relationship, and userId are required');
@@ -262,7 +262,7 @@ async function handleCheckMissingInfo(parameters: any) {
 
 async function handleAddHealthCondition(parameters: any, conversationID: string) {
   const { name, category, severity, notes } = parameters;
-  const userId = await basicInfoCRUD.getUserID(conversationID)
+  const userId = await basicInfoCRUD.getUserID({conversationId: conversationID})
   
   if (!userId || !name || !category) {
     throw new Error('userId, name, and category are required');
@@ -335,7 +335,7 @@ async function handleGetUserHealthConditions(parameters: any) {
 
 async function handleAddMedication(parameters: any, conversationID: string) {
   const { name, category, dosage, frequency, prescriber, notes } = parameters;
-    const userId = await basicInfoCRUD.getUserID(conversationID)
+    const userId = await basicInfoCRUD.getUserID({conversationId: conversationID})
 
   if (!userId || !name || !category || !dosage || !frequency) {
     throw new Error('userId, name, category, dosage, and frequency are required');

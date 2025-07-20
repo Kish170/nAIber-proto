@@ -24,11 +24,22 @@ export class BasicInfoCRUD {
         })
     }
 
-    async getUserID(conversationId: string) {
-        const user = await prismaClient.user.findUniqueOrThrow({
-            where: { conversationID: conversationId },
-            select: { id: true }
-        })
-        return user.id
+    async getUserID(identifier: { conversationId: string } | { phoneNumber: string }) {
+        if ('conversationId' in identifier) {
+            const user = await prismaClient.user.findUniqueOrThrow({
+                where: { conversationID: identifier.conversationId },
+                select: { id: true }
+            })
+            return user.id
+        } 
+
+        if ('phoneNumber' in identifier) {
+            const user = await prismaClient.user.findUniqueOrThrow({
+                where: { phoneNumber: identifier.phoneNumber },
+                select: { id: true }
+            })
+            return user.id
+        } 
+        
     }
 }

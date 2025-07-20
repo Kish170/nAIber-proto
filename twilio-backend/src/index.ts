@@ -1,6 +1,6 @@
 import express from 'express';
 import dotenv from 'dotenv';
-import ElevenLabsWebhook from './routes/ElevenLabsWebhook'
+import ElevenLabsWebhook from './routes/elevenlabs-webhooks/OnboardingWebhook'
 import TwilioOutbound from './routes/TwilioOutbound'
 import TwimlRouter from './routes/TwimlRouter'
 import { WebSocketServer } from 'ws';
