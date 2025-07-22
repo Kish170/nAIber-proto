@@ -60,10 +60,26 @@ router.post('/check-in', validateRequest, async (req, res) => {
         let result;
 
         switch (function_name) {
-            case 'escalate_to_human':
+            case 'detect_emergency_situation':
                 result = await escalateToHuman(parameters);
                 break;
 
+            case 'get_user_profile':
+                result = await getUserProfile(parameters);
+                break;
+                
+            case 'check_health_status':
+                result = await checkHealthStatus(parameters);
+                break;
+                
+            case 'verify_medication_compliance':
+                result = await verifyMedicationCompliance(parameters);
+                break;
+                
+            case 'complete_pol_check':
+                result = await completePolCheck(parameters);
+                break;
+                
             default:
                 return res.status(400).json({
                     success: false,
@@ -86,9 +102,15 @@ router.post('/check-in', validateRequest, async (req, res) => {
 });
 
 async function escalateToHuman(parameters: any) {
-    const { escalate } = parameters;
+    console.log('[Escalation] escalateToHuman called with parameters:', parameters);
+    const { escalate, urgencyLevel, description, reason } = parameters;
 
-    if (String(escalate).toLowerCase() === 'true') {
+    // Handle both manual escalation and emergency detection
+    const shouldEscalate = String(escalate).toLowerCase() === 'true' || 
+                          urgencyLevel === 'high' || 
+                          urgencyLevel === 'critical';
+
+    if (shouldEscalate) {
         try {
             const ecNumber = await getEmergencyContact()
             console.log('[DEBUG] Emergency contact result:', ecNumber, typeof ecNumber);
@@ -140,7 +162,36 @@ async function escalateToHuman(parameters: any) {
     }
 }
 
-export async function getEmergencyContact() {
+async function getUserProfile(parameters: any) {
+    try {
+        console.log("[Checkup] Getting user info")
+        const userID = await basicInfoCRUD.getUserID({ phoneNumber: `${process.env.PHONE_NUMBER}` })
+        console.log('[Checkup] Found user ID:', userID);
+        
+        if (userID) {
+            const userInfo = await basicInfoCRUD.getAllUserInfo(userID)
+            return {
+                success: true,
+                message: 'User information retrieved successfully',
+                data: userInfo
+            }
+        }
+        
+        return {
+            success: false,
+            message: 'User not found'
+        }
+    } catch(error) {
+        console.error('[Checkup] Error getting user info:', error);
+        return {
+            success: false,
+            message: 'Error retrieving user information',
+            error: error
+        }
+    }
+}
+
+async function getEmergencyContact() {
     try {
         console.log('[Transfer Setup] Setting up escalation to human');
         const userID = await basicInfoCRUD.getUserID({ phoneNumber: `${process.env.PHONE_NUMBER}` })
@@ -170,6 +221,87 @@ export async function getEmergencyContact() {
     } catch (error) {
         console.error('[Transfer Setup] Error setting up transfer:', error);
         return;
+    }
+}
+
+async function checkHealthStatus(parameters: any) {
+    try {
+        console.log("[Health Status] Recording health status:", parameters);
+        const { status, symptoms, severity } = parameters;
+        
+        // Here you could save health status to database
+        // For now, just return acknowledgment
+        
+        return {
+            success: true,
+            message: 'Health status recorded successfully',
+            data: {
+                status,
+                symptoms,
+                severity,
+                recordedAt: new Date().toISOString()
+            }
+        };
+    } catch (error) {
+        console.error('[Health Status] Error recording health status:', error);
+        return {
+            success: false,
+            message: 'Error recording health status',
+            error: error
+        };
+    }
+}
+
+async function verifyMedicationCompliance(parameters: any) {
+    try {
+        console.log("[Medication] Verifying medication compliance:", parameters);
+        const { medicationName, taken, timeOfDay } = parameters;
+        
+        // Here you could log medication compliance to database
+        
+        return {
+            success: true,
+            message: 'Medication compliance logged successfully',
+            data: {
+                medicationName,
+                taken,
+                timeOfDay,
+                loggedAt: new Date().toISOString()
+            }
+        };
+    } catch (error) {
+        console.error('[Medication] Error logging medication compliance:', error);
+        return {
+            success: false,
+            message: 'Error logging medication compliance',
+            error: error
+        };
+    }
+}
+
+async function completePolCheck(parameters: any) {
+    try {
+        console.log("[POL Check] Completing proof of life check:", parameters);
+        const { checkStatus, notes } = parameters;
+        
+        // Here you could update check completion status in database
+        
+        return {
+            success: true,
+            message: 'Proof of life check completed successfully',
+            data: {
+                checkStatus,
+                notes,
+                completedAt: new Date().toISOString()
+            }
+        };
+    } catch (error) {
+        console.error('[POL Check] Error completing check:', error);
+        return {
+            success: false,
+            message: 'Error completing proof of life check',
+            error: error
+        };
     }
 }
 

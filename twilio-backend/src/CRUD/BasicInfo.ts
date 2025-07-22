@@ -42,4 +42,23 @@ export class BasicInfoCRUD {
         } 
         
     }
+
+    async getAllUserInfo(userId: string) {
+        return await prismaClient.user.findFirst({
+            where: { id: userId }, 
+            include: {
+              emergencyContacts: true,
+              healthConditions: {
+                  include: {
+                      healthCondition: true
+                  }
+              },
+              medications: {
+                  include: {
+                      medication: true
+                  }
+              }
+          }
+        })
+    }
 }
