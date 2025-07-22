@@ -32,7 +32,6 @@ router.post("/call/onboarding", async (req, res) => {
   }
 });
 
-// Route 2: PoL check calls
 router.post("/call/pol-check", async (req, res) => {
   try {
     const { to } = req.body;

@@ -1,11 +1,18 @@
 import { WebSocketServer, WebSocket } from 'ws';
-import { EmergencyContactCRUD } from './../CRUD/EmergencyContact';
-import { BasicInfoCRUD } from './../CRUD/BasicInfo';
-import { ElevenLabsClient } from '@elevenlabs/elevenlabs-js';
+import Twilio from 'twilio';
 
-const elevenLabs = new ElevenLabsClient({ apiKey: process.env.ELEVENLABS_API_KEY! });
-const emergencyContactCRUD = new EmergencyContactCRUD();
-const basicInfoCRUD = new BasicInfoCRUD();
+const twilioClient = Twilio(process.env.TWILIO_ACCOUNT_SID!, process.env.TWILIO_AUTH_TOKEN!);
+
+// Connection manager to track active connections
+interface ActiveConnection {
+  streamSid: string;
+  twilioWs: WebSocket;
+  elevenLabsWs: WebSocket | null;
+  callSid?: string;
+  conversationId?: string;
+}
+
+const activeConnections = new Map<string, ActiveConnection>();
 
 export function setupOutboundMediaStream(wss: WebSocketServer) {
   wss.on('connection', (ws: WebSocket, req) => {
@@ -28,6 +35,12 @@ export function setupOutboundMediaStream(wss: WebSocketServer) {
 
         elevenLabsWs.on('open', () => {
           console.log('[ElevenLabs] Connected');
+          
+          if (streamSid && activeConnections.has(streamSid)) {
+            const connection = activeConnections.get(streamSid)!;
+            connection.elevenLabsWs = elevenLabsWs;
+            activeConnections.set(streamSid, connection);
+          }
 
           // 🟢 This is the key part to make the agent speak
           const initMessage = {
@@ -72,9 +85,16 @@ export function setupOutboundMediaStream(wss: WebSocketServer) {
           case 'start':
             streamSid = data.start.streamSid;
             const agentId = data.start.customParameters?.agent_id
+            
+            activeConnections.set(streamSid!, {
+              streamSid: streamSid!,
+              twilioWs: ws,
+              elevenLabsWs: null,
+              callSid: data.start.callSid
+            });
+            
             if (agentId) {
               connectToElevenLabs(agentId);
-              setUpCallTransfer(agentId);
             } else {
               console.error('[Twilio WS] No agent_id found in customParameters');
             }
@@ -98,66 +118,80 @@ export function setupOutboundMediaStream(wss: WebSocketServer) {
     });
 
     ws.on('close', () => {
+      console.log('[Twilio] Media stream disconnected');
+      if (streamSid && activeConnections.has(streamSid)) {
+        const connection = activeConnections.get(streamSid)!;
+        if (connection.elevenLabsWs) {
+          connection.elevenLabsWs.close();
+        }
+        activeConnections.delete(streamSid);
+      }
       elevenLabsWs?.close();
     });
   });
 }
 
-async function setUpCallTransfer(agentId: string) {
-  try {
-    console.log('[Transfer Setup] Setting up transfer for agent:', agentId);
-    const userID = await basicInfoCRUD.getUserID({ phoneNumber: `${process.env.PHONE_NUMBER}` })
-    console.log('[Transfer Setup] Found user ID:', userID);
+// export async function endCall(streamSid: string) {
+//   try {
+//     const connection = activeConnections.get(streamSid);
+//     if (!connection) {
+//       console.error(`[End Call] Connection not found for streamSid: ${streamSid}`);
+//       return { success: false, error: 'Connection not found' };
+//     }
 
-    if (userID) {
-      const emergencyContacts = await emergencyContactCRUD.getEmergencyContactsByUserId(userID)
-      console.log('[Transfer Setup] Emergency contacts:', emergencyContacts);
+//     if (connection.callSid) {
+//       await twilioClient.calls(connection.callSid).update({ status: 'completed' });
+//       console.log(`[End Call] Twilio call ${connection.callSid} ended`);
+//     }
 
-      if (emergencyContacts.length === 0) {
-        console.error('[Transfer Setup] No emergency contacts found');
-        return;
-      }
+//     if (connection.elevenLabsWs && connection.elevenLabsWs.readyState === WebSocket.OPEN) {
+//       connection.elevenLabsWs.close();
+//       console.log('[End Call] ElevenLabs WebSocket closed');
+//     }
 
-      const ecNumber = emergencyContacts[0].phoneNumber
-      console.log('[Transfer Setup] Using emergency contact:', ecNumber);
-      console.log('[Transfer Setup] Phone number type:', typeof ecNumber);
-      
-      if (!ecNumber) {
-        console.error('[Transfer Setup] Emergency contact phone number is null/undefined');
-        return;
-      }
-      
-      const transferRules = [
-        {
-          phone_number: ecNumber,
-          condition: 'When the user explicitly states they are in danger, having a medical emergency, or specifically requests to speak with a human operator.',
-          transfer_type: 'sip_refer'
-        }
-      ];
-      await elevenLabs.conversationalAi.agents.update(`${agentId}`, {
-        conversationConfig: {
-          agent: {
-            prompt: {
-              tools: [
-                {
-                  type: 'system',
-                  name: 'transfer_to_number',
-                  description: 'Transfer the user to a human operator based on their request.',
-                  params: {
-                    system_tool_type: 'transfer_to_number',
-                    transfers: transferRules,
-                  },
-                },
-              ],
-            },
-          },
-        },
-      });
-      console.log('[Transfer Setup] Agent updated successfully with transfer rules');
-    } else {
-      console.error('[Transfer Setup] No user found for phone number:', process.env.PHONE_NUMBER);
+//     if (connection.twilioWs && connection.twilioWs.readyState === WebSocket.OPEN) {
+//       connection.twilioWs.close();
+//       console.log('[End Call] Twilio WebSocket closed');
+//     }
+
+//     activeConnections.delete(streamSid);
+
+//     return { success: true, message: 'Call ended successfully' };
+//   } catch (error) {
+//     console.error('[End Call] Error ending call:', error);
+//     return { success: false, error: 'Failed to end call' };
+//   }
+// }
+
+// export async function endAllCalls() {
+//   try {
+//     const promises = Array.from(activeConnections.keys()).map(streamSid => endCall(streamSid));
+//     const results = await Promise.all(promises);
+    
+//     console.log(`[End All Calls] Ended ${results.length} calls`);
+//     return { success: true, message: `Ended ${results.length} calls` };
+//   } catch (error) {
+//     console.error('[End All Calls] Error ending calls:', error);
+//     return { success: false, error: 'Failed to end calls' };
+//   }
+// }
+
+export function getActiveConnections() {
+  return Array.from(activeConnections.entries()).map(([streamSid, connection]) => ({
+    streamSid,
+    callSid: connection.callSid,
+    hasElevenLabsWs: !!connection.elevenLabsWs,
+    twilioWsState: connection.twilioWs.readyState,
+    elevenLabsWsState: connection.elevenLabsWs?.readyState
+  }));
+}
+
+// Function to close ElevenLabs WebSocket connections (stops AI)
+export function closeElevenLabsConnections() {
+  for (const [streamSid, connection] of activeConnections) {
+    if (connection.elevenLabsWs && connection.elevenLabsWs.readyState === WebSocket.OPEN) {
+      connection.elevenLabsWs.close();
+      console.log(`[Cleanup] Closed ElevenLabs WS for ${streamSid}`);
     }
-  } catch (error) {
-    console.error('[Transfer Setup] Error setting up transfer:', error);
   }
 }
