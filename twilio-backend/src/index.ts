@@ -1,8 +1,10 @@
 import express from 'express';
 import dotenv from 'dotenv';
-import ElevenLabsWebhook from './routes/elevenlabs-webhooks/OnboardingWebhook'
+import OnboardingWebhook from './routes/elevenlabs-webhooks/OnboardingWebhook'
 import TwilioOutbound from './routes/TwilioOutbound'
 import TwimlRouter from './routes/TwimlRouter'
+import EscalationWebhook from './routes/elevenlabs-webhooks/EscalationWebhook'
+import CheckUpWebhook from  './routes/elevenlabs-webhooks/CheckUpWebhook'
 import { WebSocketServer } from 'ws';
 import path from 'path';
 import http from 'http';
@@ -18,9 +20,11 @@ app.get('/', (req, res) => {
 });
 
 // API routes
-app.use('/api', ElevenLabsWebhook);
+app.use('/api', EscalationWebhook);
 app.use('/api', TwilioOutbound);
 app.use('/twiml', TwimlRouter)
+app.use('/api', OnboardingWebhook)
+app.use('/api', CheckUpWebhook)
 
 const PORT = process.env.PORT || 3000;
 const server = http.createServer(app);
