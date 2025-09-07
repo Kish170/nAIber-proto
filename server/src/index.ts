@@ -7,7 +7,9 @@ import CheckUpWebhook from  './routes/elevenlabs-webhooks/CheckUpWebhook'
 import { WebSocketServer } from 'ws';
 import path from 'path';
 import http from 'http';
-import { setupOutboundMediaStream } from './ws/OutboundMediaStream';
+import { setupOutboundMediaStream } from './utils/OutboundMediaStream';
+import McpServer from '../src/routes/McpServer';
+
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 const app = express();
@@ -18,17 +20,19 @@ app.get('/', (req, res) => {
   res.send('Hello from nAIber backend! ElevenLabs Conversational AI integration ready.');
 });
 
-// API routes
-app.use('/api', TwilioOutbound);
 app.use('/twiml', TwimlRouter)
+app.use('/api', TwilioOutbound);
 app.use('/api', OnboardingWebhook)
 app.use('/api', CheckUpWebhook)
+app.use('/api', McpServer)
 
-const PORT = process.env.PORT || 3000;
 const server = http.createServer(app);
 
 const wss = new WebSocketServer({ server, path: '/outbound-media-stream' });
 setupOutboundMediaStream(wss);
+
+
+const PORT = process.env.PORT || 3000;
 
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

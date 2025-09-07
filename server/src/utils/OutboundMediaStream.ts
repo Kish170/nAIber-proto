@@ -1,21 +1,18 @@
 import { WebSocketServer, WebSocket } from 'ws';
-import Twilio from 'twilio';
 
-const twilioClient = Twilio(process.env.TWILIO_ACCOUNT_SID!, process.env.TWILIO_AUTH_TOKEN!);
-
-// Connection manager to track active connections
 interface ActiveConnection {
   streamSid: string;
   twilioWs: WebSocket;
   elevenLabsWs: WebSocket | null;
   callSid?: string;
   conversationId?: string;
+  keepAliveInterval?: NodeJS.Timeout;
 }
 
 const activeConnections = new Map<string, ActiveConnection>();
 
 export function setupOutboundMediaStream(wss: WebSocketServer) {
-  wss.on('connection', (ws: WebSocket, req) => {
+  wss.on('connection', (ws: WebSocket) => {
     console.log('[Twilio] Media stream connected');
 
     let streamSid: string | null = null;
@@ -23,6 +20,8 @@ export function setupOutboundMediaStream(wss: WebSocketServer) {
 
     const connectToElevenLabs = async (agentId: string) => {
       try {
+        console.log('[ElevenLabs] Connecting with agent ID:', agentId);
+        
         const response = await fetch(
           `https://api.elevenlabs.io/v1/convai/conversation/get_signed_url?agent_id=${agentId}`,
           {
@@ -30,19 +29,36 @@ export function setupOutboundMediaStream(wss: WebSocketServer) {
           }
         );
 
-        const { signed_url } = await response.json();
+        if (!response.ok) {
+          throw new Error(`ElevenLabs API error: ${response.status} ${response.statusText}`);
+        }
+
+        const responseData = await response.json();
+        console.log('[ElevenLabs] Got signed URL response:', { 
+          status: response.status,
+          hasSignedUrl: !!responseData.signed_url 
+        });
+        
+        const { signed_url } = responseData;
         elevenLabsWs = new WebSocket(signed_url);
 
         elevenLabsWs.on('open', () => {
-          console.log('[ElevenLabs] Connected');
+          console.log('[ElevenLabs] Connected successfully');
           
           if (streamSid && activeConnections.has(streamSid)) {
             const connection = activeConnections.get(streamSid)!;
             connection.elevenLabsWs = elevenLabsWs;
+            
+            connection.keepAliveInterval = setInterval(() => {
+              if (elevenLabsWs && elevenLabsWs.readyState === WebSocket.OPEN) {
+                elevenLabsWs.ping();
+                console.log('[ElevenLabs] Sent keepalive ping');
+              }
+            }, 30000);
+            
             activeConnections.set(streamSid, connection);
           }
 
-          // 🟢 This is the key part to make the agent speak
           const initMessage = {
             type: 'conversation_initiation_client_data',
             conversation_config_override: {
@@ -53,6 +69,7 @@ export function setupOutboundMediaStream(wss: WebSocketServer) {
           };
 
           elevenLabsWs!.send(JSON.stringify(initMessage));
+          console.log('[ElevenLabs] Sent initialization message');
         });
 
         elevenLabsWs.on('message', data => {
@@ -70,8 +87,22 @@ export function setupOutboundMediaStream(wss: WebSocketServer) {
           }
         });
 
-        elevenLabsWs.on('error', console.error);
-        elevenLabsWs.on('close', () => console.log('[ElevenLabs] Closed'));
+        elevenLabsWs.on('error', (error) => {
+          console.error('[ElevenLabs] WebSocket error:', error);
+        });
+        
+        elevenLabsWs.on('close', (code, reason) => {
+          console.log('[ElevenLabs] Closed with code:', code, 'reason:', reason.toString());
+          
+          if (streamSid && activeConnections.has(streamSid)) {
+            const connection = activeConnections.get(streamSid)!;
+            if (connection.keepAliveInterval) {
+              clearInterval(connection.keepAliveInterval);
+              console.log('[ElevenLabs] Cleared keepalive interval');
+            }
+          }
+          
+        });
       } catch (err) {
         console.error('[ElevenLabs] Failed to connect:', err);
       }
@@ -121,60 +152,22 @@ export function setupOutboundMediaStream(wss: WebSocketServer) {
       console.log('[Twilio] Media stream disconnected');
       if (streamSid && activeConnections.has(streamSid)) {
         const connection = activeConnections.get(streamSid)!;
+        
+        if (connection.keepAliveInterval) {
+          clearInterval(connection.keepAliveInterval);
+          console.log('[Twilio] Cleared keepalive interval on disconnect');
+        }
+        
         if (connection.elevenLabsWs) {
           connection.elevenLabsWs.close();
         }
+        
         activeConnections.delete(streamSid);
       }
       elevenLabsWs?.close();
     });
   });
 }
-
-// export async function endCall(streamSid: string) {
-//   try {
-//     const connection = activeConnections.get(streamSid);
-//     if (!connection) {
-//       console.error(`[End Call] Connection not found for streamSid: ${streamSid}`);
-//       return { success: false, error: 'Connection not found' };
-//     }
-
-//     if (connection.callSid) {
-//       await twilioClient.calls(connection.callSid).update({ status: 'completed' });
-//       console.log(`[End Call] Twilio call ${connection.callSid} ended`);
-//     }
-
-//     if (connection.elevenLabsWs && connection.elevenLabsWs.readyState === WebSocket.OPEN) {
-//       connection.elevenLabsWs.close();
-//       console.log('[End Call] ElevenLabs WebSocket closed');
-//     }
-
-//     if (connection.twilioWs && connection.twilioWs.readyState === WebSocket.OPEN) {
-//       connection.twilioWs.close();
-//       console.log('[End Call] Twilio WebSocket closed');
-//     }
-
-//     activeConnections.delete(streamSid);
-
-//     return { success: true, message: 'Call ended successfully' };
-//   } catch (error) {
-//     console.error('[End Call] Error ending call:', error);
-//     return { success: false, error: 'Failed to end call' };
-//   }
-// }
-
-// export async function endAllCalls() {
-//   try {
-//     const promises = Array.from(activeConnections.keys()).map(streamSid => endCall(streamSid));
-//     const results = await Promise.all(promises);
-    
-//     console.log(`[End All Calls] Ended ${results.length} calls`);
-//     return { success: true, message: `Ended ${results.length} calls` };
-//   } catch (error) {
-//     console.error('[End All Calls] Error ending calls:', error);
-//     return { success: false, error: 'Failed to end calls' };
-//   }
-// }
 
 export function getActiveConnections() {
   return Array.from(activeConnections.entries()).map(([streamSid, connection]) => ({
@@ -186,7 +179,6 @@ export function getActiveConnections() {
   }));
 }
 
-// Function to close ElevenLabs WebSocket connections (stops AI)
 export function closeElevenLabsConnections() {
   for (const [streamSid, connection] of activeConnections) {
     if (connection.elevenLabsWs && connection.elevenLabsWs.readyState === WebSocket.OPEN) {

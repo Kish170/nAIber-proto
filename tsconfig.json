@@ -2,12 +2,12 @@
   "compilerOptions": {
     "target": "es2020",
     "module": "commonjs",
-    "rootDir": "twilio-backend/src",
-    "outDir": "twilio-backend/dist",
+    "rootDir": "server/src",
+    "outDir": "server/dist",
     "strict": true,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true
   },
-  "include": ["twilio-backend/src"]
+  "include": ["server/src"]
 }

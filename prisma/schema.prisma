@@ -10,8 +10,8 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
 
@@ -87,29 +87,36 @@ enum MedicationFrequency {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  conversationID String @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String   @id @default(cuid())
+  conversationID String   @unique
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   fullName    String
   age         Int?
   phoneNumber String? @unique
   gender      Gender?
 
-  healthConditions UserHealthCondition[]
-  medications UserMedication[]
+  healthConditions  UserHealthCondition[]
+  medications       UserMedication[]
   emergencyContacts EmergencyContact[]
 
-  preferredCheckInTime  String?
-  checkInFrequency  CheckInFrequency?
+  preferredCheckInTime String?
+  checkInFrequency     CheckInFrequency?
+
+  // Personalization fields
+  hobbiesInterests String[]
+  favoriteTopics   String[]
+  likes            String[]
+  dislikes         String[]
+  dailyRoutine     String?
 
   @@map("users")
 }
 
 model HealthCondition {
-  id          String @id @default(cuid())
-  name        String @unique
+  id          String         @id @default(cuid())
+  name        String         @unique
   category    HealthCategory
   description String?
 
@@ -131,7 +138,7 @@ model UserHealthCondition {
   notes       String?
   isActive    Boolean   @default(true)
 
-  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   healthCondition HealthCondition @relation(fields: [healthConditionId], references: [id])
 
   @@unique([userId, healthConditionId])
@@ -139,13 +146,13 @@ model UserHealthCondition {
 }
 
 model Medication {
-  id          String @id @default(cuid())
-  name        String @unique
+  id          String             @id @default(cuid())
+  name        String             @unique
   genericName String?
   category    MedicationCategory
-  
+
   users UserMedication[]
-  
+
   @@map("medications")
 }
 
@@ -153,32 +160,32 @@ model UserMedication {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
   userId       String
   medicationId String
-  
-  dosage       String   
-  frequency    MedicationFrequency
-  startedAt    DateTime?
-  endedAt      DateTime?
-  prescriber   String?  
-  notes        String?
-  isActive     Boolean  @default(true)
-  
-  user         User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  medication   Medication @relation(fields: [medicationId], references: [id])
-  
+
+  dosage     String
+  frequency  MedicationFrequency
+  startedAt  DateTime?
+  endedAt    DateTime?
+  prescriber String?
+  notes      String?
+  isActive   Boolean             @default(true)
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  medication Medication @relation(fields: [medicationId], references: [id])
+
   @@unique([userId, medicationId])
   @@map("user_medications")
 }
 
 model EmergencyContact {
-  id           String       @id @default(cuid())
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
-  
-  userId       String
-  
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId String
+
   name         String
   phoneNumber  String
   email        String?
@@ -186,8 +193,9 @@ model EmergencyContact {
   isPrimary    Boolean      @default(false)
   address      String?
   notes        String?
-  
-  user         User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@map("emergency_contacts")
 }
+ 

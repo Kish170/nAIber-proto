@@ -10,6 +10,7 @@
     "@langchain/core": "^0.3.62",
     "@langchain/langgraph": "^0.3.7",
     "@langchain/openai": "^0.5.18",
+    "@modelcontextprotocol/sdk": "^1.17.5",
     "@prisma/client": "^6.11.1",
     "@types/express-ws": "^3.0.5",
     "dotenv": "^16.6.1",
@@ -20,16 +21,16 @@
     "tsx": "^4.20.3",
     "twilio": "^5.7.3",
     "ws": "^8.18.3",
-    "zod": "^3.25.32"
+    "zod": "^3.25.76"
   },
   "name": "naiber-proto",
   "version": "1.0.0",
   "description": "Prototype of nAIber backend",
-  "main": "twilio-backend/dist/index.js",
+  "main": "server/dist/index.js",
   "scripts": {
-    "dev": "ts-node-dev --respawn --transpile-only twilio-backend/src/index.ts",
+    "dev": "ts-node-dev --respawn --transpile-only server/src/index.ts",
     "build": "tsc",
-    "start": "node twilio-backend/dist/index.js"
+    "start": "node server/dist/index.js"
   },
   "devDependencies": {
     "@types/dotenv": "^6.1.1",
