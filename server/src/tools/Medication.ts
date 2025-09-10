@@ -1,14 +1,13 @@
 import { PrismaClient, MedicationCategory, Prisma } from '../../../generated/prisma';
 
-const prismaClient = new PrismaClient();
-
 export class MedicationTools {
+  private readonly prismaClient = new PrismaClient();
   async createMedication(data: Prisma.MedicationCreateInput) {
     if (!data.name?.trim()) {
       throw new Error('Medication name is required');
     }
 
-    return await prismaClient.medication.create({ data });
+    return await this.prismaClient.medication.create({ data });
   }
 
   async getMedicationByName(name: string) {
@@ -16,7 +15,7 @@ export class MedicationTools {
       throw new Error('Medication name is required');
     }
 
-    return await prismaClient.medication.findFirst({
+    return await this.prismaClient.medication.findFirst({
       where: {
         OR: [
           {
@@ -41,19 +40,19 @@ export class MedicationTools {
       throw new Error('Medication ID is required');
     }
 
-    return await prismaClient.medication.findUnique({
+    return await this.prismaClient.medication.findUnique({
       where: { id }
     });
   }
 
   async getAllMedications() {
-    return await prismaClient.medication.findMany({
+    return await this.prismaClient.medication.findMany({
       orderBy: { name: 'asc' }
     });
   }
 
   async addUserMedication(data: Prisma.UserMedicationCreateInput) {
-    return await prismaClient.userMedication.create({
+    return await this.prismaClient.userMedication.create({
       data,
       include: {
         medication: true,
@@ -69,7 +68,7 @@ export class MedicationTools {
       throw new Error('User ID is required');
     }
 
-    return await prismaClient.userMedication.findMany({
+    return await this.prismaClient.userMedication.findMany({
       where: {
         userId,
         isActive: true
@@ -88,7 +87,7 @@ export class MedicationTools {
       throw new Error('User medication ID is required');
     }
 
-    return await prismaClient.userMedication.findUnique({
+    return await this.prismaClient.userMedication.findUnique({
       where: { id },
       include: {
         medication: true,
@@ -104,7 +103,7 @@ export class MedicationTools {
       throw new Error('User medication ID is required');
     }
 
-    return await prismaClient.userMedication.update({
+    return await this.prismaClient.userMedication.update({
       where: { id: userMedicationId },
       data,
       include: {
@@ -118,7 +117,7 @@ export class MedicationTools {
       throw new Error('User medication ID is required');
     }
 
-    return await prismaClient.userMedication.update({
+    return await this.prismaClient.userMedication.update({
       where: { id: userMedicationId },
       data: { isActive: false }
     });
@@ -129,7 +128,7 @@ export class MedicationTools {
       throw new Error('User medication ID is required');
     }
 
-    return await prismaClient.userMedication.delete({
+    return await this.prismaClient.userMedication.delete({
       where: { id: userMedicationId }
     });
   }

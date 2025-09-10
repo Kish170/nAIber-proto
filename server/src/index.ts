@@ -24,7 +24,7 @@ app.use('/twiml', TwimlRouter)
 app.use('/api', TwilioOutbound);
 app.use('/api', OnboardingWebhook)
 app.use('/api', CheckUpWebhook)
-app.use('/api', McpServer)
+// app.use('/api', McpServer)
 
 const server = http.createServer(app);
 

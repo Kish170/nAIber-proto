@@ -6,6 +6,19 @@ import express from 'express';
 
 const router = express.Router();
 
+// CORS middleware for MCP endpoints
+router.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    
+    if (req.method === 'OPTIONS') {
+        res.sendStatus(200);
+        return;
+    }
+    next();
+});
+
 const userProfileService = new UserProfileService();
 const healthDataService = new HealthDataService();
 const emergencyService = new EmergencyService();
@@ -342,40 +355,106 @@ toolConfigs.forEach(config => {
     });
 });
 
+console.log(`[MCP Server] Initialized with ${tools.size} tools:`);
+Array.from(tools.keys()).forEach(toolName => {
+    console.log(`[MCP Server] - ${toolName}`);
+});
+
+// Health check endpoint
+router.get("/health", (req, res) => {
+    console.log('[MCP Server] Health check requested');
+    res.json({ 
+        status: "healthy", 
+        tools: tools.size,
+        timestamp: new Date().toISOString()
+    });
+});
+
+// ElevenLabs MCP discovery endpoint (GET request)
+router.get("/mcp", async (req, res) => {
+    try {
+        console.log('[MCP Server] ElevenLabs discovery request (GET /mcp)');
+        res.json({
+            protocolVersion: "2024-11-05",
+            capabilities: {
+                tools: {}
+            },
+            serverInfo: {
+                name: "naiber-mcp",
+                version: "1.0.0"
+            },
+            tools: Array.from(tools.values()).map(tool => ({
+                name: tool.name,
+                description: tool.description,
+                inputSchema: tool.inputSchema
+            }))
+        });
+    } catch (error: any) {
+        console.error('[MCP Server] Discovery error:', error);
+        res.status(500).json({ 
+            error: { 
+                code: -32603, 
+                message: error.message 
+            } 
+        });
+    }
+});
+
 // MCP Protocol HTTP endpoint
 router.post("/mcp", async (req, res) => {
     try {
-        const { method, params } = req.body;
+        const { method, params, id } = req.body;
+        const timestamp = new Date().toISOString();
+        
+        console.log(`[MCP Server] ${timestamp} - Method: ${method}`);
+        console.log(`[MCP Server] Request body:`, JSON.stringify(req.body, null, 2));
         
         switch (method) {
             case 'initialize':
+                console.log('[MCP Server] Client initialized connection');
                 res.json({
-                    protocolVersion: "2024-11-05",
-                    capabilities: {
-                        tools: {}
-                    },
-                    serverInfo: {
-                        name: "naiber-mcp",
-                        version: "1.0.0"
+                    jsonrpc: "2.0",
+                    id: id,
+                    result: {
+                        protocolVersion: "2024-11-05",
+                        capabilities: {
+                            tools: {}
+                        },
+                        serverInfo: {
+                            name: "naiber-mcp",
+                            version: "1.0.0"
+                        }
                     }
                 });
                 break;
                 
             case 'tools/list':
+                console.log(`[MCP Server] Client requested tools list (${tools.size} tools available)`);
                 res.json({
-                    tools: Array.from(tools.values()).map(tool => ({
-                        name: tool.name,
-                        description: tool.description,
-                        inputSchema: tool.inputSchema
-                    }))
+                    jsonrpc: "2.0",
+                    id: id,
+                    result: {
+                        tools: Array.from(tools.values()).map(tool => ({
+                            name: tool.name,
+                            description: tool.description,
+                            inputSchema: tool.inputSchema
+                        }))
+                    }
                 });
                 break;
                 
             case 'tools/call':
                 const { name, arguments: args } = params;
                 const tool = tools.get(name);
+                
+                console.log(`[MCP Tool Call] ${timestamp} - Tool: ${name}`);
+                console.log(`[MCP Tool Call] Arguments:`, JSON.stringify(args, null, 2));
+                
                 if (!tool) {
-                    return res.status(404).json({ 
+                    console.error(`[MCP Tool Call] Tool "${name}" not found`);
+                    return res.json({ 
+                        jsonrpc: "2.0",
+                        id: id,
                         error: { 
                             code: -32601, 
                             message: `Tool ${name} not found` 
@@ -383,17 +462,30 @@ router.post("/mcp", async (req, res) => {
                     });
                 }
                 
+                const startTime = Date.now();
                 const result = await tool.handler(args);
+                const executionTime = Date.now() - startTime;
+                
+                console.log(`[MCP Tool Call] ${name} completed in ${executionTime}ms`);
+                console.log(`[MCP Tool Call] Result:`, JSON.stringify(result, null, 2));
+                
                 res.json({
-                    content: [{ 
-                        type: "text", 
-                        text: JSON.stringify(result) 
-                    }]
+                    jsonrpc: "2.0",
+                    id: id,
+                    result: {
+                        content: [{ 
+                            type: "text", 
+                            text: JSON.stringify(result) 
+                        }]
+                    }
                 });
                 break;
                 
             default:
-                res.status(400).json({ 
+                console.warn(`[MCP Server] Unknown method requested: ${method}`);
+                res.json({ 
+                    jsonrpc: "2.0",
+                    id: id,
                     error: { 
                         code: -32601, 
                         message: `Unknown method: ${method}` 
@@ -402,7 +494,9 @@ router.post("/mcp", async (req, res) => {
         }
     } catch (error: any) {
         console.error('[MCP Server] Error:', error);
-        res.status(500).json({ 
+        res.json({ 
+            jsonrpc: "2.0",
+            id: req.body.id,
             error: { 
                 code: -32603, 
                 message: error.message 

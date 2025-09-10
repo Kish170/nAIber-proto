@@ -1,17 +1,23 @@
 import { WebSocketServer, WebSocket } from 'ws';
+import { ConversationMemoryService } from '../services/ConversationContextService';
+import { LangChainTools } from '../tools/LangChainTools';
+import { BasicInfoTools } from '../tools/BasicInfo'
 
 interface ActiveConnection {
   streamSid: string;
   twilioWs: WebSocket;
   elevenLabsWs: WebSocket | null;
   callSid?: string;
-  conversationId?: string;
+  conversationId?: String;
   keepAliveInterval?: NodeJS.Timeout;
 }
 
-const activeConnections = new Map<string, ActiveConnection>();
+const activeConnections = new Map<string, ActiveConnection>()
+const langTools = new LangChainTools
+const memoryService = new ConversationMemoryService
+const basicInfo = new BasicInfoTools
 
-export function setupOutboundMediaStream(wss: WebSocketServer) {
+export async function setupOutboundMediaStream(wss: WebSocketServer) {
   wss.on('connection', (ws: WebSocket) => {
     console.log('[Twilio] Media stream connected');
 
@@ -91,17 +97,24 @@ export function setupOutboundMediaStream(wss: WebSocketServer) {
           console.error('[ElevenLabs] WebSocket error:', error);
         });
         
-        elevenLabsWs.on('close', (code, reason) => {
+        elevenLabsWs.on('close', async (code, reason) => {
           console.log('[ElevenLabs] Closed with code:', code, 'reason:', reason.toString());
-          
           if (streamSid && activeConnections.has(streamSid)) {
             const connection = activeConnections.get(streamSid)!;
+            const conversationID = connection.conversationId?.toString()
+            if(connection || conversationID) {
+              await memoryService.initializeCollection()
+              const transcript = await memoryService.getTranscript(conversationID!!)
+              const conversationSummary = await langTools.extractConversation(transcript)
+              const userId = await basicInfo.getUserID({ conversationId: conversationID!! })
+              await memoryService.saveConversationHighlights(userId, conversationID!!, conversationSummary)
+            }
+
             if (connection.keepAliveInterval) {
               clearInterval(connection.keepAliveInterval);
               console.log('[ElevenLabs] Cleared keepalive interval');
             }
           }
-          
         });
       } catch (err) {
         console.error('[ElevenLabs] Failed to connect:', err);
@@ -152,7 +165,7 @@ export function setupOutboundMediaStream(wss: WebSocketServer) {
       console.log('[Twilio] Media stream disconnected');
       if (streamSid && activeConnections.has(streamSid)) {
         const connection = activeConnections.get(streamSid)!;
-        
+
         if (connection.keepAliveInterval) {
           clearInterval(connection.keepAliveInterval);
           console.log('[Twilio] Cleared keepalive interval on disconnect');

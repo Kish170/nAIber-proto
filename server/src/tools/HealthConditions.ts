@@ -1,14 +1,13 @@
 import { PrismaClient, HealthCategory, Prisma } from '../../../generated/prisma';
 
-const prismaClient = new PrismaClient();
-
 export class HealthConditionsTools {
+  private readonly prismaClient = new PrismaClient();
   async createHealthCondition(data: Prisma.HealthConditionCreateInput) {
     if (!data.name?.trim()) {
       throw new Error('Health condition name is required');
     }
 
-    return await prismaClient.healthCondition.create({ data });
+    return await this.prismaClient.healthCondition.create({ data });
   }
 
   async getHealthConditionByName(name: string) {
@@ -16,7 +15,7 @@ export class HealthConditionsTools {
       throw new Error('Health condition name is required');
     }
 
-    return await prismaClient.healthCondition.findFirst({
+    return await this.prismaClient.healthCondition.findFirst({
       where: {
         name: {
           equals: name,
@@ -31,19 +30,19 @@ export class HealthConditionsTools {
       throw new Error('Health condition ID is required');
     }
 
-    return await prismaClient.healthCondition.findUnique({
+    return await this.prismaClient.healthCondition.findUnique({
       where: { id }
     });
   }
 
   async getAllHealthConditions() {
-    return await prismaClient.healthCondition.findMany({
+    return await this.prismaClient.healthCondition.findMany({
       orderBy: { name: 'asc' }
     });
   }
 
   async addUserHealthCondition(data: Prisma.UserHealthConditionCreateInput) {
-    return await prismaClient.userHealthCondition.create({
+    return await this.prismaClient.userHealthCondition.create({
       data,
       include: {
         healthCondition: true,
@@ -59,7 +58,7 @@ export class HealthConditionsTools {
       throw new Error('User ID is required');
     }
 
-    return await prismaClient.userHealthCondition.findMany({
+    return await this.prismaClient.userHealthCondition.findMany({
       where: {
         userId,
         isActive: true
@@ -78,7 +77,7 @@ export class HealthConditionsTools {
       throw new Error('User health condition ID is required');
     }
 
-    return await prismaClient.userHealthCondition.findUnique({
+    return await this.prismaClient.userHealthCondition.findUnique({
       where: { id },
       include: {
         healthCondition: true,
@@ -94,7 +93,7 @@ export class HealthConditionsTools {
       throw new Error('User health condition ID is required');
     }
 
-    return await prismaClient.userHealthCondition.update({
+    return await this.prismaClient.userHealthCondition.update({
       where: { id: userHealthConditionId },
       data,
       include: {
@@ -108,7 +107,7 @@ export class HealthConditionsTools {
       throw new Error('User health condition ID is required');
     }
 
-    return await prismaClient.userHealthCondition.update({
+    return await this.prismaClient.userHealthCondition.update({
       where: { id: userHealthConditionId },
       data: { isActive: false }
     });
@@ -119,7 +118,7 @@ export class HealthConditionsTools {
       throw new Error('User health condition ID is required');
     }
 
-    return await prismaClient.userHealthCondition.delete({
+    return await this.prismaClient.userHealthCondition.delete({
       where: { id: userHealthConditionId }
     });
   }

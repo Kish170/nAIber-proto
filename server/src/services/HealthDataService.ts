@@ -190,8 +190,6 @@ export class HealthDataService {
         console.log("[Medication] Verifying medication compliance:", parameters);
         const { medicationName, taken, timeOfDay } = parameters;
         
-        // Here you could log medication compliance to database
-        
         return {
             success: true,
             message: 'Medication compliance logged successfully',

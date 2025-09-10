@@ -1,10 +1,9 @@
 import { PrismaClient, Prisma } from '../../../generated/prisma';
 
-const prismaClient = new PrismaClient();
-
 export class EmergencyContactTools {
+  private readonly prismaClient = new PrismaClient();
   async createEmergencyContact(data: Prisma.EmergencyContactCreateInput) {
-    return await prismaClient.emergencyContact.create({ 
+    return await this.prismaClient.emergencyContact.create({ 
       data,
       include: {
         user: {
@@ -19,7 +18,7 @@ export class EmergencyContactTools {
       throw new Error('User ID is required');
     }
 
-    return await prismaClient.emergencyContact.findMany({
+    return await this.prismaClient.emergencyContact.findMany({
       where: { userId },
       orderBy: [
         { isPrimary: 'desc' },
@@ -33,7 +32,7 @@ export class EmergencyContactTools {
       throw new Error('Contact ID is required');
     }
 
-    return await prismaClient.emergencyContact.findUnique({
+    return await this.prismaClient.emergencyContact.findUnique({
       where: { id: contactId },
       include: {
         user: {
@@ -48,7 +47,7 @@ export class EmergencyContactTools {
       throw new Error('Contact ID is required');
     }
 
-    return await prismaClient.emergencyContact.update({
+    return await this.prismaClient.emergencyContact.update({
       where: { id: contactId },
       data
     });
@@ -59,7 +58,7 @@ export class EmergencyContactTools {
       throw new Error('Contact ID is required');
     }
 
-    return await prismaClient.emergencyContact.delete({
+    return await this.prismaClient.emergencyContact.delete({
       where: { id: contactId }
     });
   }
@@ -69,7 +68,7 @@ export class EmergencyContactTools {
       throw new Error('User ID and Contact ID are required');
     }
 
-    return await prismaClient.$transaction(async (tx) => {
+    return await this.prismaClient.$transaction(async (tx) => {
       await tx.emergencyContact.updateMany({
         where: { userId },
         data: { isPrimary: false }

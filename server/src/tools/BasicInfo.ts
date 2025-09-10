@@ -1,11 +1,10 @@
 import { BasicInfo } from '../utils/types/Types';
 import { PrismaClient } from '../../../generated/prisma'
 
-const prismaClient = new PrismaClient()
-
 export class BasicInfoTools {
+    private readonly prismaClient = new PrismaClient();
     async createUser(userData: BasicInfo) {
-        return await prismaClient.user.create({
+        return await this.prismaClient.user.create({
             data: {
                 fullName: userData.fullName,
                 conversationID: userData.conversationID
@@ -14,7 +13,7 @@ export class BasicInfoTools {
     }
     
     async updateUser(field: string, value: any, conversationId: string) {
-        return await prismaClient.user.update({
+        return await this.prismaClient.user.update({
             where: { conversationID: conversationId },
             data: { [field]: value }
         })
@@ -22,7 +21,7 @@ export class BasicInfoTools {
 
     async getUserID(identifier: { conversationId: string } | { phoneNumber: string }): Promise<string> {
         if ('conversationId' in identifier) {
-            const user = await prismaClient.user.findUniqueOrThrow({
+            const user = await this.prismaClient.user.findUniqueOrThrow({
                 where: { conversationID: identifier.conversationId },
                 select: { id: true }
             })
@@ -30,7 +29,7 @@ export class BasicInfoTools {
         } 
 
         if ('phoneNumber' in identifier) {
-            const user = await prismaClient.user.findUniqueOrThrow({
+            const user = await this.prismaClient.user.findUniqueOrThrow({
                 where: { phoneNumber: identifier.phoneNumber },
                 select: { id: true }
             })
@@ -41,7 +40,7 @@ export class BasicInfoTools {
     }
 
     async getAllUserInfo(userId: string) {
-        return await prismaClient.user.findFirst({
+        return await this.prismaClient.user.findFirst({
             where: { id: userId }, 
             include: {
               emergencyContacts: true,
@@ -60,7 +59,7 @@ export class BasicInfoTools {
     }
 
     async getUserPersonalization(userId: string) {
-        return await prismaClient.user.findUnique({
+        return await this.prismaClient.user.findUnique({
             where: { id: userId },
             select: {
                 hobbiesInterests: true,
@@ -73,7 +72,7 @@ export class BasicInfoTools {
     }
 
     async updatePersonalizationField(userId: string, field: string, value: any) {
-        return await prismaClient.user.update({
+        return await this.prismaClient.user.update({
             where: { id: userId },
             data: { [field]: value }
         })
@@ -90,7 +89,7 @@ export class BasicInfoTools {
             throw new Error(`${field.slice(0, -1)} cannot be empty`)
         }
 
-        const user = await prismaClient.user.findUnique({
+        const user = await this.prismaClient.user.findUnique({
             where: { id: userId },
             select: { [field]: true }
         })
@@ -111,7 +110,7 @@ export class BasicInfoTools {
             updatedItems = currentItems.filter((i: string) => i !== item)
         }
         
-        return await prismaClient.user.update({
+        return await this.prismaClient.user.update({
             where: { id: userId },
             data: { [field]: updatedItems }
         })
