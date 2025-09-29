@@ -1,42 +1,98 @@
 import { BasicInfo } from '../utils/types/Types';
-import { PrismaClient } from '../../../generated/prisma'
+import { PrismaClient } from '../../../generated/prisma';
+import { userContextManager } from '../utils/UserContext';
 
 export class BasicInfoTools {
     private readonly prismaClient = new PrismaClient();
     async createUser(userData: BasicInfo) {
-        return await this.prismaClient.user.create({
+        const user = await this.prismaClient.user.create({
             data: {
                 fullName: userData.fullName,
                 conversationID: userData.conversationID
             }
-        })
+        });
+
+        // Update user context when user is created during onboarding
+        console.log('[UserContext] Updating context with new user ID during onboarding');
+
+        // Update context by conversationID with the new user ID
+        const conversationContext = userContextManager.getContextByConversation(userData.conversationID);
+        if (conversationContext && conversationContext.userId === 'PENDING') {
+            conversationContext.updateUserId(user.id);
+            conversationContext.updateFullName(userData.fullName);
+            console.log('[UserContext] ✅ Updated context with new user ID and name');
+        }
+
+        return user;
     }
     
     async updateUser(field: string, value: any, conversationId: string) {
-        return await this.prismaClient.user.update({
+        const result = await this.prismaClient.user.update({
             where: { conversationID: conversationId },
             data: { [field]: value }
-        })
+        });
+
+        // Update user context when phone number is updated
+        if (field === 'phoneNumber') {
+            console.log(`[UserContext] Phone number updated to: ${value}`);
+
+            // Get current context by conversationId
+            const conversationContext = userContextManager.getContextByConversation(conversationId);
+            if (conversationContext) {
+                // Update phone number in the conversation context
+                conversationContext.phoneNumber = value;
+
+                // Create/update context by phone number for easy lookup
+                await userContextManager.setContext(value, {
+                    userId: conversationContext.userId,
+                    conversationID: conversationContext.conversationID,
+                    lastConversationId: conversationContext.lastConversationId,
+                    phoneNumber: value,
+                    fullName: conversationContext.fullName
+                });
+
+                console.log(`[UserContext] ✅ Updated phone number context to: ${value}`);
+            }
+        }
+
+        return result;
     }
 
-    async getUserID(identifier: { conversationId: string } | { phoneNumber: string }): Promise<string> {
+    async getUserID(identifier: { conversationId: string } | { phoneNumber: string }): Promise<string | null> {
+        // Try to get from cache first
         if ('conversationId' in identifier) {
-            const user = await this.prismaClient.user.findUniqueOrThrow({
+            const cachedContext = userContextManager.getContextByConversation(identifier.conversationId);
+            if (cachedContext && cachedContext.userId !== 'PENDING') {
+                console.log('[UserContext] ✅ Found userId in cache by conversationId');
+                return cachedContext.userId;
+            }
+
+            // Fallback to database
+            console.log('[UserContext] Cache miss, querying database for conversationId');
+            const user = await this.prismaClient.user.findUnique({
                 where: { conversationID: identifier.conversationId },
                 select: { id: true }
-            })
-            return user.id
-        } 
+            });
+            return user?.id || null;
+        }
 
         if ('phoneNumber' in identifier) {
-            const user = await this.prismaClient.user.findUniqueOrThrow({
+            const cachedContext = userContextManager.getContextByPhone(identifier.phoneNumber);
+            if (cachedContext && cachedContext.userId !== 'PENDING') {
+                console.log('[UserContext] ✅ Found userId in cache by phoneNumber');
+                return cachedContext.userId;
+            }
+
+            // Fallback to database
+            console.log('[UserContext] Cache miss, querying database for phoneNumber');
+            const user = await this.prismaClient.user.findUnique({
                 where: { phoneNumber: identifier.phoneNumber },
                 select: { id: true }
-            })
-            return user.id
-        } 
-        
-        throw new Error('Invalid identifier provided')
+            });
+            return user?.id || null;
+        }
+
+        throw new Error('Invalid identifier provided');
     }
 
     async getAllUserInfo(userId: string) {
@@ -62,11 +118,18 @@ export class BasicInfoTools {
         return await this.prismaClient.user.findUnique({
             where: { id: userId },
             select: {
-                hobbiesInterests: true,
-                favoriteTopics: true,
-                likes: true,
-                dislikes: true,
-                dailyRoutine: true
+                topics: {
+                    include: {
+                        topic: true
+                    }
+                },
+                preferences: {
+                    include: {
+                        preference: true
+                    }
+                },
+                dailyRoutine: true,
+                lastConversationId: true
             }
         })
     }
@@ -78,67 +141,10 @@ export class BasicInfoTools {
         })
     }
 
-    // Generic helper for array operations
-    private async updateUserArray(
-        userId: string, 
-        field: 'hobbiesInterests' | 'favoriteTopics' | 'likes' | 'dislikes',
-        item: string,
-        operation: 'add' | 'remove'
-    ) {
-        if (!item?.trim()) {
-            throw new Error(`${field.slice(0, -1)} cannot be empty`)
-        }
-
-        const user = await this.prismaClient.user.findUnique({
-            where: { id: userId },
-            select: { [field]: true }
-        })
-        
-        if (!user) {
-            throw new Error('User not found')
-        }
-
-        const currentItems = (user as any)[field] || []
-        let updatedItems: string[]
-
-        if (operation === 'add') {
-            if (currentItems.includes(item)) {
-                return user // Item already exists, return current state
-            }
-            updatedItems = [...currentItems, item]
-        } else {
-            updatedItems = currentItems.filter((i: string) => i !== item)
-        }
-        
+    async updateConversationId(userId: string, newConversationId: string) {
         return await this.prismaClient.user.update({
             where: { id: userId },
-            data: { [field]: updatedItems }
+            data: { conversationID: newConversationId }
         })
-    }
-
-    async addHobbyInterest(userId: string, hobby: string) {
-        return await this.updateUserArray(userId, 'hobbiesInterests', hobby, 'add')
-    }
-
-    async addFavoriteTopic(userId: string, topic: string) {
-        return await this.updateUserArray(userId, 'favoriteTopics', topic, 'add')
-    }
-
-    async addLikeDislike(userId: string, item: string, type: 'like' | 'dislike') {
-        const fieldName = type === 'like' ? 'likes' : 'dislikes'
-        return await this.updateUserArray(userId, fieldName, item, 'add')
-    }
-
-    async removeHobbyInterest(userId: string, hobby: string) {
-        return await this.updateUserArray(userId, 'hobbiesInterests', hobby, 'remove')
-    }
-
-    async removeFavoriteTopic(userId: string, topic: string) {
-        return await this.updateUserArray(userId, 'favoriteTopics', topic, 'remove')
-    }
-
-    async removeLikeDislike(userId: string, item: string, type: 'like' | 'dislike') {
-        const fieldName = type === 'like' ? 'likes' : 'dislikes'
-        return await this.updateUserArray(userId, fieldName, item, 'remove')
     }
 }
