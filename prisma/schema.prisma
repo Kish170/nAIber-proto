@@ -6,160 +6,216 @@ generator client {
 datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
 }
 
 model User {
-  id                   String                @id @default(cuid())
-  conversationID       String                @unique
-  createdAt            DateTime              @default(now())
-  updatedAt            DateTime              @updatedAt
-  fullName             String
-  age                  Int?
-  phoneNumber          String?               @unique
-  gender               Gender?
-  preferredCheckInTime String?
-  checkInFrequency     CheckInFrequency?
-  dailyRoutine         String?
-  lastConversationId   String?
-  emergencyContacts    EmergencyContact[]
-  healthConditions     UserHealthCondition[]
-  medications          UserMedication[]
-  preferences          UserPreference[]
-  topics               UserTopic[]
+  id                  String    @id @default(uuid())
+
+  name                String
+  age                 Int?
+  phone               String    @unique
+  gender              Gender?
+
+  interests           String[]
+  dislikes            String[]
+
+  callFrequency       CheckInFrequency @default(DAILY)
+  preferredCallTime   DateTime         @db.Time
+
+  isFirstCall         Boolean   @default(true)
+
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  lastCallAt          DateTime?
+
+  emergencyContact      EmergencyContact?
+  healthConditions      UserHealthCondition[]
+  medications           UserMedication[]
+  callLogs              CallLog[]
+  conversationSummaries ConversationSummary[]
+  conversationTopics    ConversationTopic[]
+  healthLogs            HealthLog[]
 
   @@map("users")
 }
 
-model HealthCondition {
-  id          String                @id @default(cuid())
-  name        String                @unique
-  category    HealthCategory
-  description String?
-  users       UserHealthCondition[]
-
-  @@map("health_conditions")
-}
-
-model UserHealthCondition {
-  id                String          @id @default(cuid())
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
-  userId            String
-  healthConditionId String
-  severity          Severity?
-  diagnosedAt       DateTime?
-  notes             String?
-  isActive          Boolean         @default(true)
-  healthCondition   HealthCondition @relation(fields: [healthConditionId], references: [id])
-  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, healthConditionId])
-  @@map("user_health_conditions")
-}
-
-model Medication {
-  id          String             @id @default(cuid())
-  name        String             @unique
-  genericName String?
-  category    MedicationCategory
-  users       UserMedication[]
-
-  @@map("medications")
-}
-
-model UserMedication {
-  id           String              @id @default(cuid())
-  createdAt    DateTime            @default(now())
-  updatedAt    DateTime            @updatedAt
-  userId       String
-  medicationId String
-  dosage       String
-  frequency    MedicationFrequency
-  startedAt    DateTime?
-  endedAt      DateTime?
-  prescriber   String?
-  notes        String?
-  isActive     Boolean             @default(true)
-  medication   Medication          @relation(fields: [medicationId], references: [id])
-  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, medicationId])
-  @@map("user_medications")
-}
-
 model EmergencyContact {
-  id           String       @id @default(cuid())
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
-  userId       String
-  name         String
-  phoneNumber  String
-  email        String?
-  relationship Relationship
-  isPrimary    Boolean      @default(false)
-  address      String?
-  notes        String?
-  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                  String       @id @default(uuid())
+  userId              String       @unique
 
+  name                String
+  phone               String
+  email               String?
+  relationship        String
+
+  smsEnabled          Boolean @default(true)
+  notifyOnMissedCalls Boolean @default(true)
+
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  user                User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
   @@map("emergency_contacts")
 }
 
-model Topic {
-  id          String      @id @default(cuid())
-  name        String      @unique
-  category    String?
-  description String?
-  users       UserTopic[]
+model UserHealthCondition {
+  id          String    @id @default(uuid())
+  userId      String
 
-  @@map("topics")
+  condition   String
+  severity    String?
+  diagnosedAt DateTime?
+  notes       String?
+  isActive    Boolean   @default(true)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, condition])
+  @@index([userId, isActive])
+  @@map("user_health_conditions")
 }
 
-model UserTopic {
-  id             String   @id @default(cuid())
-  createdAt      DateTime @default(now())
-  userId         String
-  topicId        String
-  conversationId String?
-  topic          Topic    @relation(fields: [topicId], references: [id])
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+model UserMedication {
+  id         String    @id @default(uuid())
+  userId     String
 
-  @@unique([userId, topicId])
-  @@map("user_topics")
+  name       String
+  dosage     String
+  frequency  String
+
+  startedAt  DateTime?
+  endedAt    DateTime?
+  notes      String?
+  isActive   Boolean   @default(true)
+
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, name])
+  @@index([userId, isActive])
+  @@map("user_medications")
 }
 
-model Preference {
-  id       String           @id @default(cuid())
-  name     String           @unique
-  type     String
-  category String?
-  users    UserPreference[]
+model CallLog {
+  id                       String       @id @default(uuid())
+  userId                   String
 
-  @@map("preferences")
+  scheduledTime            DateTime
+  endTime                  DateTime?
+
+  status                   CallStatus   @default(PENDING)
+  outcome                  CallOutcome?
+
+  noAnswerCount            Int          @default(0)
+  retryCount               Int          @default(0)
+  nextRetryTime            DateTime?
+
+  twilioCallSid            String?
+  elevenlabsConversationId String?
+
+  createdAt                DateTime     @default(now())
+  updatedAt                DateTime     @updatedAt
+
+  user                     User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversationSummary      ConversationSummary?
+  healthMentions           HealthLog[]
+
+  @@index([userId, scheduledTime])
+  @@index([status])
+  @@index([scheduledTime])
+  @@index([userId, createdAt])
+  @@map("call_logs")
 }
 
-model UserPreference {
-  id           String     @id @default(cuid())
-  createdAt    DateTime   @default(now())
-  userId       String
-  preferenceId String
-  preference   Preference @relation(fields: [preferenceId], references: [id])
-  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+model ConversationSummary {
+  id                    String   @id @default(uuid())
+  userId                String
+  conversationId        String   @unique
 
-  @@unique([userId, preferenceId])
-  @@map("user_preferences")
+  summaryText           String
+  durationMinutes       Int?
+
+  topicsDiscussed       String[]
+
+  keyHighlights         Json?
+
+  createdAt             DateTime @default(now())
+
+  user                  User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  callLog               CallLog                      @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  conversationTopicRefs ConversationTopicReference[]
+
+  @@index([userId, createdAt])
+  @@map("conversation_summaries")
 }
 
-enum Relationship {
-  SPOUSE
-  DAUGHTER
-  SON
-  SIBLING
-  FRIEND
-  NURSE
-  DOCTOR
-  CAREGIVER
-  OTHER
+model ConversationTopic {
+  id                     String   @id @default(uuid())
+  userId                 String
+
+  topicName              String
+  category               String?
+
+  firstMentioned         DateTime @default(now())
+  lastMentioned          DateTime @default(now())
+
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  user                   User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversationReferences ConversationTopicReference[]
+
+  @@unique([userId, topicName])
+  @@index([userId, lastMentioned])
+  @@index([lastMentioned])
+  @@map("conversation_topics")
+}
+
+model ConversationTopicReference {
+  id                    String              @id @default(uuid())
+  conversationSummaryId String
+  conversationTopicId   String
+
+  mentionedAt           DateTime            @default(now())
+
+  conversationSummary   ConversationSummary @relation(fields: [conversationSummaryId], references: [id], onDelete: Cascade)
+  conversationTopic     ConversationTopic   @relation(fields: [conversationTopicId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationSummaryId, conversationTopicId])
+  @@index([conversationTopicId, mentionedAt])
+  @@map("conversation_topic_references")
+}
+
+model HealthLog {
+  id                    String   @id @default(uuid())
+  userId                String
+  conversationId        String
+
+  mentionText           String
+  mentionType           String
+
+  severity              String?
+  bodyPart              String?
+
+  surfacedToDashboard   Boolean  @default(false)
+  stakeholderNotified   Boolean  @default(false)
+
+  detectedAt            DateTime @default(now())
+  notifiedAt            DateTime?
+
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  callLog               CallLog  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([userId, detectedAt])
+  @@index([surfacedToDashboard])
+  @@map("health_mentions")
 }
 
 enum Gender {
@@ -169,54 +225,49 @@ enum Gender {
   PREFER_NOT_TO_SAY
 }
 
-enum Severity {
-  MILD
-  MODERATE
-  SEVERE
+enum Relationship {
+  SPOUSE
+  DAUGHTER
+  SON
+  SIBLING
+  FRIEND
+  CAREGIVER
+  OTHER
 }
 
 enum CheckInFrequency {
   DAILY
   WEEKLY
-  MONTHLY
-  AS_NEEDED
+  
 }
 
-enum HealthCategory {
-  CHRONIC
-  ACUTE
-  MENTAL_HEALTH
-  PHYSICAL
-  GENETIC
-  AUTOIMMUNE
+enum CallStatus {
+  PENDING          
+  QUEUED           
+  IN_PROGRESS      
+  COMPLETED        
+  FAILED           
 }
 
-enum MedicationCategory {
-  PAIN_RELIEF
-  HEART
-  DIABETES
-  BLOOD_PRESSURE
-  MENTAL_HEALTH
-  ANTIBIOTICS
-  VITAMINS
-  OTHER
+enum CallOutcome {
+  COMPLETED         
+  NO_ANSWER         
+  BUSY              
+  FAILED            
+  USER_ENDED_EARLY  
 }
 
-enum MedicationFrequency {
-  ONCE_DAILY
-  TWICE_DAILY
-  THREE_TIMES_DAILY
-  FOUR_TIMES_DAILY
-  EVERY_OTHER_DAY
-  WEEKLY
-  MONTHLY
-  AS_NEEDED
-  EVERY_4_HOURS
-  EVERY_6_HOURS
-  EVERY_8_HOURS
-  EVERY_12_HOURS
-  BEDTIME
-  WITH_MEALS
-  BEFORE_MEALS
-  AFTER_MEALS
+enum NotificationType {
+  MISSED_CALLS          
+  SYSTEM_FAILURE        
+  HEALTH_CONCERN        
+  WEEKLY_SUMMARY        
+  MEDICATION_REMINDER   
+}
+
+enum NotificationStatus {
+  PENDING    
+  SENT       
+  DELIVERED  
+  FAILED     
 }

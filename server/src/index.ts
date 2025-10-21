@@ -1,14 +1,13 @@
 import express from 'express';
 import dotenv from 'dotenv';
-import OnboardingWebhook from './routes/elevenlabs-webhooks/OnboardingWebhook'
+// import OnboardingWebhook from './routes/elevenlabs-webhooks/OnboardingWebhook'
 import TwilioOutbound from './routes/TwilioOutbound'
 import TwimlRouter from './routes/TwimlRouter'
 import CheckUpWebhook from  './routes/elevenlabs-webhooks/CheckUpWebhook'
 import { WebSocketServer } from 'ws';
 import path from 'path';
 import http from 'http';
-import { setupOutboundMediaStream } from './utils/OutboundMediaStream';
-import McpServer from '../src/routes/McpServer';
+import { setupOutboundMediaStream } from './tools/OutboundMediaStream';
 
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
@@ -22,7 +21,7 @@ app.get('/', (req, res) => {
 
 app.use('/twiml', TwimlRouter)
 app.use('/api', TwilioOutbound);
-app.use('/api', OnboardingWebhook)
+// app.use('/api', OnboardingWebhook)
 app.use('/api', CheckUpWebhook)
 // app.use('/api', McpServer)
 
