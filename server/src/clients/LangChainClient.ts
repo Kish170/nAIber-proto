@@ -1,51 +1,54 @@
 import { z } from "zod";
 import { initChatModel } from "langchain/chat_models/universal";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
+import { ChatOpenAI } from "@langchain/openai";
+import { ChatPromptTemplate } from "@langchain/core/prompts";
 
-export class LangChainTools {
-	private readonly extractionPrompt = `
-			Extract key highlights from this elderly care conversation.
-
-			Conversation: {conversation}
-
-			Return as JSON:
-			{{
-			"highlights": ["highlight1", "highlight2"],
-			"topics": ["topic1", "topic2"],
-			"mood": "emotional state"
-			}}
-	`;
-
-	private readonly responseStructure = z.object({
+export class LangChainClient {
+    private model: ChatOpenAI
+    private modelApiKey: string
+    private readonly responseSchema = z.object({
 		highlights: z.array(z.string()).describe("Key conversation highlights"),
 		topics: z.array(z.string()).describe("Main topics discussed"),
 		mood: z.string().describe("User's emotional state"),
 	});
 
-	private llm?: any;
+    constructor(config: string) {
+        this.modelApiKey = config
+        this.model = new ChatOpenAI({
+            model: "gpt-4o-mini",
+			temperature: 0.1,
+			apiKey: this.modelApiKey,
+        });
+    }
 
-	private async initializeLLM() {
-		if (!this.llm) {
-			this.llm = await initChatModel("gpt-4o-mini", {
-				modelProvider: "openai",
-				temperature: 0.1,
-			});
-		}
-		return this.llm;
-	}
+    async structuredAICalls(systemMessage: string, userMessage: string) {
+        try {
+            const structuredLLM = this.model.withStructuredOutput(
+				this.responseSchema,
+				{
+					strict: true, 
+				}
+			);
+            const prompt = ChatPromptTemplate.fromMessages([
+                [
+                    "system",
+                    systemMessage
+                ],
+                [
+                    "human",
+                    userMessage
+                ]
+            ])
 
-	async extractConversation(conversationTranscript: string) {
-		const llm = await this.initializeLLM();
+            const chain = prompt.pipe(structuredLLM)
+            const response = await chain.invoke({systemMessage, userMessage})
 
-		const structuredLLM = llm.withStructuredOutput(this.responseStructure);
+            return response
 
-		const messages = [
-			new SystemMessage(this.extractionPrompt),
-			new HumanMessage(conversationTranscript)
-		];
-
-		const response = await structuredLLM.invoke(messages);
-
-		return response;
-	}
+        } catch(error) {
+            console.error("Error setting prompt:", error);
+			throw new Error("Failed to execute AI request");
+        }
+    }
 }

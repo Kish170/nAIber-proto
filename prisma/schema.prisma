@@ -166,6 +166,10 @@ model ConversationTopic {
   firstMentioned         DateTime @default(now())
   lastMentioned          DateTime @default(now())
 
+//   engagement_level       String  
+//   user_interest_score    Int
+// add memory chains, entity and sentiment tracking
+
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt
 

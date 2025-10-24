@@ -7,7 +7,7 @@ import CheckUpWebhook from  './routes/elevenlabs-webhooks/CheckUpWebhook'
 import { WebSocketServer } from 'ws';
 import path from 'path';
 import http from 'http';
-import { setupOutboundMediaStream } from './tools/OutboundMediaStream';
+import { setupOutboundMediaStream } from './utils/OutboundMediaStream';
 
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 

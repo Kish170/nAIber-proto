@@ -7,7 +7,7 @@ export interface QdrantConfig {
 
 export interface ConversationPoint {
     id: string;
-    vector: number;
+    vector: number[];
     payload: {
         userId: string;
         conversationId: string;
@@ -22,13 +22,21 @@ export interface ConversationPoint {
 
 export interface QueryParams {
     userId: string;
-    query: string, 
-    limit?: number
+    queryEmbedding: number[];
+    limit?: number;
 }
 
 export interface CollectionPutResult {
     success: boolean;
     highlightsStored: number;
+}
+
+export interface SearchPayload {
+    highlight: string;
+    topics: string[];
+    mood: string;
+    data: string;
+    similarity: number;
 }
 
 // add response interface
@@ -37,6 +45,7 @@ export class QdrantClient {
     private client: AxiosInstance;
     private config: QdrantConfig
     private collectionName: string
+    private initializationPromise: Promise<boolean> | null = null;
 
     constructor(config: QdrantConfig) {
         this.config = config;
@@ -47,6 +56,39 @@ export class QdrantClient {
         this.collectionName = 'naiber-conversations';
     }
 
+    private async ensureCollectionExists(): Promise<boolean> {
+        if (this.initializationPromise) {
+            return this.initializationPromise;
+        }
+
+        this.initializationPromise = this.getOrInitializeCollection();
+        return this.initializationPromise;
+    }
+
+    private async getOrInitializeCollection(): Promise<boolean> {
+        try {
+            const response = await this.client.get(`/collections/${this.collectionName}`);
+            return response.data.result.status === "green";
+        } catch (error) {
+            return this.initializeCollection();
+        }
+    }
+
+    private async initializeCollection(): Promise<boolean> {
+        try {
+            const response = await this.client.put(`/collections/${this.collectionName}`, {
+                vectors: {
+                    size: 1536,
+                    distance: "Cosine"
+                }
+            });
+            return response.data.result === true || response.status === 200;
+        } catch (error) {
+            console.error('[QdrantClient] Error initializing collection:', error);
+            return false;
+        }
+    }
+
     private getQdrantHeaders() {
         return {
             'Content-Type': 'application/json',
@@ -54,19 +96,72 @@ export class QdrantClient {
         };
     }
 
-    // async postToCollection(points: ConversationPoint[]) {
-    //     const response = await this.client.put(`/collections/${this.collectionName}/points`, { points });
-    //     return 
-    // }
+    async postToCollection(points: ConversationPoint[]): Promise<CollectionPutResult> {
+        try {
+            if (!points || points.length === 0) {
+                throw new Error('points array is required and must not be empty');
+            }
 
-    // async searchCollection(params: QueryParams) {
-    //     const {userId, query, limit} = params;
+            await this.ensureCollectionExists();
 
-    //     if (!userId || query) {
-    //         throw new Error('userId and query are required parameters');
-    //     }
+            const response = await this.client.put(`/collections/${this.collectionName}/points`, { points });
 
-    //     return this.client.
-    // }
+            return {
+                success: response.status === 200,
+                highlightsStored: points.length
+            };
+        } catch (error) {
+            console.error('[QdrantClient] Error posting to collection:', error);
+            return {
+                success: false,
+                highlightsStored: 0
+            };
+        }
+    }
+
+    async searchCollection(params: QueryParams): Promise<SearchPayload[]> {
+        try {
+            const {userId, queryEmbedding, limit} = params;
+
+            if (!userId || !queryEmbedding) {
+                throw new Error('userId and queryEmbedding are required parameters');
+            }
+
+            await this.ensureCollectionExists();
+
+            const response = await this.client.post(`/collections/${this.collectionName}/points/search`, {
+                vector: queryEmbedding,
+                filter: {
+                    must: [{ key: 'userId', match: { value: userId } }]
+                },
+                limit: limit || 5,
+                with_payload: true
+            });
+
+            if (!response.data || !Array.isArray(response.data.result)) {
+                console.warn('[QdrantClient] Unexpected response format from search');
+                return [];
+            }
+
+            return response.data.result.map((result: any) => {
+                const payload = result.payload ?? {};
+                return {
+                    highlight: payload.highlight ?? '',
+                    topics: Array.isArray(payload.topics)
+                        ? payload.topics
+                        : (typeof payload.topics === 'string' ? payload.topics.split(', ') : []),
+                    mood: payload.mood ?? '',
+                    data: payload.conversationDate ?? '',
+                    similarity: result.score ?? 0
+                };
+            });
+
+        } catch (error) {
+            console.error('[QdrantClient] Error searching collection:', error);
+            return [];
+        }
+    }
+
+    // TODO: Finish up clients, properly use client, fix topic summary, filter
 
 }

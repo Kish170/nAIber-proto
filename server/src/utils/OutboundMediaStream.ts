@@ -1,7 +1,7 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import { ConversationMemoryService } from '../services/ConversationContextService';
-import { LangChainTools } from '../clients/LangChainClient';
-import { BasicInfoTools } from '../repositories/UserRespository';
+import { LangChainTools } from '../tools/LangChainTools';
+import { BasicInfoTools } from '../tools/dbUtils';
 import { PersonalizationService } from '../services/PersonalizationService';
 import { userContextManager } from './UserContext';
 

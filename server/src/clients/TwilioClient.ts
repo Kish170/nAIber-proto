@@ -1,6 +1,6 @@
 import Twilio, { twiml } from "twilio";
 
-export interface TwilioConfig {
+export interface TwilioConfigs {
     accountSid: string;
     authToken: string;
     phoneNumber: string;
@@ -41,31 +41,21 @@ export interface CallInfo {
 
 export class TwilioClient {
     private client: ReturnType<typeof Twilio>;
-    private config: TwilioConfig;
+    private configs: TwilioConfigs;
 
-    constructor(config: TwilioConfig) {
-        if (!config.accountSid || !config.authToken) {
-            throw new Error(
-                'Twilio configuration error: accountSid and authToken are required'
-            );
-        }
-
-        this.config = config;
-        this.client = Twilio(config.accountSid, config.authToken);
+    constructor(configs: TwilioConfigs) {
+        this.configs = configs;
+        this.client = Twilio(configs.accountSid, configs.authToken);
     }
 
     async createCall(params: CreateCallParams): Promise<CallResult> {
         try {
             const { to, agentId } = params;
 
-            if (!to || !agentId) {
-                throw new Error('to and agentId are required parameters');
-            }
-
-            const twimlUrl = `${this.config.baseUrl}/twiml?agent_id=${agentId}`;
+            const twimlUrl = `${this.configs.baseUrl}/twiml?agent_id=${agentId}`;
 
             const call = await this.client.calls.create({
-                from: this.config.phoneNumber,
+                from: this.configs.phoneNumber,
                 to: to,
                 url: twimlUrl
             });
@@ -141,7 +131,7 @@ export class TwilioClient {
 
             const call = await this.client.calls.create({
                 to: to,
-                from: this.config.phoneNumber,
+                from: this.configs.phoneNumber,
                 twiml: voiceResponse.toString()
             });
 
@@ -183,7 +173,7 @@ export class TwilioClient {
 
             const transferCall = await this.client.calls.create({
                 to: transferToNumber,
-                from: this.config.phoneNumber,
+                from: this.configs.phoneNumber,
                 twiml: transferTwiml
             });
 
@@ -210,7 +200,7 @@ export class TwilioClient {
         return `
             <Response>
             <Connect>
-                <Stream url="${this.config.streamUrl}">
+                <Stream url="${this.configs.streamUrl}">
                 <Parameter name="agent_id" value="${agentId}" />
                 </Stream>
             </Connect>
@@ -257,16 +247,16 @@ export class TwilioClient {
     }
 
     getPhoneNumber(): string {
-        return this.config.phoneNumber;
+        return this.configs.phoneNumber;
     }
 
     isConfigured(): boolean {
         return !!(
-            this.config.accountSid &&
-            this.config.authToken &&
-            this.config.phoneNumber &&
-            this.config.baseUrl &&
-            this.config.streamUrl
+            this.configs.accountSid &&
+            this.configs.authToken &&
+            this.configs.phoneNumber &&
+            this.configs.baseUrl &&
+            this.configs.streamUrl
         );
     }
 }
