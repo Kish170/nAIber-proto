@@ -1,5 +1,5 @@
-import { PrismaDBClient } from '../clients/PrismaDBClient';
-import { UserProfileData, EmergencyContact, ConversationTopic, Medication, HealthCondition, ConversationSummary, BasicInfo } from '../tools/types/Types'
+import { PrismaDBClient } from '../clients/PrismaDBClient.js';
+import { UserProfileData, EmergencyContact, ConversationTopic, Medication, HealthCondition, ConversationSummary, BasicInfo } from '../tools/types/Types.js'
 
 const prismaClient = PrismaDBClient.getInstance().getClient()
 
@@ -139,7 +139,7 @@ export class UserProfile {
     }
 
     getActiveHealthConditions(): HealthCondition[] {
-        return this.data.healthConditions.filter(c => c.isActive);
+        return this.data.healthConditions.filter((c: HealthCondition) => c.isActive);
     }
 
     hasHealthConditions(): boolean {
@@ -147,7 +147,7 @@ export class UserProfile {
     }
 
     getActiveMedications(): Medication[] {
-        return this.data.medications.filter(m => m.isActive);
+        return this.data.medications.filter((m:Medication) => m.isActive);
     }
 
     hasMedications(): boolean {

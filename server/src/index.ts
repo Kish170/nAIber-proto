@@ -1,35 +1,19 @@
 import express from 'express';
-import dotenv from 'dotenv';
-// import OnboardingWebhook from './routes/elevenlabs-webhooks/OnboardingWebhook'
-import TwilioOutbound from './routes/TwilioOutbound'
-import TwimlRouter from './routes/TwimlRouter'
-import CheckUpWebhook from  './routes/elevenlabs-webhooks/CheckUpWebhook'
-import { WebSocketServer } from 'ws';
-import path from 'path';
 import http from 'http';
-import { setupOutboundMediaStream } from './utils/OutboundMediaStream';
-
-dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+import { CallController } from './controllers/CallController.js';
+import { createCallRouter } from './routes/CallRoutes.js';
 
 const app = express();
+const callController = new CallController();
+
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
 
-app.get('/', (req, res) => {
-  res.send('Hello from nAIber backend! ElevenLabs Conversational AI integration ready.');
-});
-
-app.use('/twiml', TwimlRouter)
-app.use('/api', TwilioOutbound);
-// app.use('/api', OnboardingWebhook)
-app.use('/api', CheckUpWebhook)
-// app.use('/api', McpServer)
+// Mount call routes
+app.use(createCallRouter(callController));
 
 const server = http.createServer(app);
-
-const wss = new WebSocketServer({ server, path: '/outbound-media-stream' });
-setupOutboundMediaStream(wss);
-
+await callController.initializeWSServer(server);
 
 const PORT = process.env.PORT || 3000;
 

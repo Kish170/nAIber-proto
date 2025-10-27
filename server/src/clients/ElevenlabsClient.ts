@@ -1,23 +1,21 @@
 import axios, { AxiosInstance } from 'axios';
-import { buildFirstMessage, buildSystemPrompt } from '../tools/SystemPrompts';
-import { UserProfile } from "../repositories/UserRespository";
 
-export interface ElevenLabsConfigs{
+export interface ElevenLabsConfigs {
     apiKey: string;
-    voiceID: string;
     agentID: string;
-    modelID: string;
-    audioFormat: string;
-    sampleRate: string;
     baseUrl: string;
+    agentNumber: string;
 }
 
 export class ElevenLabsClient {
     private client: AxiosInstance;
     private configs: ElevenLabsConfigs;
 
-
     constructor(configs: ElevenLabsConfigs) {
+        if (!configs.apiKey || !configs.agentID || !configs.baseUrl) {
+            throw new Error('ElevenLabs configuration error: apiKey, agentID, and baseUrl are required');
+        }
+
         this.configs = configs;
         this.client = axios.create({
             baseURL: configs.baseUrl,
@@ -32,90 +30,40 @@ export class ElevenLabsClient {
         }
     }
 
-    private async getSignedURL(): Promise<string> {
+    async getSignedURL(): Promise<string> {
         try {
-            const response = await this.client.get(`get_signed_url?agent_id=${this.configs.agentID}`)
+            const response = await this.client.get(`/conversation/get_signed_url?agent_id=${this.configs.agentID}`)
             return response.data.signed_url
         } catch (error) {
-            console.error('[ElevenLabs] Failed to connect:', error);
+            console.error('[ElevenLabsClient] Failed to get signed URL:', error);
             throw new Error("Unable to get signed url")
         }
     }
 
-    async initializeWSServer(userProfile: UserProfile) {
+    async getTranscript(conversationId: string): Promise<any> {
         try {
-            const signedURL = await this.getSignedURL();
-            const systemPrompt = buildSystemPrompt(userProfile);
-            const firstMesage = buildFirstMessage(userProfile);
-            const onConnect = await this.wsOpenEvent();
-            const onDisconnect = await this.wsCloseEvent();
-            const onMessage = await this.wsMessageEvent();
-            const onError = await this.wsErrorEvent();
-            const onStatusChange = await this.wsStatusChangeEvent();
-            const onModeChange = await this.wsModeChangeEvent();
-            const onCanSendFeedbackChange = await this.wsCanSendFeedbackChangeEvent();
-
-            const { Conversation } = await import('@elevenlabs/client');
-            const elevenLabsWs = await Conversation.startSession({
-                signedURL,
-                agentId: this.configs.agentID,
-                connectionType: 'websocket',
-                agent: {
-                    prompt: {
-                        prompt: systemPrompt
-                    },
-                    firstMessage: firstMesage,
-                    language: "en"
-                },
-                tts: {
-                    voicdId: this.configs.voiceID
-                },
-                onConnect: onConnect,
-                onDisconnect: onDisconnect,
-                onMessage: onMessage,
-                onError: onError,
-                onCanSendFeedbackChange: onCanSendFeedbackChange,
-                onStatusChange: onStatusChange,
-                onModeChange: onModeChange
-            });
-
+            const response = await this.client.get(`/conversations/${conversationId}`);
+            return response.data;
         } catch (error) {
-            console.error('[ElevenLabs] Failed to connect server:', error);
-            throw new Error("Unable to setup ws server")
+            console.error('[ElevenLabs] Failed to get transcript:', error);
+            throw new Error(
+                `Failed to get transcript: ${error instanceof Error ? error.message : 'Unknown error'}`
+            );
         }
     }
 
-    private async wsOpenEvent() {
-        
+    async initiateCall() {
+        try {
+            const response = await this.client.post(`/twilio/outbound-call`, {
+                agent_id: this.configs.agentID,
+                agent_phone_number_id: this.configs.agentNumber
+            });
+            return response.data;
+        } catch (error) {
+            console.error('[ElevenLabs] Failed to initiate simple outbound call:', error);
+            throw new Error(
+                `Failed to initiate simple outbound call: ${error instanceof Error ? error.message : 'Unknown error'}`
+            );
+        }
     }
-
-    private async wsMessageEvent() {
-        
-    }
-
-    private async wsErrorEvent() {
-        
-    }
-
-    private async wsCloseEvent() {
-        
-    }
-
-    private async wsStatusChangeEvent() {
-        
-    }
-
-    private async wsModeChangeEvent() {
-        
-    }
-
-    private async wsCanSendFeedbackChangeEvent() {
-        
-    }
-
-    // async getTranscript(conversationID: string, retries =) {
-
-    // } may not need can use post webhook
-
-
 }

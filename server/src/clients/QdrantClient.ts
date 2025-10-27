@@ -3,6 +3,7 @@ import axios, { AxiosInstance } from 'axios';
 export interface QdrantConfig {
     baseUrl: string;
     api_key: string;
+    collectionName: string;
 }
 
 export interface ConversationPoint {
@@ -44,7 +45,6 @@ export interface SearchPayload {
 export class QdrantClient {
     private client: AxiosInstance;
     private config: QdrantConfig
-    private collectionName: string
     private initializationPromise: Promise<boolean> | null = null;
 
     constructor(config: QdrantConfig) {
@@ -52,9 +52,7 @@ export class QdrantClient {
         this.client = axios.create({
             baseURL: config.baseUrl,
             headers: this.getQdrantHeaders()
-        });
-        this.collectionName = 'naiber-conversations';
-    }
+        });    }
 
     private async ensureCollectionExists(): Promise<boolean> {
         if (this.initializationPromise) {
@@ -67,7 +65,7 @@ export class QdrantClient {
 
     private async getOrInitializeCollection(): Promise<boolean> {
         try {
-            const response = await this.client.get(`/collections/${this.collectionName}`);
+            const response = await this.client.get(`/collections/${this.config.collectionName}`);
             return response.data.result.status === "green";
         } catch (error) {
             return this.initializeCollection();
@@ -76,7 +74,7 @@ export class QdrantClient {
 
     private async initializeCollection(): Promise<boolean> {
         try {
-            const response = await this.client.put(`/collections/${this.collectionName}`, {
+            const response = await this.client.put(`/collections/${this.config.collectionName}`, {
                 vectors: {
                     size: 1536,
                     distance: "Cosine"
@@ -104,7 +102,7 @@ export class QdrantClient {
 
             await this.ensureCollectionExists();
 
-            const response = await this.client.put(`/collections/${this.collectionName}/points`, { points });
+            const response = await this.client.put(`/collections/${this.config.collectionName}/points`, { points });
 
             return {
                 success: response.status === 200,
@@ -129,7 +127,7 @@ export class QdrantClient {
 
             await this.ensureCollectionExists();
 
-            const response = await this.client.post(`/collections/${this.collectionName}/points/search`, {
+            const response = await this.client.post(`/collections/${this.config.collectionName}/points/search`, {
                 vector: queryEmbedding,
                 filter: {
                     must: [{ key: 'userId', match: { value: userId } }]

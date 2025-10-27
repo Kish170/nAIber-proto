@@ -1,4 +1,4 @@
-import { UserProfile } from "../repositories/UserRespository";
+import { UserProfile } from "../repositories/UserRespository.js";
 
 function cleanJson(obj: any): string {
     return JSON.stringify(
@@ -15,6 +15,7 @@ export function buildFirstMessage(userProfile: UserProfile) {
     const now = new Date();
     const hours = now.getHours();
     const partOfDay = hours < 12 ? "morning" : hours < 18 ? "afternoon" : "evening";
+    const name = userProfile.name;
 
     const baseInfo = `
         Here is some background information about the user to help you start a personalized conversation:
@@ -48,7 +49,7 @@ export function buildFirstMessage(userProfile: UserProfile) {
         `.trim();
         oneShot = `
             Example greeting for inspiration:
-            "Good ${partOfDay}, {{name}}! It’s so nice to meet you. My name’s nAIber — like 'neighbor', but with a little AI twist.
+            "Good ${partOfDay}, ${name}! It’s so nice to meet you. My name’s nAIber — like 'neighbor', but with a little AI twist.
             I’m here to check in with you, have a nice chat, and make sure you’re doing well today.
 
             How are you doing this ${partOfDay}? Did you sleep okay?"
@@ -80,7 +81,7 @@ export function buildFirstMessage(userProfile: UserProfile) {
     greetingNotes = `
         Guidance for greeting a returning user:
         - Start the conversation warmly and naturally.
-        - Introduce yourself briefly as nAIber if desired: "Hi {{name}}, it’s nAIber, your friendly check-in companion."
+        - Introduce yourself briefly as nAIber if desired: "Hi ${name}, it’s nAIber, your friendly check-in companion."
         - Use subtle references from the last conversation to personalize the first message.
         - Ask an open-ended question related to a previous topic to re-engage the user.
         - Keep the tone friendly, empathetic, and human-like.

@@ -1,16 +1,11 @@
-import Twilio, { twiml } from "twilio";
+import Twilio from "twilio";
 
 export interface TwilioConfigs {
     accountSid: string;
     authToken: string;
-    phoneNumber: string;
+    agentNumber: string;
     baseUrl: string;
     streamUrl: string;
-}
-
-export interface CreateCallParams {
-    to: string;
-    agentId: string;
 }
 
 export interface UpdateCallParams {
@@ -39,6 +34,12 @@ export interface CallInfo {
     status: string;
 }
 
+export interface ConnectionMessage {
+    event: string;
+    protocol: string;
+    version: string;
+}
+
 export class TwilioClient {
     private client: ReturnType<typeof Twilio>;
     private configs: TwilioConfigs;
@@ -48,14 +49,17 @@ export class TwilioClient {
         this.client = Twilio(configs.accountSid, configs.authToken);
     }
 
-    async createCall(params: CreateCallParams): Promise<CallResult> {
-        try {
-            const { to, agentId } = params;
+    // ============================================
+    // PUBLIC METHODS - Call Management
+    // ============================================
 
-            const twimlUrl = `${this.configs.baseUrl}/twiml?agent_id=${agentId}`;
+    async createCall(to: string): Promise<CallResult> {
+        try {
+            const twimlUrl = `${this.configs.baseUrl}/twiml`;
+            console.log('[TwilioClient] Creating call with TwiML URL:', twimlUrl);
 
             const call = await this.client.calls.create({
-                from: this.configs.phoneNumber,
+                from: this.configs.agentNumber,
                 to: to,
                 url: twimlUrl
             });
@@ -118,113 +122,6 @@ export class TwilioClient {
         }
     }
 
-    async createConferenceCall(params: CreateConferenceParams): Promise<CallResult> {
-        try {
-            const { to, conferenceName, startOnEnter = true, endOnExit = true } = params;
-
-            const voiceResponse = new twiml.VoiceResponse();
-            const dial = voiceResponse.dial();
-            dial.conference({
-                startConferenceOnEnter: startOnEnter,
-                endConferenceOnExit: endOnExit
-            }, conferenceName);
-
-            const call = await this.client.calls.create({
-                to: to,
-                from: this.configs.phoneNumber,
-                twiml: voiceResponse.toString()
-            });
-
-            return {
-                success: true,
-                message: 'Conference call created successfully',
-                callSid: call.sid
-            };
-        } catch (error) {
-            console.error('[TwilioClient] Error creating conference call:', error);
-            return {
-                success: false,
-                message: 'Failed to create conference call',
-                error: error instanceof Error ? error.message : 'Unknown error'
-            };
-        }
-    }
-
-    async transferToConference(
-        currentCallSid: string,
-        transferToNumber: string,
-        conferenceName: string,
-        holdMessage: string = "Please hold while we connect you to an agent"
-    ): Promise<CallResult> {
-        try {
-            const voiceResponse = new twiml.VoiceResponse();
-            voiceResponse.say(holdMessage);
-            const dial = voiceResponse.dial();
-            dial.conference({
-                startConferenceOnEnter: true,
-                endConferenceOnExit: true
-            }, conferenceName);
-
-            await this.client.calls(currentCallSid).update({
-                twiml: voiceResponse.toString()
-            });
-
-            const transferTwiml = `<Response><Dial><Conference>${conferenceName}</Conference></Dial></Response>`;
-
-            const transferCall = await this.client.calls.create({
-                to: transferToNumber,
-                from: this.configs.phoneNumber,
-                twiml: transferTwiml
-            });
-
-            return {
-                success: true,
-                message: 'Call transferred to conference successfully',
-                callSid: transferCall.sid
-            };
-        } catch (error) {
-            console.error('[TwilioClient] Error transferring to conference:', error);
-            return {
-                success: false,
-                message: 'Failed to transfer call to conference',
-                error: error instanceof Error ? error.message : 'Unknown error'
-            };
-        }
-    }
-
-    generateStreamTwiml(agentId: string): string {
-        if (!agentId) {
-            return this.generateErrorTwiml('Missing agent configuration');
-        }
-
-        return `
-            <Response>
-            <Connect>
-                <Stream url="${this.configs.streamUrl}">
-                <Parameter name="agent_id" value="${agentId}" />
-                </Stream>
-            </Connect>
-            </Response>
-        `.trim();
-    }
-
-    generateErrorTwiml(message: string = 'I\'m sorry, there was a technical issue. Please try calling again.'): string {
-        return `
-            <Response>
-            <Say>${message}</Say>
-            </Response>
-        `.trim();
-    }
-
-    generateHangupTwiml(message?: string): string {
-        const voiceResponse = new twiml.VoiceResponse();
-        if (message) {
-            voiceResponse.say(message);
-        }
-        voiceResponse.hangup();
-        return voiceResponse.toString();
-    }
-
     async endCall(callSid: string): Promise<CallResult> {
         try {
             await this.client.calls(callSid).update({
@@ -246,17 +143,121 @@ export class TwilioClient {
         }
     }
 
-    getPhoneNumber(): string {
-        return this.configs.phoneNumber;
+    // ============================================
+    // PUBLIC METHODS - Conference & Transfer
+    // ============================================
+
+    // async createConferenceCall(params: CreateConferenceParams): Promise<CallResult> {
+    //     try {
+    //         const { to, conferenceName, startOnEnter = true, endOnExit = true } = params;
+
+    //         const voiceResponse = new twiml.VoiceResponse();
+    //         const dial = voiceResponse.dial();
+    //         dial.conference({
+    //             startConferenceOnEnter: startOnEnter,
+    //             endConferenceOnExit: endOnExit
+    //         }, conferenceName);
+
+    //         const call = await this.client.calls.create({
+    //             to: to,
+    //             from: this.configs.userNumber,
+    //             twiml: voiceResponse.toString()
+    //         });
+
+    //         return {
+    //             success: true,
+    //             message: 'Conference call created successfully',
+    //             callSid: call.sid
+    //         };
+    //     } catch (error) {
+    //         console.error('[TwilioClient] Error creating conference call:', error);
+    //         return {
+    //             success: false,
+    //             message: 'Failed to create conference call',
+    //             error: error instanceof Error ? error.message : 'Unknown error'
+    //         };
+    //     }
+    // }
+
+    // async transferToConference(
+    //     currentCallSid: string,
+    //     transferToNumber: string,
+    //     conferenceName: string,
+    //     holdMessage: string = "Please hold while we connect you to an agent"
+    // ): Promise<CallResult> {
+    //     try {
+    //         const voiceResponse = new twiml.VoiceResponse();
+    //         voiceResponse.say(holdMessage);
+    //         const dial = voiceResponse.dial();
+    //         dial.conference({
+    //             startConferenceOnEnter: true,
+    //             endConferenceOnExit: true
+    //         }, conferenceName);
+
+    //         await this.client.calls(currentCallSid).update({
+    //             twiml: voiceResponse.toString()
+    //         });
+
+    //         const transferTwiml = `<Response><Dial><Conference>${conferenceName}</Conference></Dial></Response>`;
+
+    //         const transferCall = await this.client.calls.create({
+    //             to: transferToNumber,
+    //             from: this.configs.userNumber,
+    //             twiml: transferTwiml
+    //         });
+
+    //         return {
+    //             success: true,
+    //             message: 'Call transferred to conference successfully',
+    //             callSid: transferCall.sid
+    //         };
+    //     } catch (error) {
+    //         console.error('[TwilioClient] Error transferring to conference:', error);
+    //         return {
+    //             success: false,
+    //             message: 'Failed to transfer call to conference',
+    //             error: error instanceof Error ? error.message : 'Unknown error'
+    //         };
+    //     }
+    // }
+
+    // ============================================
+    // PUBLIC METHODS - TwiML Generation
+    // ============================================
+
+    generateStreamTwiml(agentId: string): string {
+        if (!agentId) {
+            return this.generateErrorTwiml('Missing agent configuration');
+        }
+
+        return `
+            <Response>
+            <Connect>
+                <Stream url="${this.configs.streamUrl}">
+                </Stream>
+            </Connect>
+            </Response>
+        `.trim();
     }
 
-    isConfigured(): boolean {
-        return !!(
-            this.configs.accountSid &&
-            this.configs.authToken &&
-            this.configs.phoneNumber &&
-            this.configs.baseUrl &&
-            this.configs.streamUrl
-        );
+    generateErrorTwiml(message: string = 'I\'m sorry, there was a technical issue. Please try calling again.'): string {
+        return `
+            <Response>
+            <Say>${message}</Say>
+            </Response>
+        `.trim();
+    }
+
+    // generateHangupTwiml(message?: string): string {
+    //     const voiceResponse = new twiml.VoiceResponse();
+    //     if (message) {
+    //         voiceResponse.say(message);
+    //     }
+    //     voiceResponse.hangup();
+    //     return voiceResponse.toString();
+    // }
+
+    getPhoneNumber(): string {
+        return this.configs.agentNumber;
     }
 }
