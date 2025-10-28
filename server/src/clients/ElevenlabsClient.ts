@@ -23,7 +23,7 @@ export class ElevenLabsClient {
         });
     }
 
-    private getElevenLabHeaders() {
+    private getElevenLabHeaders(): Record<string, string> {
         return {
             'Content-Type': 'application/json',
             'xi-api-key': process.env.ELEVENLABS_API_KEY!,
@@ -52,7 +52,7 @@ export class ElevenLabsClient {
         }
     }
 
-    async initiateCall() {
+    async initiateCall(): Promise<any> {
         try {
             const response = await this.client.post(`/twilio/outbound-call`, {
                 agent_id: this.configs.agentID,

@@ -8,7 +8,7 @@ function cleanJson(obj: any): string {
     );
 }
 
-export function buildFirstMessage(userProfile: UserProfile) {
+export function buildFirstMessage(userProfile: UserProfile): string {
 
     let oneShot;
     let greetingNotes;
@@ -17,91 +17,98 @@ export function buildFirstMessage(userProfile: UserProfile) {
     const partOfDay = hours < 12 ? "morning" : hours < 18 ? "afternoon" : "evening";
     const name = userProfile.name;
 
-    const baseInfo = `
-        Here is some background information about the user to help you start a personalized conversation:
-        ${cleanJson(userProfile.getBasicInfo())}
-        When you talk to the user:
-        - Use their **name** naturally in conversation.
-        - Match your tone and topics to their **age** and **gender** where appropriate.
-        - Bring up their **interests** in a friendly, organic way to build connection.
-        - Avoid or steer away from their **dislikes**.
-        - Keep the conversation warm, natural, and human-like — not scripted or robotic.
+    // const baseInfo = `
+    //     Here is some background information about the user to help you start a personalized conversation:
+    //     ${cleanJson(userProfile.getBasicInfo())}
+    //     When you talk to the user:
+    //     - Use their **name** naturally in conversation.
+    //     - Match your tone and topics to their **age** and **gender** where appropriate.
+    //     - Bring up their **interests** in a friendly, organic way to build connection.
+    //     - Avoid or steer away from their **dislikes**.
+    //     - Keep the conversation warm, natural, and human-like — not scripted or robotic.
 
-        Use this information to make your first few messages feel personal, engaging, and relatable.
-    `.trim();
+    //     Use this information to make your first few messages feel personal, engaging, and relatable.
+    // `.trim();
 
-    if (userProfile.isFirstCall || userProfile.lastCallAt == null) {
-        greetingNotes = `
-            When greeting the user for the very first time:
-            - Start the conversation with warmth and kindness.
-            - Address the user by their **name** if available.
-            - Speak slowly, clearly, and with a gentle, reassuring tone.
-            - Express genuine **happiness to meet or talk with them**.
-            - Avoid sounding robotic, overly formal, or scripted — the goal is to feel **friendly and human**.
-            - Acknowledge that this is the **first check-in call**, and set a welcoming tone for future conversations.
-            - Ask **simple, caring questions** to open dialogue — for example, how they’re feeling or how their day has been.
-            - Be mindful of their **age and comfort level** — avoid slang or overly energetic phrasing.
-            - Maintain **respect and empathy** throughout; the user should feel valued and cared for.
-            - Keep the introduction brief and easy to follow before moving into conversation or questions.
-            - You can use the current time (${partOfDay}) to customize greetings and references naturally.
+    // if (userProfile.isFirstCall || userProfile.lastCallAt == null) {
+    //     greetingNotes = `
+    //         When greeting the user for the very first time:
+    //         - Start the conversation with warmth and kindness.
+    //         - Address the user by their **name** if available.
+    //         - Speak slowly, clearly, and with a gentle, reassuring tone.
+    //         - Express genuine **happiness to meet or talk with them**.
+    //         - Avoid sounding robotic, overly formal, or scripted — the goal is to feel **friendly and human**.
+    //         - Acknowledge that this is the **first check-in call**, and set a welcoming tone for future conversations.
+    //         - Ask **simple, caring questions** to open dialogue — for example, how they’re feeling or how their day has been.
+    //         - Be mindful of their **age and comfort level** — avoid slang or overly energetic phrasing.
+    //         - Maintain **respect and empathy** throughout; the user should feel valued and cared for.
+    //         - Keep the introduction brief and easy to follow before moving into conversation or questions.
+    //         - You can use the current time (${partOfDay}) to customize greetings and references naturally.
 
-            The goal is to make the user feel **safe, seen, and genuinely cared for** from the very first interaction.
-        `.trim();
-        oneShot = `
-            Example greeting for inspiration:
-            "Good ${partOfDay}, ${name}! It’s so nice to meet you. My name’s nAIber — like 'neighbor', but with a little AI twist.
+    //         The goal is to make the user feel **safe, seen, and genuinely cared for** from the very first interaction.
+    //     `.trim();
+    //     oneShot = `
+    //         Example greeting for inspiration:
+    //         "Good ${partOfDay}, ${name}! It’s so nice to meet you. My name’s nAIber — like 'neighbor', but with a little AI twist.
+    //         I’m here to check in with you, have a nice chat, and make sure you’re doing well today.
+
+    //         How are you doing this ${partOfDay}? Did you sleep okay?"
+
+    //         Use this as inspiration for your own first message.
+    //         Keep it short, warm, and natural. Introduce yourself as nAIber, explain briefly what you do, and start with a gentle, caring question about the user’s day or wellbeing.
+    //     `.trim();
+    //     return `
+    //         ${baseInfo}
+    //         ${greetingNotes}
+    //         ${oneShot}
+    //     `
+    // }
+    
+    // const lastConversation = `
+    //     Here is some background information on the last conversation:
+    //     ${cleanJson(userProfile.getLastConversationSummary())}
+
+    //     Use this information to personalize your **first message** in this new session:
+    //     - Subtly reference relevant details from the last conversation (e.g., something the user mentioned or an emotion they expressed).
+    //     - Acknowledge that you’ve spoken before, but **keep it light and natural** — for example, “It’s nice to talk again” or “I remember you mentioned…”.
+    //     - If the previous conversation ended on a topic or event (e.g., they had plans or were feeling unwell), you can gently check in about it.
+    //     - Avoid sounding like you’re reading from notes — weave any references smoothly into your greeting.
+    //     - Keep the tone friendly, empathetic, and conversational.
+    //     - Do not restate the whole summary; use only relevant details to make the user feel remembered and cared for.
+    //     - You can reference the current time (${partOfDay}) naturally in the greeting.
+    // `.trim();
+
+    // greetingNotes = `
+    //     Guidance for greeting a returning user:
+    //     - Start the conversation warmly and naturally.
+    //     - Introduce yourself briefly as nAIber if desired: "Hi ${name}, it’s nAIber, your friendly check-in companion."
+    //     - Use subtle references from the last conversation to personalize the first message.
+    //     - Ask an open-ended question related to a previous topic to re-engage the user.
+    //     - Keep the tone friendly, empathetic, and human-like.
+    //     - Avoid repeating the entire summary; choose 1–2 relevant details to weave in naturally.
+    // `.trim();
+
+    // oneShot = `
+    //     Example greeting for returning users:
+    //     "Good ${partOfDay}, Alice! Welcome back. I remember you mentioned your tulips were starting to bloom last time — how are they doing today?"
+    // `.trim();
+
+    // return `
+    //     ${baseInfo}
+    //     ${lastConversation}
+    //     ${greetingNotes}
+    //     ${oneShot}
+    // `
+
+    return `
+    "Good ${partOfDay}, ${name}! It’s so nice to meet you. My name’s nAIber — like 'neighbor', but with a little AI twist.
             I’m here to check in with you, have a nice chat, and make sure you’re doing well today.
 
             How are you doing this ${partOfDay}? Did you sleep okay?"
-
-            Use this as inspiration for your own first message.
-            Keep it short, warm, and natural. Introduce yourself as nAIber, explain briefly what you do, and start with a gentle, caring question about the user’s day or wellbeing.
-        `.trim();
-        return `
-            ${baseInfo}
-            ${greetingNotes}
-            ${oneShot}
-        `
-    }
-    
-    const lastConversation = `
-        Here is some background information on the last conversation:
-        ${cleanJson(userProfile.getLastConversationSummary())}
-
-        Use this information to personalize your **first message** in this new session:
-        - Subtly reference relevant details from the last conversation (e.g., something the user mentioned or an emotion they expressed).
-        - Acknowledge that you’ve spoken before, but **keep it light and natural** — for example, “It’s nice to talk again” or “I remember you mentioned…”.
-        - If the previous conversation ended on a topic or event (e.g., they had plans or were feeling unwell), you can gently check in about it.
-        - Avoid sounding like you’re reading from notes — weave any references smoothly into your greeting.
-        - Keep the tone friendly, empathetic, and conversational.
-        - Do not restate the whole summary; use only relevant details to make the user feel remembered and cared for.
-        - You can reference the current time (${partOfDay}) naturally in the greeting.
-    `.trim();
-
-    greetingNotes = `
-        Guidance for greeting a returning user:
-        - Start the conversation warmly and naturally.
-        - Introduce yourself briefly as nAIber if desired: "Hi ${name}, it’s nAIber, your friendly check-in companion."
-        - Use subtle references from the last conversation to personalize the first message.
-        - Ask an open-ended question related to a previous topic to re-engage the user.
-        - Keep the tone friendly, empathetic, and human-like.
-        - Avoid repeating the entire summary; choose 1–2 relevant details to weave in naturally.
-    `.trim();
-
-    oneShot = `
-        Example greeting for returning users:
-        "Good ${partOfDay}, Alice! Welcome back. I remember you mentioned your tulips were starting to bloom last time — how are they doing today?"
-    `.trim();
-
-    return `
-        ${baseInfo}
-        ${lastConversation}
-        ${greetingNotes}
-        ${oneShot}
     `
 }
 
-export function buildSystemPrompt(userProfile: UserProfile) {
+export function buildSystemPrompt(userProfile: UserProfile): string {
     // ============================================
     // STATIC SECTIONS (Core personality & rules)
     // ============================================

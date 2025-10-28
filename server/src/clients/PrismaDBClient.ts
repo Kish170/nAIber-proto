@@ -1,6 +1,6 @@
 import { PrismaClient } from '../../../generated/prisma/index.js';
 
-export class PrismaDBClient {
+class PrismaDBClient {
   private static instance: PrismaDBClient;  
   private client: PrismaClient;            
 
@@ -10,7 +10,7 @@ export class PrismaDBClient {
 
   static getInstance(): PrismaDBClient {
     if (!PrismaDBClient.instance) {
-      PrismaDBClient.instance = new PrismaDBClient();
+        PrismaDBClient.instance = new PrismaDBClient();
     }
     return PrismaDBClient.instance;
   }
@@ -19,3 +19,5 @@ export class PrismaDBClient {
     return this.client;
   }
 }
+
+export const prismaClient = PrismaDBClient.getInstance().getClient();

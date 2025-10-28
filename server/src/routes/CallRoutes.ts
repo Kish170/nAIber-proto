@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { CallController } from '../controllers/CallController.js';
 
-export function createCallRouter(callController: CallController) {
+export function createCallRouter(callController: CallController): Router {
     const router = Router();
 
     router.post('/call', async (req, res) => {
@@ -26,6 +26,21 @@ export function createCallRouter(callController: CallController) {
             res.status(500).type('text/xml').send(
                 '<Response><Say>Service temporarily unavailable</Say></Response>'
             );
+        }
+    });
+
+    // Debug endpoint to check active sessions
+    router.get('/sessions', async (req, res) => {
+        try {
+            const { sessionManager } = await import('../services/SessionManager.js');
+            const sessions = await sessionManager.getAllActiveSessions();
+            res.json({
+                count: sessions.length,
+                sessions
+            });
+        } catch (error) {
+            console.error('[CallRoutes] Error fetching sessions:', error);
+            res.status(500).json({ error: 'Failed to fetch sessions' });
         }
     });
 

@@ -5,15 +5,6 @@ import { ElevenLabsConfigs } from '../clients/ElevenlabsClient.js';
 import { UserProfile } from '../repositories/UserRespository.js';
 import { WebSocketService } from '../services/WebSocketService.js';
 
-// export interface ActiveConnection {
-//   streamSid: string;
-//   twilioWs: WebSocket;
-//   elevenLabsWs: WebSocket | null;
-//   callSid?: string;
-//   conversationId: String;
-//   keepAliveInterval?: NodeJS.Timeout;
-// }
-
 export class CallController {
     private elevenLabsConfigs: ElevenLabsConfigs;
     private twilioClient: TwilioClient;
@@ -68,7 +59,7 @@ export class CallController {
 
             console.log('[CallController] WebSocket server created at /outbound-media-stream');
 
-            wss.on("connection", async (ws: WebSocket) => {
+            wss.on("connection", async (ws: WebSocket): Promise<void> => {
                 console.log('[CallController] Twilio WebSocket connected');
 
                 const userNumber = process.env.PHONE_NUMBER;
@@ -85,18 +76,21 @@ export class CallController {
                     return;
                 }
 
-                const webSocketService = new WebSocketService(ws, this.elevenLabsConfigs);
-                await webSocketService.connectToElevenLabs(userProfile);
+                const webSocketService = new WebSocketService(ws, this.elevenLabsConfigs, this.twilioClient);
 
-                ws.on("message", (rawData) => {
+                // Set up Twilio message handler FIRST before connecting to ElevenLabs
+                // This ensures we capture the "connected" and "start" events
+                ws.on("message", async (rawData): Promise<void> => {
                     const buffer = Buffer.isBuffer(rawData) ? rawData : Buffer.from(rawData.toString());
-                    webSocketService.twilioEventProcessor(buffer);
-                })
-                
-                ws.on("close", () => {
-                    webSocketService.closeWSConnection();
+                    await webSocketService.twilioEventProcessor(buffer);
                 })
 
+                ws.on("close", async (): Promise<void> => {
+                    await webSocketService.closeWSConnection();
+                })
+
+                // Connect to ElevenLabs AFTER setting up message handlers
+                await webSocketService.connectToElevenLabs(userProfile);
             });
 
             return wss;

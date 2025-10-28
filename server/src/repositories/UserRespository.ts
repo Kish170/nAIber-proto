@@ -1,7 +1,6 @@
-import { PrismaDBClient } from '../clients/PrismaDBClient.js';
+import { prismaClient } from '../clients/PrismaDBClient.js';
 import { UserProfileData, EmergencyContact, ConversationTopic, Medication, HealthCondition, ConversationSummary, BasicInfo } from '../tools/types/Types.js'
 
-const prismaClient = PrismaDBClient.getInstance().getClient()
 
 export class UserProfile {
     private readonly data: UserProfileData;

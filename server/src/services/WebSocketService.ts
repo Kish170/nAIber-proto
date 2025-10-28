@@ -2,34 +2,52 @@ import { ElevenLabsClient, ElevenLabsConfigs } from "../clients/ElevenlabsClient
 import { UserProfile } from "../repositories/UserRespository.js";
 import { WebSocket } from 'ws';
 import { buildFirstMessage, buildSystemPrompt } from '../tools/SystemPrompts.js';
+import { TwilioClient } from "../clients/TwilioClient.js";
+import { sessionManager, SessionManager, SessionData } from "./SessionManager.js";
+
+export interface WebSockets {
+    twilioWs: WebSocket;
+    elevenLabsWs: WebSocket;
+}
 
 export class WebSocketService {
     private twilioWs: WebSocket;
     private elevenLabsClient: ElevenLabsClient;
+    private twilioClient: TwilioClient | null = null;
     private elevenlabsWs: WebSocket | null = null;
     private streamSID: string = "";
     private conversationId: string = "";
+    private callSid: string = "";
     private keepAliveInterval?: NodeJS.Timeout;
+    private localConnections: Map<string, WebSockets> = new Map();
+    private sessionManager: SessionManager = sessionManager;
+    private startedAt: Date = new Date();
+    private userId: string = "";
 
-    constructor(twilioWs: WebSocket, elevenLabsConfig: ElevenLabsConfigs) {
+
+    constructor(twilioWs: WebSocket, elevenLabsConfig: ElevenLabsConfigs, twilioClient?: TwilioClient) {
         this.twilioWs = twilioWs;
         this.elevenLabsClient = new ElevenLabsClient(elevenLabsConfig);
+        this.twilioClient = twilioClient || null;
     }
 
     // TWILIO SETUP
-    twilioEventProcessor(message: Buffer) {
+    async twilioEventProcessor(message: Buffer): Promise<void> {
         try {
             const data = JSON.parse(message.toString());
 
-            // Log all incoming Twilio events for debugging
-            console.log('[TwilioClient] Received event:', data.event, data.streamSid ? `streamSid: ${data.streamSid}` : '');
+            if (data.event !== 'media') {
+                console.log('[TwilioClient] Received event:', data.event, data.streamSid ? `streamSid: ${data.streamSid}` : '');
+            }
 
             switch (data.event) {
                 case "connected":
+                    console.log("CONNECTED")
                     this.manageConnectedEvent(data);
                     break;
                 case "start":
-                    this.manageStartEvent(data);
+                    console.log("STARTTTT")
+                    await this.manageStartEvent(data);
                     break;
                 case "media":
                     this.manageMediaEvent(data);
@@ -48,24 +66,80 @@ export class WebSocketService {
         }
     }
 
-    closeWSConnection() {
-        // TODO: Add cleanup logic if needed
-        console.log('[TwilioClient] WebSocket connection closing');
+    async closeWSConnection(): Promise<void> {
+        console.log('[WebSocketService] Closing WebSocket connections and ending call');
+
+        await sessionManager.deleteSession(this.callSid);
+        this.deleteLocalConnection(this.callSid);
+
+        if (this.keepAliveInterval) {
+            clearInterval(this.keepAliveInterval);
+            console.log('[WebSocketService] Cleared keepalive interval');
+        }
+
+        if (this.elevenlabsWs && this.elevenlabsWs.readyState === WebSocket.OPEN) {
+            console.log('[WebSocketService] Closing ElevenLabs WebSocket');
+            this.elevenlabsWs.close();
+            this.elevenlabsWs = null;
+        }
+
+        if (this.twilioWs && this.twilioWs.readyState === WebSocket.OPEN) {
+            console.log('[WebSocketService] Closing Twilio WebSocket');
+            this.twilioWs.close();
+        }
+
+        if (this.callSid && this.twilioClient) {
+            console.log('[WebSocketService] Ending Twilio call via API:', this.callSid);
+            try {
+                const result = await this.twilioClient.endCall(this.callSid);
+                if (result.success) {
+                    console.log('[WebSocketService] Successfully ended Twilio call');
+                } else {
+                    console.error('[WebSocketService] Failed to end Twilio call:', result.error);
+                }
+            } catch (error) {
+                console.error('[WebSocketService] Error ending Twilio call:', error);
+            }
+        }
     }
 
-    private manageConnectedEvent(data: any) {
+    private manageConnectedEvent(data: any): void {
         // add logic if needed
         console.log('[TwilioClient] Connected event:', data);
     }
 
-    private manageStartEvent(data: any) {
+    private async manageStartEvent(data: any): Promise<void> {
         console.log('[WebSocketService] Start event received:', JSON.stringify(data, null, 2));
         this.streamSID = data.start.streamSid;
-        console.log('[WebSocketService] Twilio stream started - streamSid:', this.streamSID);
+        this.callSid = data.start.callSid;
+        console.log('[WebSocketService] Twilio stream started - streamSid:', this.streamSID, 'callSid:', this.callSid);
+
+        if (this.elevenlabsWs) {
+            this.localConnections.set(this.callSid, {
+                twilioWs: this.twilioWs,
+                elevenLabsWs: this.elevenlabsWs
+            });
+            console.log('[WebSocketService] Stored local connections for callSid:', this.callSid);
+        } else {
+            console.warn('[WebSocketService] ElevenLabs WebSocket not ready, cannot store connections');
+        }
+
+        if (this.userId) {
+            await sessionManager.createSession(this.callSid, {
+                callSid: this.callSid,
+                conversationId: this.conversationId || '', // May be empty initially
+                userId: this.userId,
+                streamSid: this.streamSID,
+                startedAt: this.startedAt.toISOString()
+            });
+            console.log('[WebSocketService] Stored redis session for callSid:', this.callSid);
+        } else {
+            console.warn('[WebSocketService] UserId not set, cannot create session');
+        }
     }
 
-    private manageMediaEvent(data: any) {
-        // Capture streamSid from first media event if not already set
+    private manageMediaEvent(data: any): void {
+        // Capture streamSid if we don't have it from start event
         if (!this.streamSID && data.streamSid) {
             this.streamSID = data.streamSid;
             console.log('[WebSocketService] Captured streamSid from media event:', this.streamSID);
@@ -77,13 +151,16 @@ export class WebSocketService {
         }
     }
 
-    private manageStopEvent(data: any) {
-        // add logic
+    private manageStopEvent(data: any): void {
         console.log('[TwilioClient] Stop event:', data);
+        if (!this.callSid && data.stop?.callSid) {
+            this.callSid = data.stop.callSid;
+            console.log('[WebSocketService] Captured callSid from stop event:', this.callSid);
+        }
     }
 
-    private manageMarkEvent(data: any) {
-        // add logic
+    private manageMarkEvent(data: any): void {
+        // add logic if needed
         console.log('[TwilioClient] Mark event:', data);
     }
 
@@ -107,7 +184,8 @@ export class WebSocketService {
             const signedUrl = await this.elevenLabsClient.getSignedURL();
             const systemPrompt = buildSystemPrompt(userProfile);
             const firstMessage = buildFirstMessage(userProfile);
-            const userName = userProfile.name;
+
+            this.userId = userProfile.id;
 
             console.log('[WebSocketService] Creating ElevenLabs WebSocket connection');
             this.elevenlabsWs = new WebSocket(signedUrl);
@@ -143,6 +221,19 @@ export class WebSocketService {
                     first_message: firstMessage,
                     language: 'en',
                     auto_start_conversation: true
+                },
+                tts: {
+                    voice_id: process.env.ELEVENLABS_VOICE_ID
+                },
+                conversation: {
+                    client_events: {
+                        enable_user_transcription: true,
+                        enable_agent_response: true
+                    }
+                },
+                asr: {
+                    quality: 'high',
+                    user_input_audio_format: 'pcm_mulaw'
                 }
             },
         };
@@ -154,10 +245,11 @@ export class WebSocketService {
         try {
             const msg = JSON.parse(data.toString());
 
-            if (msg.type !== 'audio' && msg.type !== 'ping') {
+            const importantEvents = ['conversation_initiation_metadata', 'user_transcript', 'agent_response', 'interruption'];
+            if (importantEvents.includes(msg.type)) {
                 console.log('[WebSocketService] ElevenLabs message:', {
                     type: msg.type,
-                    conversation_id: msg.conversation_id
+                    conversation_id: this.conversationId
                 });
             }
 
@@ -199,15 +291,20 @@ export class WebSocketService {
         console.error('[WebSocketService] ElevenLabs WebSocket error:', error);
     }
 
-    private handleClose(code: number, reason: Buffer): void {
-        console.log(`[WebSocketService] ElevenLabs WebSocket closed, code: ${code}, reason: ${reason.toString()}`);
+    private async handleClose(code: number, reason: Buffer): Promise<void> {
+        const reasonText = reason.toString() || 'No reason provided';
+        console.log(`[WebSocketService] ElevenLabs WebSocket closed`);
+        console.log(`[WebSocketService] Close code: ${code}, reason: ${reasonText}`);
 
-        if (this.keepAliveInterval) {
-            clearInterval(this.keepAliveInterval);
-            console.log('[WebSocketService] Cleared keepalive interval');
+        await this.closeWSConnection();
+    }
+
+    private async deleteLocalConnection(callSid: string): Promise<boolean> {
+        const deleted = this.localConnections.delete(callSid);
+        if (!deleted) {
+            console.warn('[WebSocketService] No local connection found for callSid:', callSid);
         }
-
-        // TODO: Handle cleanup - save transcript, etc.
+        return deleted;
     }
 
     closeConnection(): void {

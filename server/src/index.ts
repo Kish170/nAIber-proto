@@ -2,6 +2,10 @@ import express from 'express';
 import http from 'http';
 import { CallController } from './controllers/CallController.js';
 import { createCallRouter } from './routes/CallRoutes.js';
+import { sessionManager } from './services/SessionManager.js';
+
+// Initialize SessionManager
+await sessionManager.initialize();
 
 const app = express();
 const callController = new CallController();

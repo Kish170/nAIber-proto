@@ -232,10 +232,10 @@ export class TwilioClient {
 
         return `
             <Response>
-            <Connect>
-                <Stream url="${this.configs.streamUrl}">
-                </Stream>
-            </Connect>
+                <Connect>
+                    <Stream url="${this.configs.streamUrl}">
+                    </Stream>
+                </Connect>
             </Response>
         `.trim();
     }
