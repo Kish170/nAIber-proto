@@ -3,7 +3,7 @@ import { UserProfile } from "../repositories/UserRespository.js";
 import { WebSocket } from 'ws';
 import { buildFirstMessage, buildSystemPrompt } from '../tools/SystemPrompts.js';
 import { TwilioClient } from "../clients/TwilioClient.js";
-import { sessionManager, SessionManager, SessionData } from "./SessionManager.js";
+import { sessionManager } from "./SessionManager.js";
 
 export interface WebSockets {
     twilioWs: WebSocket;
@@ -20,9 +20,7 @@ export class WebSocketService {
     private callSid: string = "";
     private keepAliveInterval?: NodeJS.Timeout;
     private localConnections: Map<string, WebSockets> = new Map();
-    private sessionManager: SessionManager = sessionManager;
     private startedAt: Date = new Date();
-    private userId: string = "";
 
 
     constructor(twilioWs: WebSocket, elevenLabsConfig: ElevenLabsConfigs, twilioClient?: TwilioClient) {
@@ -36,17 +34,11 @@ export class WebSocketService {
         try {
             const data = JSON.parse(message.toString());
 
-            if (data.event !== 'media') {
-                console.log('[TwilioClient] Received event:', data.event, data.streamSid ? `streamSid: ${data.streamSid}` : '');
-            }
-
             switch (data.event) {
                 case "connected":
-                    console.log("CONNECTED")
                     this.manageConnectedEvent(data);
                     break;
                 case "start":
-                    console.log("STARTTTT")
                     await this.manageStartEvent(data);
                     break;
                 case "media":
@@ -104,7 +96,6 @@ export class WebSocketService {
     }
 
     private manageConnectedEvent(data: any): void {
-        // add logic if needed
         console.log('[TwilioClient] Connected event:', data);
     }
 
@@ -114,38 +105,21 @@ export class WebSocketService {
         this.callSid = data.start.callSid;
         console.log('[WebSocketService] Twilio stream started - streamSid:', this.streamSID, 'callSid:', this.callSid);
 
-        if (this.elevenlabsWs) {
-            this.localConnections.set(this.callSid, {
-                twilioWs: this.twilioWs,
-                elevenLabsWs: this.elevenlabsWs
-            });
-            console.log('[WebSocketService] Stored local connections for callSid:', this.callSid);
-        } else {
-            console.warn('[WebSocketService] ElevenLabs WebSocket not ready, cannot store connections');
-        }
-
-        if (this.userId) {
-            await sessionManager.createSession(this.callSid, {
-                callSid: this.callSid,
-                conversationId: this.conversationId || '', // May be empty initially
-                userId: this.userId,
-                streamSid: this.streamSID,
-                startedAt: this.startedAt.toISOString()
-            });
-            console.log('[WebSocketService] Stored redis session for callSid:', this.callSid);
-        } else {
-            console.warn('[WebSocketService] UserId not set, cannot create session');
-        }
+        await sessionManager.createSession(this.callSid, {
+            callSid: this.callSid,
+            conversationId: this.conversationId || '',
+            streamSid: this.streamSID,
+            startedAt: this.startedAt.toISOString()
+        });
+         
     }
 
     private manageMediaEvent(data: any): void {
-        // Capture streamSid if we don't have it from start event
         if (!this.streamSID && data.streamSid) {
             this.streamSID = data.streamSid;
             console.log('[WebSocketService] Captured streamSid from media event:', this.streamSID);
         }
 
-        // Forward audio to ElevenLabs
         if (data.media?.payload) {
             this.sendAudioToElevenLabs(data.media.payload);
         }
@@ -185,10 +159,18 @@ export class WebSocketService {
             const systemPrompt = buildSystemPrompt(userProfile);
             const firstMessage = buildFirstMessage(userProfile);
 
-            this.userId = userProfile.id;
-
             console.log('[WebSocketService] Creating ElevenLabs WebSocket connection');
             this.elevenlabsWs = new WebSocket(signedUrl);
+
+            if (this.elevenlabsWs) {
+                this.localConnections.set(this.callSid, {
+                    twilioWs: this.twilioWs,
+                    elevenLabsWs: this.elevenlabsWs
+                });
+                console.log('[WebSocketService] Stored local connections for callSid:', this.callSid);
+            } else {
+                console.warn('[WebSocketService] ElevenLabs WebSocket not ready, cannot store connections');
+            }
 
             this.elevenlabsWs.on('open', () => this.handleOpen(systemPrompt, firstMessage));
             this.elevenlabsWs.on('message', (data: any) => this.handleMessage(data));

@@ -230,10 +230,19 @@ export class TwilioClient {
             return this.generateErrorTwiml('Missing agent configuration');
         }
 
+        const audioParameters = `
+            <Parameter name="stream_sample_rate" value="8000"/>
+            <Parameter name="stream_format" value="mulaw"/>
+        `;
+        
+        const elevenLabsParameter = `<Parameter name="agent_id" value="${agentId}"/>`;
+
         return `
             <Response>
                 <Connect>
                     <Stream url="${this.configs.streamUrl}">
+                        ${audioParameters}
+                        ${elevenLabsParameter}
                     </Stream>
                 </Connect>
             </Response>

@@ -59,38 +59,37 @@ export class CallController {
 
             console.log('[CallController] WebSocket server created at /outbound-media-stream');
 
-            wss.on("connection", async (ws: WebSocket): Promise<void> => {
+            wss.on("connection", (ws: WebSocket): void => {
                 console.log('[CallController] Twilio WebSocket connected');
-
-                const userNumber = process.env.PHONE_NUMBER;
-                if (!userNumber) {
-                    console.error('[CallController] Missing phone number');
-                    ws.close();
-                    return;
-                }
-
-                const userProfile = await UserProfile.loadByPhone(userNumber);
-                if (!userProfile) {
-                    console.error('[CallController] User profile not found');
-                    ws.close();
-                    return;
-                }
 
                 const webSocketService = new WebSocketService(ws, this.elevenLabsConfigs, this.twilioClient);
 
-                // Set up Twilio message handler FIRST before connecting to ElevenLabs
-                // This ensures we capture the "connected" and "start" events
                 ws.on("message", async (rawData): Promise<void> => {
                     const buffer = Buffer.isBuffer(rawData) ? rawData : Buffer.from(rawData.toString());
                     await webSocketService.twilioEventProcessor(buffer);
-                })
+                });
 
                 ws.on("close", async (): Promise<void> => {
                     await webSocketService.closeWSConnection();
-                })
+                });
 
-                // Connect to ElevenLabs AFTER setting up message handlers
-                await webSocketService.connectToElevenLabs(userProfile);
+                (async () => {
+                    const userNumber = process.env.PHONE_NUMBER;
+                    if (!userNumber) {
+                        console.error('[CallController] Missing phone number');
+                        ws.close();
+                        return;
+                    }
+
+                    const userProfile = await UserProfile.loadByPhone(userNumber);
+                    if (!userProfile) {
+                        console.error('[CallController] User profile not found');
+                        ws.close();
+                        return;
+                    }
+
+                    await webSocketService.connectToElevenLabs(userProfile);
+                })();
             });
 
             return wss;

@@ -3,7 +3,6 @@ import { redisClient } from "../clients/RedisClient.js";
 export interface SessionData {
     callSid: string;
     conversationId: string;
-    userId: string;
     streamSid: string;
     startedAt: string; 
 }
