@@ -3,12 +3,12 @@
     "target": "es2020",
     "module": "node16",
     "moduleResolution": "node16",
-    "rootDir": "server/src",
-    "outDir": "server/dist",
     "strict": true,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
-    "skipLibCheck": true
-  },
-  "include": ["server/src"]
+    "skipLibCheck": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true
+  }
 }

@@ -17,7 +17,7 @@ async function testWebhook() {
       conversation_id: 'test_conv_123'
     });
     
-    console.log('✅ Create user response:', createUserResponse.data);
+    console.log('Create user response:', createUserResponse.data);
     const userId = createUserResponse.data.data.userId;
     
     // Test 2: Save User Data
@@ -32,7 +32,7 @@ async function testWebhook() {
       conversation_id: 'test_conv_123'
     });
     
-    console.log('✅ Save data response:', saveDataResponse.data);
+    console.log('Save data response:', saveDataResponse.data);
     
     // Test 3: Check Missing Info
     console.log('\n3. Testing check_missing_info...');
@@ -44,7 +44,7 @@ async function testWebhook() {
       conversation_id: 'test_conv_123'
     });
     
-    console.log('✅ Check missing info response:', checkInfoResponse.data);
+    console.log(' Check missing info response:', checkInfoResponse.data);
     
     // Test 4: Create Emergency Contact
     console.log('\n4. Testing create_emergency_contact...');
@@ -59,7 +59,7 @@ async function testWebhook() {
       conversation_id: 'test_conv_123'
     });
     
-    console.log('✅ Emergency contact response:', emergencyContactResponse.data);
+    console.log(' Emergency contact response:', emergencyContactResponse.data);
     
     // Test 5: Add Health Condition
     console.log('\n5. Testing add_health_condition...');
@@ -75,7 +75,7 @@ async function testWebhook() {
       conversation_id: 'test_conv_123'
     });
     
-    console.log('✅ Health condition response:', healthConditionResponse.data);
+    console.log(' Health condition response:', healthConditionResponse.data);
     
     // Test 6: Get User Health Conditions
     console.log('\n6. Testing get_user_health_conditions...');
@@ -87,7 +87,7 @@ async function testWebhook() {
       conversation_id: 'test_conv_123'
     });
     
-    console.log('✅ Get health conditions response:', getUserHealthConditionsResponse.data);
+    console.log(' Get health conditions response:', getUserHealthConditionsResponse.data);
     
     // Test 7: Add Medication
     console.log('\n7. Testing add_medication...');
@@ -105,7 +105,7 @@ async function testWebhook() {
       conversation_id: 'test_conv_123'
     });
     
-    console.log('✅ Medication response:', medicationResponse.data);
+    console.log(' Medication response:', medicationResponse.data);
     
     // Test 8: Get User Medications
     console.log('\n8. Testing get_user_medications...');
@@ -117,12 +117,12 @@ async function testWebhook() {
       conversation_id: 'test_conv_123'
     });
     
-    console.log('✅ Get medications response:', getUserMedicationsResponse.data);
+    console.log(' Get medications response:', getUserMedicationsResponse.data);
     
-    console.log('\n🎉 All tests passed!');
+    console.log('\n All tests passed!');
     
   } catch (error) {
-    console.error('❌ Test failed:', error.response?.data || error.message);
+    console.error(' Test failed:', error.response?.data || error.message);
   }
 }
 

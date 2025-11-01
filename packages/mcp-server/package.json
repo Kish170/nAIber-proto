@@ -1,0 +1,28 @@
+{
+  "name": "@naiber/mcp-server",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "MCP server for nAIber - provides tools and resources for AI assistants",
+  "main": "./dist/index.js",
+  "bin": {
+    "naiber-mcp": "./dist/index.js"
+  },
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@naiber/shared": "*",
+    "@modelcontextprotocol/sdk": "^1.17.5",
+    "@prisma/client": "^6.18.0",
+    "dotenv": "^16.6.1",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^18.19.118",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3"
+  }
+}

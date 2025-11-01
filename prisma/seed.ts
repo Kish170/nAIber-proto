@@ -122,7 +122,7 @@ async function main() {
     }
   });
 
-  console.log('✅ Test user created successfully!');
+  console.log(' Test user created successfully!');
   console.log(`User ID: ${user.id}`);
   console.log(`Name: ${user.name}`);
   console.log(`Phone: ${user.phone}`);

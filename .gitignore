@@ -15,7 +15,7 @@ yarn-error.log*
 /generated/prisma
 
 # Redis
-dump.rdb
+/dump.rdb
 *.rdb
 
 CLAUDE.md
