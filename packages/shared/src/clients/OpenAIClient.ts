@@ -27,7 +27,7 @@ export class OpenAIClient {
     constructor(configs: OpenAIConfigs) {
         this.openai = new OpenAI({
             apiKey: configs.apiKey,
-            baseURL: configs.baseUrl  // Optional custom endpoint
+            baseURL: configs.baseUrl  
         });
     }
 

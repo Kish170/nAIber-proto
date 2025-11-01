@@ -18,4 +18,7 @@ yarn-error.log*
 /dump.rdb
 *.rdb
 
+# ngrok (contains auth token - don't commit!)
+/*ngrok.yml
+
 CLAUDE.md

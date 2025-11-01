@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import http from 'http';
 import { LLMRouter } from './routes/LLMRoute.js';
@@ -6,15 +7,15 @@ const app = express();
 
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
-app.use(LLMRouter())
+app.use(LLMRouter());
 
 const server = http.createServer(app);
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.LLM_PORT || 3001;
 
 server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log(`ElevenLabs webhook available at: https://4973188fcbd8.ngrok-free.app/api/elevenlabs-webhook`);
+  console.log(`LLM Server running on port ${PORT}`);
+  console.log(`Chat completions endpoint: http://localhost:${PORT}/v1/chat/completions`);
 });
 
 let isShuttingDown = false;

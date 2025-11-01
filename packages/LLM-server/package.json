@@ -12,11 +12,12 @@
   },
   "dependencies": {
     "@naiber/shared": "*",
-    "@prisma/client": "^6.18.0",
-    "dotenv": "^16.6.1",
-    "zod": "^3.25.76"
+    "express": "^4.21.2",
+    "openai": "^4.0.0",
+    "dotenv": "^16.6.1"
   },
   "devDependencies": {
+    "@types/express": "^4.17.23",
     "@types/node": "^18.19.118",
     "tsx": "^4.20.3",
     "typescript": "^5.8.3"
