@@ -1,0 +1,24 @@
+{
+  "name": "@naiber/llm-server",
+  "version": "1.0.0",
+  "description": "LLM server for nAIber - custom LLM connection for ElevenLabs Conversational AI Agent",
+  "type": "module",
+  "main": "./dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@naiber/shared": "*",
+    "@prisma/client": "^6.18.0",
+    "dotenv": "^16.6.1",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^18.19.118",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3"
+  }
+}
