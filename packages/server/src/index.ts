@@ -6,7 +6,6 @@ import { sessionManager } from './services/SessionManager.js';
 import { prismaClient } from '@naiber/shared';
 import { redisClient } from './clients/RedisClient.js';
 
-// Initialize SessionManager
 await sessionManager.initialize();
 
 const app = express();
@@ -14,8 +13,6 @@ const callController = new CallController();
 
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
-
-// Mount call routes
 app.use(createCallRouter(callController));
 
 const server = http.createServer(app);

@@ -1,11 +1,11 @@
 {
-  "extends": "../../tsconfig.json",
-  "compilerOptions": {
-    "rootDir": "./src",
-    "outDir": "./dist"
-  },
-  "include": ["src/**/*"],
-  "references": [
-    { "path": "../shared" }
-  ]
+    "extends": "../../tsconfig.json",
+    "compilerOptions": {
+        "rootDir": "./src",
+        "outDir": "./dist"
+    },
+    "include": ["src/**/*", "../shared/src/clients/OpenAIClient.ts"],
+    "references": [
+        { "path": "../shared" }
+    ]
 }

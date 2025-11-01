@@ -10,6 +10,7 @@
   "scripts": {
     "dev": "npm run dev --workspace=@naiber/server",
     "dev:mcp": "npm run dev --workspace=@naiber/mcp-server",
+    "dev:llm": "npm run dev --workspace=@naiber/llm-server",
     "build": "npm run build --workspaces --if-present",
     "start": "npm run start --workspace=@naiber/server",
     "seed": "tsx prisma/seed.ts",
