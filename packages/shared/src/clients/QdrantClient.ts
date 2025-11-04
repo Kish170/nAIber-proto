@@ -2,7 +2,7 @@ import axios, { AxiosInstance } from 'axios';
 
 export interface QdrantConfig {
     baseUrl: string;
-    api_key: string;
+    apiKey: string;
     collectionName: string;
 }
 
@@ -39,8 +39,6 @@ export interface SearchPayload {
     data: string;
     similarity: number;
 }
-
-// add response interface
 
 export class QdrantClient {
     private client: AxiosInstance;
@@ -90,7 +88,7 @@ export class QdrantClient {
     private getQdrantHeaders() {
         return {
             'Content-Type': 'application/json',
-            'api-key': this.config.api_key
+            'api-key': this.config.apiKey
         };
     }
 
@@ -159,7 +157,5 @@ export class QdrantClient {
             return [];
         }
     }
-
-    // TODO: Finish up clients, properly use client, fix topic summary, filter
 
 }

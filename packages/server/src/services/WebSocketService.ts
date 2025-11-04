@@ -1,4 +1,4 @@
-import { ElevenLabsClient, ElevenLabsConfigs } from "../clients/ElevenlabsClient.js";
+import { ElevenLabsClient, ElevenLabsConfigs } from "@naiber/shared";
 import { UserProfile } from "@naiber/shared";
 import { WebSocket } from 'ws';
 import { buildFirstMessage, buildSystemPrompt } from './SystemPromptsService.js';
@@ -29,7 +29,6 @@ export class WebSocketService {
         this.twilioClient = twilioClient || null;
     }
 
-    // TWILIO SETUP
     async twilioEventProcessor(message: Buffer): Promise<void> {
         try {
             const data = JSON.parse(message.toString());
@@ -111,7 +110,6 @@ export class WebSocketService {
             streamSid: this.streamSID,
             startedAt: this.startedAt.toISOString()
         });
-         
     }
 
     private manageMediaEvent(data: any): void {
@@ -150,7 +148,6 @@ export class WebSocketService {
         }
     }
 
-    // ELEVEN LABS SETUP
     async connectToElevenLabs(userProfile: UserProfile): Promise<void> {
         try {
             console.log('[WebSocketService] Connecting to ElevenLabs');

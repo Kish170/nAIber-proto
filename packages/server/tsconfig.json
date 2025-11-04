@@ -4,7 +4,7 @@
         "rootDir": "./src",
         "outDir": "./dist"
     },
-    "include": ["src/**/*", "../shared/src/clients/OpenAIClient.ts"],
+    "include": ["src/**/*", "../shared/src/clients/OpenAIClient.ts", "../shared/src/clients/ElevenlabsClient.ts", "../shared/src/clients/QdrantClient.ts"],
     "references": [
         { "path": "../shared" }
     ]

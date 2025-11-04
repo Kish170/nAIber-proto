@@ -1,7 +1,7 @@
 import { TwilioClient } from '../clients/TwilioClient.js';
 import { WebSocketServer, WebSocket } from 'ws';
 import http from 'http';
-import { ElevenLabsConfigs } from '../clients/ElevenlabsClient.js';
+import { ElevenLabsConfigs } from '@naiber/shared';
 import { UserProfile } from '@naiber/shared';
 import { WebSocketService } from '../services/WebSocketService.js';
 

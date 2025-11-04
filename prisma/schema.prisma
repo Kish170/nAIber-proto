@@ -161,10 +161,13 @@ model ConversationTopic {
   userId                 String
 
   topicName              String
+  variations             String[]
   category               String?
 
   firstMentioned         DateTime @default(now())
   lastMentioned          DateTime @default(now())
+  
+  topicEmbedding         Float[]
 
 //   engagement_level       String  
 //   user_interest_score    Int

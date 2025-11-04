@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import http from 'http';
-import { LLMRouter } from './routes/LLMRoute.js';
+import { LLMRouter } from './routes/LLMRoute.js'
 
 const app = express();
 

@@ -1,6 +1,7 @@
 import OpenAI from 'openai';
 import { ChatCompletion } from 'openai/resources/index.mjs';
 import { Stream } from 'openai/streaming.mjs';
+import { TranscriptMessage } from '@naiber/shared';
 
 export interface OpenAIConfigs {
     apiKey: string;
@@ -14,7 +15,7 @@ export interface Message {
 
 export interface ChatCompletionRequest {
     messages: Message[];
-    model: string;
+    model?: string;
     temperature?: number;
     max_tokens?: number;
     stream?: boolean;
@@ -35,7 +36,7 @@ export class OpenAIClient {
         try {
             const oaiRequest: OpenAI.Chat.ChatCompletionCreateParams = {
                 messages: request.messages as OpenAI.Chat.ChatCompletionMessageParam[],
-                model: request.model,
+                model: request.model ?? "gpt-4o",
                 temperature: request.temperature ?? 0.7,
                 stream: false,
                 ...(request.max_tokens && { max_tokens: request.max_tokens }),
@@ -53,7 +54,7 @@ export class OpenAIClient {
         try {
             const oaiRequest: OpenAI.Chat.ChatCompletionCreateParams = {
                 messages: request.messages as OpenAI.Chat.ChatCompletionMessageParam[],
-                model: request.model,
+                model: request.model ?? "gpt-4o",
                 temperature: request.temperature ?? 0.7,
                 stream: true, 
                 ...(request.max_tokens && { max_tokens: request.max_tokens }),
@@ -80,7 +81,7 @@ export class OpenAIClient {
             throw new Error('[OpenAI] Call to api for embedding failed');
         }
     }
-
+    
     getClient(): OpenAI {
         return this.openai;
     }
