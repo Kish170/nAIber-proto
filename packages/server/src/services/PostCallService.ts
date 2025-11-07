@@ -1,11 +1,24 @@
-import { ElevenLabsClient, OpenAIClient, QdrantClient, prismaClient, Message, TranscriptMessage, Summary } from '@naiber/shared';
+import { ElevenLabsClient, OpenAIClient, QdrantClient, createSummary, Message, TranscriptMessage, UserProfileData, createConversationTopic, getConversationTopics, createConversationReferences, ReturnedTopic, updateConversationTopic, ConversationPoint } from '@naiber/shared';
+import cosine from 'compute-cosine-similarity';
+import { number } from 'zod';
+
+export interface SummaryRef {
+    conversationId: string;
+	summaryId: string;
+	topicsDiscussed: string[];
+	keyHighlights: string[];
+}
+
 
 export class ConversationHandler {
     private elevenLabsClient: ElevenLabsClient;
     private openAIClient: OpenAIClient;
     private qdrantClient: QdrantClient;
+    private userProfile: UserProfileData;
+    private summaryRef: SummaryRef | null = null;
 
-	constructor() {
+
+	constructor(userProfile: UserProfileData) {
 
         const elevenLabsApiKey = process.env.ELEVENLABS_API_KEY;
         const agentID = process.env.ELEVENLABS_AGENT_ID;
@@ -47,6 +60,8 @@ export class ConversationHandler {
             apiKey: qdrantApiKey,
             collectionName
         })
+
+        this.userProfile = userProfile;
 	}
 
 	async generateAndSaveConversationSummary(userId: string, conversationId: string) {
@@ -64,24 +79,21 @@ export class ConversationHandler {
 			const summary = await this.generateConversationSummary(transcript);
 
 			console.log('[Summary] Saving to PostgreSQL...');
-			const conversationSummary = await prismaClient.conversationSummary.create({
-				data: {
+			const conversationSummary = await createSummary({
 					userId: userId,
 					conversationId: conversationId,
 					summaryText: summary.summaryText,
 					topicsDiscussed: summary.topicsDiscussed,
 					keyHighlights: summary.keyHighlights
-				}
 			});
 
 			console.log('[Summary]  Saved to PostgreSQL');
 
-			return {
-				success: true,
+			this.summaryRef = {
 				conversationId,
 				summaryId: conversationSummary.id,
-				topicsCount: summary.topicsDiscussed.length,
-				highlightsCount: summary.keyHighlights.highlights?.length || 0
+				topicsDiscussed: summary.topicsDiscussed,
+				keyHighlights: summary.keyHighlights.highlights
 			};
 
 		} catch (error) {
@@ -90,14 +102,89 @@ export class ConversationHandler {
 		}
 	}
 
-    private async updateConversationData() {
-
+    private async updateConversationTopicData() {
+        if (this.userProfile.isFirstCall) {
+            this.summaryRef?.topicsDiscussed.forEach(async (topic) => {
+                try {
+                    await this.createNewTopic(topic);
+                } catch (error) {
+                    console.error("Unable to create new topic")
+                    throw error;
+                }
+            });
+        } else {
+            this.summaryRef?.topicsDiscussed.forEach(async (topic) => {
+                const existingTopics = await getConversationTopics(this.userProfile.id);
+                try {
+                    await this.updateTopic(topic, existingTopics);
+                } catch (error) {
+                    console.error("Unable to create new topic")
+                    throw error;
+                }
+            });
+        }
     }
 
+    private async updateTopic(newTopic: string, existingTopics: ReturnedTopic[]) {
+        const similarityThreshold = 0.85;
+        let isSimilar = false;
+        const newTopicEmbedding = await this.openAIClient.generateEmbeddings(newTopic);
+        for (const existingTopic of existingTopics) {
+            const similarity = cosine(existingTopic.topicEmbedding, newTopicEmbedding);
+            if (similarity && similarity > similarityThreshold) {
+                isSimilar = true;
+                await updateConversationTopic(this.userProfile.id, existingTopic.topicName, newTopic);
+                await createConversationReferences({
+                    conversationSummaryId: this.summaryRef?.summaryId!,
+                    conversationTopicId: existingTopic.id
+                });
+                break;
+            }
+        }
+        if (!isSimilar) {
+            await this.createNewTopic(newTopic);
+        }
+    }
+
+    private async createNewTopic(topic: string) {
+        try {
+            const embedding = await this.openAIClient.generateEmbeddings(topic);
+            const newTopic = await createConversationTopic({
+                userId: this.userProfile.id,
+                topicName: topic,
+                topicEmbedding: embedding
+            });
+            await createConversationReferences({
+                conversationSummaryId: this.summaryRef?.summaryId!,
+                conversationTopicId: newTopic.id
+            });
+        } catch (error) {
+            console.error("Unable to create new topic")
+            throw error;
+        }
+    }
+
+    private async updateVectorDB() {
+        var points: ConversationPoint[] = []
+        this.summaryRef?.keyHighlights.forEach(async (highlight) => {
+            const embedding = await this.openAIClient.generateEmbeddings(highlight);
+            points.push({
+                id: this.summaryRef?.conversationId!,
+                vector: embedding,
+                payload: {
+                    userId: this.userProfile.id,
+                    conversationId: this.summaryRef?.conversationId!,
+                    highlight: this.summaryRef?.keyHighlights![0]!,  
+                }
+            });
+        });
+        const result = await this.qdrantClient.postToCollection(points);
+    }
+
+    // deal with updating this during call for websocket service instead maybe?
     private async updateCallLog() {
 
     }
-
 
     private async generateConversationSummary(transcript: TranscriptMessage[]) {
         try {

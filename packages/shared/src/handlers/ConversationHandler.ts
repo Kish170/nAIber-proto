@@ -22,6 +22,7 @@ export interface ConversationTopicData {
     userId: string;
     topicName: string;
     category?: string;
+    topicEmbedding: number[];
 }
 
 export interface ConversationReferenceData {
@@ -29,9 +30,15 @@ export interface ConversationReferenceData {
     conversationTopicId: string;
 }
 
-export async function createSummary( data: Summary) {
+export interface ReturnedTopic {
+    id: string;
+    topicName: string;
+    topicEmbedding: number[];
+}
+
+export async function createSummary(data: Summary) {
    try {
-        await prismaClient.conversationSummary.create({
+        return await prismaClient.conversationSummary.create({
             data: {
                 userId: data.userId,
                 conversationId: data.conversationId,
@@ -66,28 +73,17 @@ export async function createLog(data: CallLogData) {
     }
 }
 
-export async function createConversationTopics(data: ConversationTopicData) {
+export async function createConversationTopic(data: ConversationTopicData): Promise<ReturnedTopic>{
     try {
-        const topic = await prismaClient.conversationTopic.upsert({
-            where: {
-                userId_topicName: {
-                    userId: data.userId,
-                    topicName: data.topicName
-                }
-            },
-            update: {
-                lastMentioned: new Date(),
-                category: data.category || undefined
-            },
-            create: {
+        return await prismaClient.conversationTopic.create({
+            data: {
                 userId: data.userId,
                 topicName: data.topicName,
                 category: data.category,
-                firstMentioned: new Date(),
-                lastMentioned: new Date()
+                topicEmbedding: data.topicEmbedding,
+                variations: [],
             }
         });
-        return topic;
     } catch (error) {
         console.error("[Conversation Handler] Unable to create/update conversation topic:", error);
         throw error;
@@ -119,10 +115,9 @@ export async function createConversationReferences(data: ConversationReferenceDa
     }
 }
 
-// need to update for proper implementation
-export async function updateConversationTopics(userId: string, topicName: string) {
+export async function updateConversationTopic(userId: string, topicName: string, newTopic: string): Promise<ReturnedTopic> {
     try {
-        const topic = await prismaClient.conversationTopic.update({
+        return await prismaClient.conversationTopic.update({
             where: {
                 userId_topicName: {
                     userId,
@@ -130,33 +125,96 @@ export async function updateConversationTopics(userId: string, topicName: string
                 }
             },
             data: {
-                lastMentioned: new Date()
+                topicName: newTopic,
+                variations: {
+                    push: topicName
+                }
+            }, 
+            select: {
+                id: true,
+                topicName: true,
+                topicEmbedding: true
             }
         });
-        return topic;
     } catch (error) {
         console.error("[Conversation Handler] Unable to update conversation topic:", error);
         throw error;
     }
 }
 
-// need to update for proper implementation
-export async function updateConversationReferences(conversationSummaryId: string, conversationTopicId: string) {
+export async function updateConversationReference(conversationSummaryId: string, conversationTopicId: string) {
     try {
-        const reference = await prismaClient.conversationTopicReference.update({
+        const reference = await prismaClient.conversationTopicReference.findFirst({
             where: {
-                conversationSummaryId_conversationTopicId: {
-                    conversationSummaryId,
-                    conversationTopicId
-                }
-            },
-            data: {
-                mentionedAt: new Date()
+                conversationSummaryId
             }
         });
-        return reference;
+
+        if (!reference) {
+            throw new Error("Reference not found");
+        }
+
+        const updated = await prismaClient.conversationTopicReference.update({
+            where: {
+                id: reference.id
+            },
+            data: {
+                conversationTopicId
+            }
+        });
+        
+        return updated;
     } catch (error) {
         console.error("[Conversation Handler] Unable to update conversation reference:", error);
         throw error;
     }
 }
+
+export async function getConversationTopics(userId: string) {
+    try {
+        const allTopics = await prismaClient.conversationTopic.findMany( {
+            where: {
+                userId
+            },
+            select: {
+                id: true,
+                topicName: true,
+                topicEmbedding: true
+            }
+        });
+        return allTopics;
+    } catch (error) {
+        console.error("[Conversation Handler] Unable to get all conversations topics", error);
+        throw error;
+    }
+}
+
+export async function getConversationTopic(userId: string, topicId: string) {
+    try {
+        const topic = await prismaClient.conversationTopic.findUnique( {
+            where: {
+                userId,
+                id: topicId 
+            },
+        });
+        return topic;
+    } catch (error) {
+        console.error("[Conversation Handler] Unable to get all conversations topics", error);
+        throw error;
+    }
+}
+
+export async function getTopicReference(topicId: string) {
+    try {
+        const topicReference = await prismaClient.conversationTopicReference.findUnique( {
+            where: {
+                id: topicId 
+            }
+        })
+        return topicReference;
+    } catch (error) {
+        console.error("[Conversation Handler] Unable to get all conversations topics", error);
+        throw error;
+    }
+}
+

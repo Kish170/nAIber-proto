@@ -69,11 +69,11 @@ export class OpenAIClient {
         }
     }
 
-    async generateEmbeddings(model: string, text: string): Promise<number[]> {
+    async generateEmbeddings(text: string): Promise<number[]> {
         try {
             const response = await this.openai.embeddings.create({
                 input: text,
-                model: model
+                model: "text-embedding-3-small"
             });
             return response.data[0].embedding;
         } catch (error) {

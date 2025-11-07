@@ -163,9 +163,6 @@ model ConversationTopic {
   topicName              String
   variations             String[]
   category               String?
-
-  firstMentioned         DateTime @default(now())
-  lastMentioned          DateTime @default(now())
   
   topicEmbedding         Float[]
 
@@ -180,8 +177,9 @@ model ConversationTopic {
   conversationReferences ConversationTopicReference[]
 
   @@unique([userId, topicName])
-  @@index([userId, lastMentioned])
-  @@index([lastMentioned])
+  @@index([userId, updatedAt])
+  @@index([updatedAt])
+  @@index([userId, topicEmbedding])
   @@map("conversation_topics")
 }
 
@@ -190,13 +188,13 @@ model ConversationTopicReference {
   conversationSummaryId String
   conversationTopicId   String
 
-  mentionedAt           DateTime            @default(now())
+  mentionedAt           DateTime            @updatedAt
 
   conversationSummary   ConversationSummary @relation(fields: [conversationSummaryId], references: [id], onDelete: Cascade)
   conversationTopic     ConversationTopic   @relation(fields: [conversationTopicId], references: [id], onDelete: Cascade)
 
   @@unique([conversationSummaryId, conversationTopicId])
-  @@index([conversationTopicId, mentionedAt])
+  @@index([conversationTopicId])
   @@map("conversation_topic_references")
 }
 

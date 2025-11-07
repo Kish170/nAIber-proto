@@ -36,7 +36,6 @@ export const userProfileInclude = Prisma.validator<Prisma.UserInclude>()({
             id: true,
             topicName: true,
             category: true,
-            lastMentioned: true,
             conversationReferences: {
                 select: {
                     conversationSummary: {
@@ -51,7 +50,7 @@ export const userProfileInclude = Prisma.validator<Prisma.UserInclude>()({
                 take: 1
             }
         },
-        orderBy: { lastMentioned: 'desc' },
+        orderBy: { updatedAt: 'desc' },
         take: 5
     },
     conversationSummaries: {
