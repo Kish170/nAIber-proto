@@ -1,4 +1,4 @@
-import { ElevenLabsClient, ElevenLabsConfigs } from "@naiber/shared";
+import { ElevenLabsClient, ElevenLabsConfigs, OpenAIClient } from "@naiber/shared";
 import { UserProfile } from "@naiber/shared";
 import { WebSocket } from 'ws';
 import { buildFirstMessage, buildSystemPrompt } from './SystemPromptsService.js';
@@ -13,6 +13,7 @@ export interface WebSockets {
 export class WebSocketService {
     private twilioWs: WebSocket;
     private elevenLabsClient: ElevenLabsClient;
+    private openAIClient: OpenAIClient;
     private twilioClient: TwilioClient | null = null;
     private elevenlabsWs: WebSocket | null = null;
     private streamSID: string = "";
@@ -22,11 +23,14 @@ export class WebSocketService {
     private localConnections: Map<string, WebSockets> = new Map();
     private startedAt: Date = new Date();
 
-
     constructor(twilioWs: WebSocket, elevenLabsConfig: ElevenLabsConfigs, twilioClient?: TwilioClient) {
         this.twilioWs = twilioWs;
         this.elevenLabsClient = new ElevenLabsClient(elevenLabsConfig);
         this.twilioClient = twilioClient || null;
+        this.openAIClient = new OpenAIClient({
+            apiKey: process.env.OPENAI_API_KEY!,
+            baseUrl: process.env.OPENAI_BASE_URL!
+        });
     }
 
     async twilioEventProcessor(message: Buffer): Promise<void> {
@@ -153,7 +157,7 @@ export class WebSocketService {
 
             const signedUrl = await this.elevenLabsClient.getSignedURL();
             const systemPrompt = buildSystemPrompt(userProfile);
-            const firstMessage = buildFirstMessage(userProfile);
+            const firstMessage = await buildFirstMessage(userProfile, this.openAIClient);
 
             console.log('[WebSocketService] Creating ElevenLabs WebSocket connection');
             this.elevenlabsWs = new WebSocket(signedUrl);
