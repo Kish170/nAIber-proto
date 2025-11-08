@@ -1,6 +1,5 @@
 import { ElevenLabsClient, OpenAIClient, QdrantClient, createSummary, Message, TranscriptMessage, UserProfileData, createConversationTopic, getConversationTopics, createConversationReferences, ReturnedTopic, updateConversationTopic, ConversationPoint } from '@naiber/shared';
 import cosine from 'compute-cosine-similarity';
-import { number } from 'zod';
 
 export interface SummaryRef {
     conversationId: string;
@@ -68,7 +67,7 @@ export class ConversationHandler {
 		try {
 			console.log(`[Summary] Starting summary generation for conversation ${conversationId}`);
 
-			const transcript = await this.elevenLabsClient.getTranscriptWithRetry(conversationId);
+			const transcript = await this.elevenLabsClient.getStructuredTranscriptWithRetry(conversationId);
 			if (!transcript || transcript.length === 0) {
 				console.error('[Summary]  No transcript available');
 				throw new Error('No transcript available for conversation');
@@ -102,7 +101,7 @@ export class ConversationHandler {
 		}
 	}
 
-    private async updateConversationTopicData() {
+    async updateConversationTopicData() {
         if (this.userProfile.isFirstCall) {
             this.summaryRef?.topicsDiscussed.forEach(async (topic) => {
                 try {
@@ -164,7 +163,7 @@ export class ConversationHandler {
         }
     }
 
-    private async updateVectorDB() {
+    async updateVectorDB() {
         var points: ConversationPoint[] = []
         this.summaryRef?.keyHighlights.forEach(async (highlight) => {
             const embedding = await this.openAIClient.generateEmbeddings(highlight);

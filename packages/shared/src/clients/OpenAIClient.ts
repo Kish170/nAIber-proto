@@ -1,7 +1,5 @@
 import OpenAI from 'openai';
-import { ChatCompletion } from 'openai/resources/index.mjs';
-import { Stream } from 'openai/streaming.mjs';
-import { TranscriptMessage } from '@naiber/shared';
+import type { Stream } from 'openai/streaming';
 
 export interface OpenAIConfigs {
     apiKey: string;
@@ -32,7 +30,7 @@ export class OpenAIClient {
         });
     }
 
-    async generalGPTCall(request: ChatCompletionRequest): Promise<ChatCompletion> {
+    async generalGPTCall(request: ChatCompletionRequest): Promise<OpenAI.Chat.Completions.ChatCompletion> {
         try {
             const oaiRequest: OpenAI.Chat.ChatCompletionCreateParams = {
                 messages: request.messages as OpenAI.Chat.ChatCompletionMessageParam[],
@@ -43,7 +41,7 @@ export class OpenAIClient {
                 ...(request.user_id && { user: request.user_id })
             };
 
-            return await this.openai.chat.completions.create(oaiRequest) as ChatCompletion;
+            return await this.openai.chat.completions.create(oaiRequest) as OpenAI.Chat.Completions.ChatCompletion;
         } catch (error) {
             console.error('[OpenAI] Failed general task:', error);
             throw new Error('[OpenAI] Call to api with general prompt failed');
@@ -56,7 +54,7 @@ export class OpenAIClient {
                 messages: request.messages as OpenAI.Chat.ChatCompletionMessageParam[],
                 model: request.model ?? "gpt-4o",
                 temperature: request.temperature ?? 0.7,
-                stream: true, 
+                stream: true,
                 ...(request.max_tokens && { max_tokens: request.max_tokens }),
                 ...(request.user_id && { user: request.user_id })
             };

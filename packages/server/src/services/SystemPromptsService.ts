@@ -381,7 +381,6 @@ export function buildSystemPrompt(userProfile: UserProfile): string {
             ${cleanJson(recentTopics.map(t => ({
                 topic: t.topicName,
                 category: t.category,
-                lastMentioned: t.lastMentioned,
                 conversationContext: t.conversationReferences[0]?.conversationSummary?.summaryText || 'No context available'
             })))}
 

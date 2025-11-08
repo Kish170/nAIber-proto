@@ -81,13 +81,16 @@ export class CallController {
                         return;
                     }
 
+                    console.log('[CallController] Looking up user with phone:', userNumber);
                     const userProfile = await UserProfile.loadByPhone(userNumber);
                     if (!userProfile) {
-                        console.error('[CallController] User profile not found');
+                        console.error('[CallController] User profile not found for phone:', userNumber);
+                        console.error('[CallController] Make sure a user exists in the database with this phone number');
                         ws.close();
                         return;
                     }
 
+                    console.log('[CallController] User profile loaded successfully');
                     await webSocketService.connectToElevenLabs(userProfile);
                 })();
             });

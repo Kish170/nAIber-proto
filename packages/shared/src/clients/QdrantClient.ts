@@ -13,11 +13,6 @@ export interface ConversationPoint {
         userId: string;
         conversationId: string;
         highlight: string;
-        topics: string;
-        mood: string;
-        conversationDate: string; 
-        timestamp: number;
-        highlightIndex: number;
     };
 }
 

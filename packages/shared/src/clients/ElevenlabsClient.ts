@@ -12,6 +12,14 @@ export interface TranscriptMessage {
     role: string;
 }
 
+export interface TranscriptData {
+    transcript?: Array<{
+        message: any;
+        role: string;
+    }>;
+}
+
+
 export class ElevenLabsClient {
     private client: AxiosInstance;
     private configs: ElevenLabsConfigs;
@@ -45,28 +53,51 @@ export class ElevenLabsClient {
         }
     }
 
-	async getTranscriptWithRetry(conversationId: string, retries = 5, delayMs = 1000): Promise<TranscriptMessage[]> {
-		for (let i = 0; i < retries; i++) {
-			const res = await fetch(`https://api.elevenlabs.io/v1/convai/conversations/${conversationId}`, {
-				headers: {
-					'xi-api-key': process.env.ELEVENLABS_API_KEY!,
-					'Content-Type': 'application/json',
-				},
-			});
+    async getTranscriptWithRetry(conversationId: string, retries = 5, delayMs = 1000): Promise<string> {
+        for (let i = 0; i < retries; i++) {
+            const res = await fetch(`https://api.elevenlabs.io/v1/convai/conversations/${conversationId}`, {
+                headers: {
+                    'xi-api-key': process.env.ELEVENLABS_API_KEY!,
+                    'Content-Type': 'application/json',
+                },
+            });
 
-			const data = await res.json();
-			if (data.transcript && data.transcript.length > 0) {
-				return data.transcript.map((turn: { message: any; role: string; }) => {
-					if (!turn.message) return null;
-					return `${turn.role.toUpperCase()}: ${turn.message}`;
-				})
-					.filter(Boolean)
-					.join("\n");
-			}
-			await new Promise(resolve => setTimeout(resolve, delayMs));
-		}
+            const data = await res.json() as TranscriptData;
+            if (data.transcript && data.transcript.length > 0) {
+                return data.transcript.map((turn) => {
+                    if (!turn.message) return null;
+                    return `${turn.role.toUpperCase()}: ${turn.message}`;
+                })
+                    .filter(Boolean)
+                    .join("\n");
+            }
+            await new Promise(resolve => setTimeout(resolve, delayMs));
+        }
         throw new Error("Unable to retrieve transcript")
-	}
+    }
+
+    async getStructuredTranscriptWithRetry(conversationId: string, retries = 5, delayMs = 1000): Promise<TranscriptMessage[]> {
+        for (let i = 0; i < retries; i++) {
+            const res = await fetch(`https://api.elevenlabs.io/v1/convai/conversations/${conversationId}`, {
+                headers: {
+                    'xi-api-key': process.env.ELEVENLABS_API_KEY!,
+                    'Content-Type': 'application/json',
+                },
+            });
+
+            const data = await res.json() as TranscriptData;
+            if (data.transcript && data.transcript.length > 0) {
+                return data.transcript
+                    .filter((turn) => turn.message)
+                    .map((turn) => ({
+                        message: turn.message,
+                        role: turn.role
+                    }));
+            }
+            await new Promise(resolve => setTimeout(resolve, delayMs));
+        }
+        throw new Error("Unable to retrieve transcript")
+    }
 
     async initiateCall(): Promise<any> {
         try {

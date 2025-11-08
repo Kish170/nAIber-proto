@@ -132,7 +132,6 @@ export class WebSocketService {
     }
 
     private manageMarkEvent(data: any): void {
-        // add logic if needed
         console.log('[TwilioClient] Mark event:', data);
     }
 
