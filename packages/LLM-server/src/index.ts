@@ -2,12 +2,14 @@ import 'dotenv/config';
 import express from 'express';
 import http from 'http';
 import { LLMRouter } from './routes/LLMRoute.js'
+import { StatusRouter } from './routes/StatusRoute.js';
 
 const app = express();
 
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
 app.use(LLMRouter());
+app.use(StatusRouter());
 
 const server = http.createServer(app);
 

@@ -10,11 +10,18 @@
   "scripts": {
     "dev": "npm run dev --workspace=@naiber/server",
     "dev:llm": "npm run dev --workspace=@naiber/llm-server",
-    "build": "npm run build --workspaces --if-present",
+    "build": "npm run build --workspace=@naiber/shared && npm run build --workspace=@naiber/server && npm run build --workspace=@naiber/llm-server",
     "start": "npm run start --workspace=@naiber/server",
-    "seed": "tsx prisma/seed.ts",
     "clean": "npm run clean --workspaces --if-present && rm -rf node_modules",
-    "lint": "npm run lint --workspaces --if-present"
+    "lint": "npm run lint --workspaces --if-present",
+    "prisma:generate": "npx prisma generate",
+    "prisma:push": "npx prisma db push",
+    "prisma:studio": "npx prisma studio",
+    "prisma:format": "npx prisma format",
+    "prisma:reset": "npx prisma db push --force-reset && npm run seed",
+    "seed": "tsx prisma/seed.ts",
+    "db:seed": "npm run seed",
+    "db:reset": "npm run prisma:reset"
   },
   "devDependencies": {
     "@types/node": "^18.19.118",

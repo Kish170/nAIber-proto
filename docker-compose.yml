@@ -1,0 +1,112 @@
+services:
+  ngrok:
+    image: ngrok/ngrok:alpine
+    container_name: naiber-ngrok
+    command:
+      - "start"
+      - "--all"
+      - "--config"
+      - "/etc/ngrok.yml"
+    volumes:
+      - ./ngrok.yml:/etc/ngrok.yml:ro
+    ports:
+      - "4040:4040"  #
+    environment:
+      NGROK_AUTHTOKEN: ${NGROK_AUTH_TOKEN}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:4040/api/tunnels"]
+      interval: 3s
+      timeout: 2s
+      retries: 10
+      start_period: 5s
+
+  # ============================================
+  # Redis - Session Management & Caching
+  # ============================================
+  redis:
+    image: redis:7-alpine
+    container_name: naiber-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  server:
+    build:
+      context: .
+      dockerfile: packages/server/dockerfile
+    container_name: naiber-server
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: 3000
+      PHONE_NUMBER: ${PHONE_NUMBER}
+
+      USE_DYNAMIC_NGROK: ${USE_DYNAMIC_NGROK}
+      NGROK_API_URL: ${NGROK_API_URL}
+
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN}
+      TWILIO_NUMBER: ${TWILIO_NUMBER}
+
+      ELEVENLABS_API_KEY: ${ELEVENLABS_API_KEY}
+      ELEVENLABS_BASE_URL: ${ELEVENLABS_BASE_URL}
+      ELEVENLABS_AGENT_ID: ${ELEVENLABS_AGENT_ID}
+      ELEVENLABS_VOICE_ID: ${ELEVENLABS_VOICE_ID}
+      ELEVENLABS_MODEL_ID: ${ELEVENLABS_MODEL_ID}
+      ELEVENLABS_AUDIO_FORMAT: ${ELEVENLABS_AUDIO_FORMAT}
+      ELEVENLABS_SAMPLE_RATE: ${ELEVENLABS_SAMPLE_RATE}
+
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL}
+
+      DATABASE_URL: ${DATABASE_URL}
+      DIRECT_URL: ${DIRECT_URL}
+
+      QDRANT_API_KEY: ${QDRANT_API_KEY}
+      QDRANT_URL: ${QDRANT_URL}
+      QDRANT_COLLECTION: ${QDRANT_COLLECTION}
+
+      REDIS_URL: ${REDIS_URL}
+
+    ports:
+      - "3000:3000"
+    depends_on:
+      ngrok:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 40s
+
+  llm-server:
+    build:
+      context: .
+      dockerfile: packages/llm-server/dockerfile
+    container_name: naiber-llm-server
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: 3001
+
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL}
+
+    ports:
+      - "3001:3001"
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+    driver: local

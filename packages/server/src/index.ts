@@ -5,8 +5,17 @@ import { createCallRouter } from './routes/CallRoutes.js';
 import { sessionManager } from './services/SessionManager.js';
 import { prismaClient } from '@naiber/shared';
 import { redisClient } from './clients/RedisClient.js';
+import { StatusRouter } from './routes/StatusRoute.js';
+import { getNgrokUrls } from './utils/ngrok.js';
 
 await sessionManager.initialize();
+
+const ngrokUrls = await getNgrokUrls();
+if (ngrokUrls.baseUrl) {
+  process.env.BASE_URL = ngrokUrls.baseUrl;
+  process.env.TWILIO_URL = ngrokUrls.twilioUrl;
+  process.env.STREAM_URL = ngrokUrls.streamUrl;
+}
 
 const app = express();
 const callController = new CallController();
@@ -14,7 +23,7 @@ const callController = new CallController();
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
 app.use(createCallRouter(callController));
-
+app.use(StatusRouter());
 const server = http.createServer(app);
 await callController.initializeWSServer(server);
 

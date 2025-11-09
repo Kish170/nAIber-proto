@@ -19,9 +19,11 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@prisma/client": "^6.18.0"
+    "@prisma/client": "^6.18.0",
+    "axios": "^1.7.9"
   },
   "devDependencies": {
+    "@types/node": "^18.19.118",
     "typescript": "^5.8.3"
   }
 }
