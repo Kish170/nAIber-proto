@@ -3,8 +3,8 @@ import { redisClient } from "../clients/RedisClient.js";
 export interface SessionData {
     callSid: string;
     conversationId: string;
-    streamSid: string;
-    startedAt: string; 
+    streamSid?: string; // Optional: only used for WebSocket approach (CallController)
+    startedAt: string;
 }
 
 export class SessionManager {

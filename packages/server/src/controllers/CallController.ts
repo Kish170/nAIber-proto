@@ -15,15 +15,17 @@ export class CallController {
         const agentID = process.env.ELEVENLABS_AGENT_ID;
         const elevenLabsBaseUrl = process.env.ELEVENLABS_BASE_URL;
         const agentNumber = process.env.TWILIO_NUMBER;
+        const agentNumberId = process.env.ELEVENLABS_NUMBER_ID;
 
-        if (!elevenLabsApiKey || !agentID || !elevenLabsBaseUrl || !agentNumber) {
+        if (!elevenLabsApiKey || !agentID || !elevenLabsBaseUrl || !agentNumber || !agentNumberId) {
             throw new Error('Missing required ElevenLabs environment variables');
         }
         this.elevenLabsConfigs = {
             apiKey: elevenLabsApiKey,
             agentID,
             baseUrl: elevenLabsBaseUrl,
-            agentNumber
+            agentNumber,
+            agentNumberId
         };
 
         const accountSid = process.env.TWILIO_ACCOUNT_SID;

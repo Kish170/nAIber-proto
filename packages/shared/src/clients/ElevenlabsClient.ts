@@ -1,10 +1,17 @@
 import axios, { AxiosInstance } from 'axios';
 
+export interface CallMessage {
+    conversation_id: string;
+    call_sid: string;
+    status: string;
+}
+
 export interface ElevenLabsConfigs {
     apiKey: string;
     agentID: string;
     baseUrl: string;
     agentNumber: string;
+    agentNumberId: string;
 }
 
 export interface TranscriptMessage {
@@ -25,7 +32,7 @@ export class ElevenLabsClient {
     private configs: ElevenLabsConfigs;
 
     constructor(configs: ElevenLabsConfigs) {
-        if (!configs.apiKey || !configs.agentID || !configs.baseUrl) {
+        if (!configs.apiKey || !configs.agentID || !configs.baseUrl || !configs.agentNumberId) {
             throw new Error('ElevenLabs configuration error: apiKey, agentID, and baseUrl are required');
         }
 
@@ -99,17 +106,39 @@ export class ElevenLabsClient {
         throw new Error("Unable to retrieve transcript")
     }
 
-    async initiateCall(): Promise<any> {
+    async initiateOutboundCall(phoneNumber: string): Promise<CallMessage> {
         try {
-            const response = await this.client.post(`/twilio/outbound-call`, {
-                agent_id: this.configs.agentID,
-                agent_phone_number_id: this.configs.agentNumber
+            const payload: any = {
+                agentId: this.configs.agentID,
+                agentPhoneNumberId: this.configs.agentNumberId,
+                toNumber: phoneNumber
+            };
+
+            console.log('[ElevenLabsClient] Initiating outbound call to:', phoneNumber);
+            const response = await this.client.post(`/twilio/outbound-call`, payload);
+
+            console.log('[ElevenLabsClient] Call initiated successfully:', {
+                conversation_id: response.data.conversation_id,
+                call_sid: response.data.call_sid
             });
-            return response.data;
-        } catch (error) {
-            console.error('[ElevenLabs] Failed to initiate simple outbound call:', error);
+
+            return {
+                conversation_id: response.data.conversation_id,
+                call_sid: response.data.call_sid,
+                status: response.data.status || 'initiated'
+            };
+        } catch (error: any) {
+            console.error('[ElevenLabsClient] Failed to initiate outbound call');
+
+            if (error.response?.data?.detail) {
+                console.error('[ElevenLabsClient] Validation errors:', JSON.stringify(error.response.data.detail, null, 2));
+            }
+            if (error.response?.data) {
+                console.error('[ElevenLabsClient] Full error response:', JSON.stringify(error.response.data, null, 2));
+            }
+
             throw new Error(
-                `Failed to initiate simple outbound call: ${error instanceof Error ? error.message : 'Unknown error'}`
+                `Failed to initiate outbound call: ${error instanceof Error ? error.message : 'Unknown error'}`
             );
         }
     }
