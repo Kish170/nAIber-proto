@@ -148,8 +148,10 @@ model ConversationSummary {
 
   createdAt             DateTime @default(now())
 
+  callLogId             String?  @unique
+
   user                  User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  callLog               CallLog                      @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  callLog               CallLog?                     @relation(fields: [callLogId], references: [id], onDelete: Cascade)
   conversationTopicRefs ConversationTopicReference[]
 
   @@index([userId, createdAt])
@@ -179,7 +181,6 @@ model ConversationTopic {
   @@unique([userId, topicName])
   @@index([userId, updatedAt])
   @@index([updatedAt])
-  @@index([userId, topicEmbedding])
   @@map("conversation_topics")
 }
 
@@ -215,8 +216,10 @@ model HealthLog {
   detectedAt            DateTime @default(now())
   notifiedAt            DateTime?
 
+  callLogId             String?
+
   user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  callLog               CallLog  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  callLog               CallLog? @relation(fields: [callLogId], references: [id], onDelete: Cascade)
 
   @@index([userId, detectedAt])
   @@index([surfacedToDashboard])

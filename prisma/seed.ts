@@ -39,7 +39,8 @@ async function main() {
       ],
       callFrequency: 'DAILY',
       preferredCallTime: new Date('1970-01-01T14:00:00Z'), // 2 PM
-      isFirstCall: true,
+      isFirstCall: false,
+      lastCallAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), // 1 day ago
 
       // Emergency Contact
       emergencyContact: {
@@ -117,12 +118,131 @@ async function main() {
         ]
       },
 
-      // No conversation topics yet - first call
-      // No conversation summaries yet - first call
+      // Create sample conversation summaries (without CallLog)
+      conversationSummaries: {
+        create: [
+          {
+            conversationId: 'conv_sample_001',
+            summaryText: 'Margaret shared that she had a lovely day in her garden, planting some new roses. She mentioned feeling a bit tired due to her arthritis acting up with the weather change. She talked about baking cookies with her granddaughter over video call.',
+            durationMinutes: 8,
+            topicsDiscussed: ['Gardening', 'Family time', 'Arthritis pain', 'Baking'],
+            keyHighlights: [
+              'Planted new roses in the garden',
+              'Arthritis pain increased with weather change',
+              'Video call with granddaughter to bake cookies together'
+            ],
+            createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000) // 2 days ago
+          },
+          {
+            conversationId: 'conv_sample_002',
+            summaryText: 'Margaret discussed her upcoming bridge game with friends and expressed excitement about it. She mentioned taking her medication regularly and feeling generally well. Brief discussion about a mystery novel she is reading.',
+            durationMinutes: 6,
+            topicsDiscussed: ['Bridge game', 'Social activities', 'Medication adherence', 'Reading'],
+            keyHighlights: [
+              'Looking forward to bridge game on Friday',
+              'Taking all medications as prescribed',
+              'Reading a new Agatha Christie novel'
+            ],
+            createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000) // 1 day ago
+          }
+        ]
+      },
+
+      // Create sample conversation topics with embeddings
+      conversationTopics: {
+        create: [
+          {
+            topicName: 'Gardening',
+            variations: ['gardening', 'garden work', 'planting flowers', 'roses'],
+            category: 'Hobby',
+            topicEmbedding: Array(1536).fill(0).map(() => Math.random() - 0.5), // Mock embedding
+          },
+          {
+            topicName: 'Family time',
+            variations: ['family', 'grandchildren', 'daughter', 'video calls with family'],
+            category: 'Relationships',
+            topicEmbedding: Array(1536).fill(0).map(() => Math.random() - 0.5), // Mock embedding
+          },
+          {
+            topicName: 'Arthritis pain',
+            variations: ['arthritis', 'joint pain', 'knee pain', 'hand pain'],
+            category: 'Health',
+            topicEmbedding: Array(1536).fill(0).map(() => Math.random() - 0.5), // Mock embedding
+          },
+          {
+            topicName: 'Baking',
+            variations: ['baking', 'cookies', 'baking with grandkids'],
+            category: 'Hobby',
+            topicEmbedding: Array(1536).fill(0).map(() => Math.random() - 0.5), // Mock embedding
+          },
+          {
+            topicName: 'Social activities',
+            variations: ['bridge game', 'friends', 'social gatherings'],
+            category: 'Social',
+            topicEmbedding: Array(1536).fill(0).map(() => Math.random() - 0.5), // Mock embedding
+          }
+        ]
+      }
     }
   });
 
-  console.log(' Test user created successfully!');
+  // Create conversation topic references to link summaries with topics
+  const summaries = await prisma.conversationSummary.findMany({
+    where: { userId: user.id }
+  });
+
+  const topics = await prisma.conversationTopic.findMany({
+    where: { userId: user.id }
+  });
+
+  // Link first conversation to its topics
+  const firstSummary = summaries.find(s => s.conversationId === 'conv_sample_001');
+  if (firstSummary) {
+    const gardeningTopic = topics.find(t => t.topicName === 'Gardening');
+    const familyTopic = topics.find(t => t.topicName === 'Family time');
+    const arthritisTopic = topics.find(t => t.topicName === 'Arthritis pain');
+    const bakingTopic = topics.find(t => t.topicName === 'Baking');
+
+    if (gardeningTopic && familyTopic && arthritisTopic && bakingTopic) {
+      await prisma.conversationTopicReference.createMany({
+        data: [
+          {
+            conversationSummaryId: firstSummary.id,
+            conversationTopicId: gardeningTopic.id
+          },
+          {
+            conversationSummaryId: firstSummary.id,
+            conversationTopicId: familyTopic.id
+          },
+          {
+            conversationSummaryId: firstSummary.id,
+            conversationTopicId: arthritisTopic.id
+          },
+          {
+            conversationSummaryId: firstSummary.id,
+            conversationTopicId: bakingTopic.id
+          }
+        ]
+      });
+    }
+  }
+
+  // Link second conversation to its topics
+  const secondSummary = summaries.find(s => s.conversationId === 'conv_sample_002');
+  if (secondSummary) {
+    const socialTopic = topics.find(t => t.topicName === 'Social activities');
+
+    if (socialTopic) {
+      await prisma.conversationTopicReference.create({
+        data: {
+          conversationSummaryId: secondSummary.id,
+          conversationTopicId: socialTopic.id
+        }
+      });
+    }
+  }
+
+  console.log('✅ Test user created successfully!');
   console.log(`User ID: ${user.id}`);
   console.log(`Name: ${user.name}`);
   console.log(`Phone: ${user.phone}`);
@@ -131,7 +251,10 @@ async function main() {
   console.log('- Emergency contact (daughter Sarah)');
   console.log('- 3 health conditions');
   console.log('- 4 medications');
-  console.log('\nReady for first check-in call!');
+  console.log('- 2 conversation summaries (no CallLog entries)');
+  console.log('- 5 conversation topics with embeddings');
+  console.log('- Topic references linking conversations to topics');
+  console.log('\nReady for testing PostCallController!');
 }
 
 main()

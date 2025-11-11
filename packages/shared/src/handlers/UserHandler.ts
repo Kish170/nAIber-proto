@@ -119,5 +119,9 @@ export class UserProfile {
     getLastConversationSummary(): ConversationSummary | undefined {
         return this.data.conversationSummaries[0];
     }
+
+    getData(): UserProfileData {
+        return this.data;
+    }
 }
 

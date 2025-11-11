@@ -9,8 +9,8 @@ export interface SummaryRef {
 }
 
 
-export class ConversationHandler {
-    private elevenLabsClient: ElevenLabsClient;
+export class PostCallService {
+    // private elevenLabsClient: ElevenLabsClient;
     private openAIClient: OpenAIClient;
     private qdrantClient: QdrantClient;
     private userProfile: UserProfileData;
@@ -23,16 +23,20 @@ export class ConversationHandler {
         const agentID = process.env.ELEVENLABS_AGENT_ID;
         const elevenLabsBaseUrl = process.env.ELEVENLABS_BASE_URL;
         const agentNumber = process.env.TWILIO_NUMBER;
+        const agentNumberId = process.env.ELEVENLABS_NUMBER_ID;
 
-        if (!elevenLabsApiKey || !agentID || !elevenLabsBaseUrl || !agentNumber) {
+        if (!elevenLabsApiKey || !agentID || !elevenLabsBaseUrl || !agentNumber || !agentNumberId) {
             throw new Error('Missing required ElevenLabs environment variables');
         }
-        this.elevenLabsClient = new ElevenLabsClient({
-            apiKey: elevenLabsApiKey,
-            agentID,
-            baseUrl: elevenLabsBaseUrl,
-            agentNumber
-        });
+        // const elevenLabsConfigs = {
+        //     apiKey: elevenLabsApiKey,
+        //     agentID,
+        //     baseUrl: elevenLabsBaseUrl,
+        //     agentNumber,
+        //     agentNumberId
+        // };
+
+        // this.elevenLabsClient = new ElevenLabsClient(elevenLabsConfigs);
 
         const apiKey = process.env.OPENAI_API_KEY;
         const baseUrl = process.env.OPENAI_BASE_URL;
@@ -63,27 +67,27 @@ export class ConversationHandler {
         this.userProfile = userProfile;
 	}
 
-	async generateAndSaveConversationSummary(userId: string, conversationId: string) {
+	async generateAndSaveConversationSummary(userId: string, conversationId: string, transcriptSummary: string, conversationTopics: string[], conversationHighlights: string[]) {
 		try {
-			console.log(`[Summary] Starting summary generation for conversation ${conversationId}`);
+			// console.log(`[Summary] Starting summary generation for conversation ${conversationId}`);
 
-			const transcript = await this.elevenLabsClient.getStructuredTranscriptWithRetry(conversationId);
-			if (!transcript || transcript.length === 0) {
-				console.error('[Summary]  No transcript available');
-				throw new Error('No transcript available for conversation');
-			}
+			// const transcript = await this.elevenLabsClient.getStructuredTranscriptWithRetry(conversationId);
+			// if (!transcript || transcript.length === 0) {
+			// 	console.error('[Summary]  No transcript available');
+			// 	throw new Error('No transcript available for conversation');
+			// }
 
-			console.log('[Summary]  Transcript retrieved');
+			// console.log('[Summary]  Transcript retrieved');
 
-			const summary = await this.generateConversationSummary(transcript);
+			// const summary = await this.generateConversationSummary(transcript);
 
 			console.log('[Summary] Saving to PostgreSQL...');
 			const conversationSummary = await createSummary({
 					userId: userId,
 					conversationId: conversationId,
-					summaryText: summary.summaryText,
-					topicsDiscussed: summary.topicsDiscussed,
-					keyHighlights: summary.keyHighlights
+					summaryText: transcriptSummary,
+					topicsDiscussed: conversationTopics,
+					keyHighlights: conversationHighlights
 			});
 
 			console.log('[Summary]  Saved to PostgreSQL');
@@ -91,8 +95,8 @@ export class ConversationHandler {
 			this.summaryRef = {
 				conversationId,
 				summaryId: conversationSummary.id,
-				topicsDiscussed: summary.topicsDiscussed,
-				keyHighlights: summary.keyHighlights.highlights
+				topicsDiscussed: conversationTopics,
+				keyHighlights: conversationHighlights
 			};
 
 		} catch (error) {
@@ -103,24 +107,24 @@ export class ConversationHandler {
 
     async updateConversationTopicData() {
         if (this.userProfile.isFirstCall) {
-            this.summaryRef?.topicsDiscussed.forEach(async (topic) => {
+            for (const topic of this.summaryRef?.topicsDiscussed || []) {
                 try {
                     await this.createNewTopic(topic);
                 } catch (error) {
                     console.error("Unable to create new topic")
                     throw error;
                 }
-            });
+            }
         } else {
-            this.summaryRef?.topicsDiscussed.forEach(async (topic) => {
-                const existingTopics = await getConversationTopics(this.userProfile.id);
+            const existingTopics = await getConversationTopics(this.userProfile.id);
+            for (const topic of this.summaryRef?.topicsDiscussed || []) {
                 try {
                     await this.updateTopic(topic, existingTopics);
                 } catch (error) {
-                    console.error("Unable to create new topic")
+                    console.error("Unable to update topic")
                     throw error;
                 }
-            });
+            }
         }
     }
 
@@ -164,8 +168,9 @@ export class ConversationHandler {
     }
 
     async updateVectorDB() {
-        var points: ConversationPoint[] = []
-        this.summaryRef?.keyHighlights.forEach(async (highlight) => {
+        const points: ConversationPoint[] = [];
+
+        for (const highlight of this.summaryRef?.keyHighlights || []) {
             const embedding = await this.openAIClient.generateEmbeddings(highlight);
             points.push({
                 id: this.summaryRef?.conversationId!,
@@ -173,11 +178,15 @@ export class ConversationHandler {
                 payload: {
                     userId: this.userProfile.id,
                     conversationId: this.summaryRef?.conversationId!,
-                    highlight: this.summaryRef?.keyHighlights![0]!,  
+                    highlight: highlight,
                 }
             });
-        });
-        const result = await this.qdrantClient.postToCollection(points);
+        }
+
+        if (points.length > 0) {
+            const result = await this.qdrantClient.postToCollection(points);
+            console.log('[PostCallService] Vector DB updated with', points.length, 'highlights');
+        }
     }
 
     // deal with updating this during call for websocket service instead maybe?
@@ -185,52 +194,52 @@ export class ConversationHandler {
 
     }
 
-    private async generateConversationSummary(transcript: TranscriptMessage[]) {
-        try {
-            const formattedTranscript = transcript
-                .map(msg => `${msg.role === 'user' ? 'User' : 'nAIber'}: ${msg.message}`)
-                .join('\n\n');
-            const messages: Message[] = [
-                {
-                    role: 'system',
-                    content: `You are analyzing a conversation between nAIber (an AI companion) and an elderly user.
-                        Your task is to create a structured summary that will be used in the next conversation.
+    // private async generateConversationSummary(transcript: TranscriptMessage[]) {
+    //     try {
+    //         const formattedTranscript = transcript
+    //             .map(msg => `${msg.role === 'user' ? 'User' : 'nAIber'}: ${msg.message}`)
+    //             .join('\n\n');
+    //         const messages: Message[] = [
+    //             {
+    //                 role: 'system',
+    //                 content: `You are analyzing a conversation between nAIber (an AI companion) and an elderly user.
+    //                     Your task is to create a structured summary that will be used in the next conversation.
 
-                        Return a JSON object with this exact structure:
-                        {
-                        "summaryText": "A 2-3 sentence summary of the conversation covering main topics and user's mood/state",
-                        "topicsDiscussed": ["topic1", "topic2", "topic3"],
-                        "keyHighlights": {
-                            "highlights": ["notable thing user mentioned 1", "notable thing user mentioned 2"],
-                            "topics": ["topic1", "topic2"],
-                            "mood": "positive|neutral|down|concerned"
-                        }
-                        }
+    //                     Return a JSON object with this exact structure:
+    //                     {
+    //                     "summaryText": "A 2-3 sentence summary of the conversation covering main topics and user's mood/state",
+    //                     "topicsDiscussed": ["topic1", "topic2", "topic3"],
+    //                     "keyHighlights": {
+    //                         "highlights": ["notable thing user mentioned 1", "notable thing user mentioned 2"],
+    //                         "topics": ["topic1", "topic2"],
+    //                         "mood": "positive|neutral|down|concerned"
+    //                     }
+    //                     }
 
-                        Guidelines:
-                        - Focus on what the USER said, not what nAIber said
-                        - Capture topics the user seemed engaged with
-                        - Note any important life updates, health mentions, or emotional moments
-                        - Keep it concise but meaningful
-                        - Mood should reflect overall emotional tone`
-                },
-                {
-                    role: 'user',
-                    content: `Conversation transcript:\n\n${formattedTranscript}`
-                }
-            ]
-            const response = await this.openAIClient.generalGPTCall({
-                messages,
-            })
-            if (!response.choices[0].message.content) {
-                throw new Error('[ConversationHandler] Failed to generate conversation summary');
-            }
-            const summary = JSON.parse(response.choices[0].message.content);
-			console.log('[OpenAI]  Conversation summary generated successfully');
-			return summary;
-        } catch(error) {
-            console.error('[ConversationHandler] Failed to generate conversation summary', error);
-            throw new Error('[ConversationHandler] Failed to generate conversation summary');
-        }
-    }
+    //                     Guidelines:
+    //                     - Focus on what the USER said, not what nAIber said
+    //                     - Capture topics the user seemed engaged with
+    //                     - Note any important life updates, health mentions, or emotional moments
+    //                     - Keep it concise but meaningful
+    //                     - Mood should reflect overall emotional tone`
+    //             },
+    //             {
+    //                 role: 'user',
+    //                 content: `Conversation transcript:\n\n${formattedTranscript}`
+    //             }
+    //         ]
+    //         const response = await this.openAIClient.generalGPTCall({
+    //             messages,
+    //         })
+    //         if (!response.choices[0].message.content) {
+    //             throw new Error('[ConversationHandler] Failed to generate conversation summary');
+    //         }
+    //         const summary = JSON.parse(response.choices[0].message.content);
+	// 		console.log('[OpenAI]  Conversation summary generated successfully');
+	// 		return summary;
+    //     } catch(error) {
+    //         console.error('[ConversationHandler] Failed to generate conversation summary', error);
+    //         throw new Error('[ConversationHandler] Failed to generate conversation summary');
+    //     }
+    // }
 }
