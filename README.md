@@ -46,8 +46,6 @@ Voice conversation requires **sub-second response times**. Standard HTTP request
 
 **Result:** End-to-end latency under 800ms for natural conversation flow.
 
----
-
 ### 2. Long-Term Memory (RAG)
 To feel like a "friend," the AI needs to remember details across weeks of conversations.
 
@@ -63,17 +61,7 @@ To feel like a "friend," the AI needs to remember details across weeks of conver
   4. **Topic Deduplication:** Compare new topics against existing using **cosine similarity** (0.85 threshold)
   5. Store highlights in **Qdrant** for semantic search
   6. Store topics in **PostgreSQL** with variations tracking
-
-**Example Flow:**
-```typescript
-� PostCallService extracts topic: "family_grandson"
-� Generates embedding: [0.234, 0.891, -0.123, ...]
-� Compares against existing topics using cosine similarity
-� If similar topic exists (>0.85): Add as variation
-� If new: Create topic with reference to conversation
-� Next call: SystemPrompt includes "Last time you mentioned your grandson's visit"
-```
-
+ 
 **Data Stored:**
 - **PostgreSQL:** Structured data (topics, summaries, user profiles)
 - **Qdrant:** Unstructured highlights for semantic search
@@ -83,7 +71,6 @@ To feel like a "friend," the AI needs to remember details across weeks of conver
 Each call must feel like a continuation of a relationship, not a random bot.
 
 **Solution:** Dynamic System Prompt Builder (`SystemPromptsService.ts`)
-- **466-line comprehensive prompt** assembled per-call:
   - Core AI personality (warm, patient, non-judgmental)
   - User profile (age, interests, health conditions, medications)
   - Last 5 conversation summaries
@@ -96,28 +83,6 @@ Each call must feel like a continuation of a relationship, not a random bot.
 - Time-of-day awareness ("Good morning, Sarah!")
 - References last conversation for returning users
 - Warm introduction for first-time users
-
----
-
-### 4. Webhook Security
-ElevenLabs sends sensitive post-call data how to verify authenticity?
-
-**Solution:** Cryptographic signature verification (`PostCallRoute.ts`)
-```typescript
-const signature = request.headers['elevenlabs-signature']
-const timestamp = request.headers['elevenlabs-signature-timestamp']
-
-if (Math.abs(currentTime - timestamp) > 300) throw new Error('Expired')
-
-const expectedSignature = crypto
-  .createHmac('sha256', ELEVENLABS_SIGNING_KEY)
-  .update(timestamp + JSON.stringify(body))
-  .digest('hex')
-
-if (signature !== expectedSignature) throw new Error('Invalid signature')
-```
-
----
 
 ## Implementation Status
 
@@ -153,8 +118,6 @@ if (signature !== expectedSignature) throw new Error('Invalid signature')
 - [x] Call logs (status, outcome, retry logic)
 - [x] Health logs (passive mentions)
 
----
-
 ### In Progress / Partial
 
 - [ ] **Call Scheduling System:** Schema exists (preferredCallTime, callFrequency) but no automated queue/cron
@@ -162,8 +125,6 @@ if (signature !== expectedSignature) throw new Error('Invalid signature')
 - [ ] **Health Data Service:** Placeholder methods exist but not saving to database
 - [ ] **LangChain Integration:** Code exists but not used (ElevenLabs now provides analysis)
 - [ ] **Real-Time Vector Search:** Qdrant integrated but only queried post-call (not during conversation)
-
----
 
 ### Planned Features
 
@@ -174,8 +135,6 @@ if (signature !== expectedSignature) throw new Error('Invalid signature')
 - [ ] **Caregiver Dashboard:** Web UI for profile management and insights
 - [ ] **Production Deployment:** Migration from ngrok to Railway/Render
 - [ ] **Mid-Call Vector Retrieval:** "Tell me what we discussed about gardening" � Query Qdrant in real-time
-
----
 
 ## Setup (Local Dev)
 
@@ -237,7 +196,7 @@ REDIS_PORT=6379
 REDIS_PASSWORD=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
-## =� License
+## License
 
 Implemented by Kishan Rajagunathas
 
