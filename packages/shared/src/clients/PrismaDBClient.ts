@@ -1,10 +1,10 @@
 import { PrismaClient } from '../../../../generated/prisma/index.js';
 
 class PrismaDBClient {
-  private static instance: PrismaDBClient;  
-  private client: PrismaClient;            
+  private static instance: PrismaDBClient;
+  private client: PrismaClient;
 
-  private constructor() {                  
+  private constructor() {
     this.client = new PrismaClient();
   }
 

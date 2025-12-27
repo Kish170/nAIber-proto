@@ -2,9 +2,10 @@
     "extends": "../../tsconfig.json",
     "compilerOptions": {
         "rootDir": "./src",
-        "outDir": "./dist"
+        "outDir": "./dist",
+        "composite": true
     },
-    "include": ["src/**/*", "../shared/src/clients/OpenAIClient.ts", "../shared/src/clients/ElevenlabsClient.ts", "../shared/src/clients/QdrantClient.ts"],
+    "include": ["src/**/*"],
     "references": [
         { "path": "../shared" }
     ]

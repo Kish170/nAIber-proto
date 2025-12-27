@@ -8,7 +8,6 @@ import { prismaClient } from '@naiber/shared';
 import { redisClient } from './clients/RedisClient.js';
 import { StatusRouter } from './routes/StatusRoute.js';
 import { getNgrokUrls } from './utils/ngrok.js';
-import PostCallRouter from './routes/PostCallRoute.js';
 
 await sessionManager.initialize();
 
@@ -23,7 +22,6 @@ const app = express();
 const callController = new CallController();
 const callController2 = new CallController2();
 
-app.use(PostCallRouter);
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
 app.use(createCallRouter(callController, callController2));

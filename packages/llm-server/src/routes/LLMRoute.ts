@@ -5,7 +5,7 @@ import type { ChatCompletionRequest } from '@naiber/shared';
 export function LLMRouter(): Router {
     const router = Router();
 
-    router.post("/v1/chat/completions", async (req: Request, res: Response) => {
+    const chatCompletionHandler = async (req: Request, res: Response) => {
         try {
             const request: ChatCompletionRequest = req.body;
 
@@ -51,7 +51,11 @@ export function LLMRouter(): Router {
                 });
             }
         }
-    });
+    };
+
+    // Support both /v1/chat/completions (OpenAI standard) and /chat/completions (ElevenLabs)
+    router.post("/v1/chat/completions", chatCompletionHandler);
+    router.post("/chat/completions", chatCompletionHandler);
 
     return router;
 }

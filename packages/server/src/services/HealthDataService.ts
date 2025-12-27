@@ -6,9 +6,6 @@ export class HealthDataService {
         console.log("[Health Status] Recording health status:", parameters);
         const { status, symptoms, severity } = parameters;
         
-        // Here you could save health status to database
-        // For now, just return acknowledgment
-        
         return {
             success: true,
             message: 'Health status recorded successfully',

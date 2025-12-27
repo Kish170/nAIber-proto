@@ -45,7 +45,8 @@ export class QdrantClient {
         this.client = axios.create({
             baseURL: config.baseUrl,
             headers: this.getQdrantHeaders()
-        });    }
+        });    
+    }
 
     private async ensureCollectionExists(): Promise<boolean> {
         if (this.initializationPromise) {
@@ -101,8 +102,11 @@ export class QdrantClient {
                 success: response.status === 200,
                 highlightsStored: points.length
             };
-        } catch (error) {
-            console.error('[QdrantClient] Error posting to collection:', error);
+        } catch (error: any) {
+            console.error('[QdrantClient] Error posting to collection:', error.message);
+            if (error.response?.data) {
+                console.error('[QdrantClient] Qdrant error details:', JSON.stringify(error.response.data, null, 2));
+            }
             return {
                 success: false,
                 highlightsStored: 0

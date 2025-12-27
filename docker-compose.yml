@@ -15,7 +15,7 @@ services:
       NGROK_AUTHTOKEN: ${NGROK_AUTH_TOKEN}
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:4040/api/tunnels"]
+      test: ["CMD", "nc", "-z", "localhost", "4040"]
       interval: 3s
       timeout: 2s
       retries: 10
@@ -42,15 +42,15 @@ services:
   server:
     build:
       context: .
-      dockerfile: packages/server/dockerfile
+      dockerfile: packages/server/Dockerfile
     container_name: naiber-server
     environment:
-      NODE_ENV: ${NODE_ENV:-production}
+      NODE_ENV: ${NODE_ENV:-development}
       PORT: 3000
       PHONE_NUMBER: ${PHONE_NUMBER}
 
       USE_DYNAMIC_NGROK: ${USE_DYNAMIC_NGROK}
-      NGROK_API_URL: ${NGROK_API_URL}
+      NGROK_API_URL: http://ngrok:4040/api/tunnels
 
       TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID}
       TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN}
@@ -59,6 +59,7 @@ services:
       ELEVENLABS_API_KEY: ${ELEVENLABS_API_KEY}
       ELEVENLABS_BASE_URL: ${ELEVENLABS_BASE_URL}
       ELEVENLABS_AGENT_ID: ${ELEVENLABS_AGENT_ID}
+      ELEVENLABS_NUMBER_ID: ${ELEVENLABS_NUMBER_ID}
       ELEVENLABS_VOICE_ID: ${ELEVENLABS_VOICE_ID}
       ELEVENLABS_MODEL_ID: ${ELEVENLABS_MODEL_ID}
       ELEVENLABS_AUDIO_FORMAT: ${ELEVENLABS_AUDIO_FORMAT}
@@ -74,13 +75,17 @@ services:
       QDRANT_URL: ${QDRANT_URL}
       QDRANT_COLLECTION: ${QDRANT_COLLECTION}
 
-      REDIS_URL: ${REDIS_URL}
+      REDIS_URL: redis://redis:6379
 
+    volumes:
+      - ./packages/server/src:/app/packages/server/src
+      - ./packages/shared/src:/app/packages/shared/src
+      - ./packages/shared/dist:/app/packages/shared/dist
     ports:
       - "3000:3000"
     depends_on:
       ngrok:
-        condition: service_healthy
+        condition: service_started
       redis:
         condition: service_healthy
     restart: unless-stopped
@@ -94,18 +99,28 @@ services:
   llm-server:
     build:
       context: .
-      dockerfile: packages/llm-server/dockerfile
+      dockerfile: packages/llm-server/Dockerfile
     container_name: naiber-llm-server
     environment:
-      NODE_ENV: ${NODE_ENV:-production}
+      NODE_ENV: ${NODE_ENV:-development}
       PORT: 3001
 
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       OPENAI_BASE_URL: ${OPENAI_BASE_URL}
 
+    volumes:
+      - ./packages/llm-server/src:/app/packages/llm-server/src
+      - ./packages/shared/src:/app/packages/shared/src
+      - ./packages/shared/dist:/app/packages/shared/dist
     ports:
       - "3001:3001"
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 40s
 
 volumes:
   redis_data:

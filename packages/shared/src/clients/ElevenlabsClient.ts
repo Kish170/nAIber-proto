@@ -52,7 +52,7 @@ export class ElevenLabsClient {
 
     async getSignedURL(): Promise<string> {
         try {
-            const response = await this.client.get(`/conversation/get_signed_url?agent_id=${this.configs.agentID}`)
+            const response = await this.client.get(`/v1/convai/conversation/get_signed_url?agent_id=${this.configs.agentID}`)
             return response.data.signed_url
         } catch (error) {
             console.error('[ElevenLabsClient] Failed to get signed URL:', error);
@@ -115,7 +115,7 @@ export class ElevenLabsClient {
             };
 
             console.log('[ElevenLabsClient] Initiating outbound call to:', phoneNumber);
-            const response = await this.client.post(`/twilio/outbound-call`, payload);
+            const response = await this.client.post(`/v1/convai/agent/outbound-call`, payload);
 
             console.log('[ElevenLabsClient] Call initiated successfully:', {
                 conversation_id: response.data.conversation_id,

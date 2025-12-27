@@ -15,8 +15,8 @@
     "./clients": "./dist/clients/index.js"
   },
   "scripts": {
-    "build": "tsc",
-    "clean": "rm -rf dist"
+    "build": "tsc --build",
+    "clean": "rm -rf dist tsconfig.tsbuildinfo"
   },
   "dependencies": {
     "@prisma/client": "^6.18.0",

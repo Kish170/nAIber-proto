@@ -1,5 +1,6 @@
 import { ElevenLabsClient, OpenAIClient, QdrantClient, createSummary, Message, TranscriptMessage, UserProfileData, createConversationTopic, getConversationTopics, createConversationReferences, ReturnedTopic, updateConversationTopic, ConversationPoint } from '@naiber/shared';
 import cosine from 'compute-cosine-similarity';
+import { randomUUID } from 'crypto';
 
 export interface SummaryRef {
     conversationId: string;
@@ -9,8 +10,8 @@ export interface SummaryRef {
 }
 
 
-export class PostCallService {
-    // private elevenLabsClient: ElevenLabsClient;
+export class PostCallFlow {
+    private elevenLabsClient: ElevenLabsClient;
     private openAIClient: OpenAIClient;
     private qdrantClient: QdrantClient;
     private userProfile: UserProfileData;
@@ -28,15 +29,15 @@ export class PostCallService {
         if (!elevenLabsApiKey || !agentID || !elevenLabsBaseUrl || !agentNumber || !agentNumberId) {
             throw new Error('Missing required ElevenLabs environment variables');
         }
-        // const elevenLabsConfigs = {
-        //     apiKey: elevenLabsApiKey,
-        //     agentID,
-        //     baseUrl: elevenLabsBaseUrl,
-        //     agentNumber,
-        //     agentNumberId
-        // };
+        const elevenLabsConfigs = {
+            apiKey: elevenLabsApiKey,
+            agentID,
+            baseUrl: elevenLabsBaseUrl,
+            agentNumber,
+            agentNumberId
+        };
 
-        // this.elevenLabsClient = new ElevenLabsClient(elevenLabsConfigs);
+        this.elevenLabsClient = new ElevenLabsClient(elevenLabsConfigs);
 
         const apiKey = process.env.OPENAI_API_KEY;
         const baseUrl = process.env.OPENAI_BASE_URL;
@@ -67,27 +68,27 @@ export class PostCallService {
         this.userProfile = userProfile;
 	}
 
-	async generateAndSaveConversationSummary(userId: string, conversationId: string, transcriptSummary: string, conversationTopics: string[], conversationHighlights: string[]) {
+	async generateAndSaveConversationSummary(userId: string, conversationId: string) {
 		try {
-			// console.log(`[Summary] Starting summary generation for conversation ${conversationId}`);
+			console.log(`[Summary] Starting summary generation for conversation ${conversationId}`);
 
-			// const transcript = await this.elevenLabsClient.getStructuredTranscriptWithRetry(conversationId);
-			// if (!transcript || transcript.length === 0) {
-			// 	console.error('[Summary]  No transcript available');
-			// 	throw new Error('No transcript available for conversation');
-			// }
+			const transcript = await this.elevenLabsClient.getStructuredTranscriptWithRetry(conversationId);
+			if (!transcript || transcript.length === 0) {
+				console.error('[Summary]  No transcript available');
+				throw new Error('No transcript available for conversation');
+			}
 
-			// console.log('[Summary]  Transcript retrieved');
+			console.log('[Summary]  Transcript retrieved');
 
-			// const summary = await this.generateConversationSummary(transcript);
+			const summary = await this.generateConversationSummary(transcript);
 
 			console.log('[Summary] Saving to PostgreSQL...');
 			const conversationSummary = await createSummary({
 					userId: userId,
 					conversationId: conversationId,
-					summaryText: transcriptSummary,
-					topicsDiscussed: conversationTopics,
-					keyHighlights: conversationHighlights
+					summaryText: summary.summaryText,
+					topicsDiscussed: summary.topicsDiscussed,
+					keyHighlights: summary.keyHighlights
 			});
 
 			console.log('[Summary]  Saved to PostgreSQL');
@@ -95,8 +96,8 @@ export class PostCallService {
 			this.summaryRef = {
 				conversationId,
 				summaryId: conversationSummary.id,
-				topicsDiscussed: conversationTopics,
-				keyHighlights: conversationHighlights
+				topicsDiscussed: summary.topicsDiscussed,
+				keyHighlights: summary.keyHighlights
 			};
 
 		} catch (error) {
@@ -170,10 +171,11 @@ export class PostCallService {
     async updateVectorDB() {
         const points: ConversationPoint[] = [];
 
-        for (const highlight of this.summaryRef?.keyHighlights || []) {
+        for (let i = 0; i < (this.summaryRef?.keyHighlights || []).length; i++) {
+            const highlight = this.summaryRef!.keyHighlights[i];
             const embedding = await this.openAIClient.generateEmbeddings(highlight);
             points.push({
-                id: this.summaryRef?.conversationId!,
+                id: randomUUID(),
                 vector: embedding,
                 payload: {
                     userId: this.userProfile.id,
@@ -185,7 +187,12 @@ export class PostCallService {
 
         if (points.length > 0) {
             const result = await this.qdrantClient.postToCollection(points);
-            console.log('[PostCallService] Vector DB updated with', points.length, 'highlights');
+            if (result.success) {
+                console.log('[PostCallService] ✅ Vector DB updated with', points.length, 'highlights');
+            } else {
+                console.error('[PostCallService] ❌ Failed to update Vector DB - highlights were not stored');
+                throw new Error('Failed to store highlights in vector database');
+            }
         }
     }
 
@@ -194,52 +201,49 @@ export class PostCallService {
 
     }
 
-    // private async generateConversationSummary(transcript: TranscriptMessage[]) {
-    //     try {
-    //         const formattedTranscript = transcript
-    //             .map(msg => `${msg.role === 'user' ? 'User' : 'nAIber'}: ${msg.message}`)
-    //             .join('\n\n');
-    //         const messages: Message[] = [
-    //             {
-    //                 role: 'system',
-    //                 content: `You are analyzing a conversation between nAIber (an AI companion) and an elderly user.
-    //                     Your task is to create a structured summary that will be used in the next conversation.
+    private async generateConversationSummary(transcript: TranscriptMessage[]) {
+        try {
+            const formattedTranscript = transcript
+                .map(msg => `${msg.role === 'user' ? 'User' : 'nAIber'}: ${msg.message}`)
+                .join('\n\n');
+            const messages: Message[] = [
+                {
+                    role: 'system',
+                    content: `You are analyzing a conversation between nAIber (an AI companion) and an elderly user.
+                        Your task is to create a structured summary that will be used in the next conversation.
 
-    //                     Return a JSON object with this exact structure:
-    //                     {
-    //                     "summaryText": "A 2-3 sentence summary of the conversation covering main topics and user's mood/state",
-    //                     "topicsDiscussed": ["topic1", "topic2", "topic3"],
-    //                     "keyHighlights": {
-    //                         "highlights": ["notable thing user mentioned 1", "notable thing user mentioned 2"],
-    //                         "topics": ["topic1", "topic2"],
-    //                         "mood": "positive|neutral|down|concerned"
-    //                     }
-    //                     }
+                        Return a JSON object with this exact structure:
+                        {
+                        "summaryText": "A 2-3 sentence summary of the conversation covering main topics and user's mood/state",
+                        "topicsDiscussed": ["topic1", "topic2", "topic3"],
+                        "keyHighlights": ["notable thing user mentioned 1", "notable thing user mentioned 2"]
+                        }
 
-    //                     Guidelines:
-    //                     - Focus on what the USER said, not what nAIber said
-    //                     - Capture topics the user seemed engaged with
-    //                     - Note any important life updates, health mentions, or emotional moments
-    //                     - Keep it concise but meaningful
-    //                     - Mood should reflect overall emotional tone`
-    //             },
-    //             {
-    //                 role: 'user',
-    //                 content: `Conversation transcript:\n\n${formattedTranscript}`
-    //             }
-    //         ]
-    //         const response = await this.openAIClient.generalGPTCall({
-    //             messages,
-    //         })
-    //         if (!response.choices[0].message.content) {
-    //             throw new Error('[ConversationHandler] Failed to generate conversation summary');
-    //         }
-    //         const summary = JSON.parse(response.choices[0].message.content);
-	// 		console.log('[OpenAI]  Conversation summary generated successfully');
-	// 		return summary;
-    //     } catch(error) {
-    //         console.error('[ConversationHandler] Failed to generate conversation summary', error);
-    //         throw new Error('[ConversationHandler] Failed to generate conversation summary');
-    //     }
-    // }
+                        Guidelines:
+                        - Focus on what the USER said, not what nAIber said
+                        - Capture topics the user seemed engaged with
+                        - Note any important life updates, health mentions, or emotional moments
+                        - Keep it concise but meaningful
+                        - Include user's emotional tone in the summaryText`
+                },
+                {
+                    role: 'user',
+                    content: `Conversation transcript:\n\n${formattedTranscript}`
+                }
+            ]
+            const response = await this.openAIClient.generalGPTCall({
+                messages,
+                response_format: { type: 'json_object' }
+            })
+            if (!response.choices[0].message.content) {
+                throw new Error('[ConversationHandler] Failed to generate conversation summary');
+            }
+            const summary = JSON.parse(response.choices[0].message.content);
+			console.log('[OpenAI]  Conversation summary generated successfully');
+			return summary;
+        } catch(error) {
+            console.error('[ConversationHandler] Failed to generate conversation summary', error);
+            throw new Error('[ConversationHandler] Failed to generate conversation summary');
+        }
+    }
 }

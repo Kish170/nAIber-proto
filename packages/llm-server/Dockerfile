@@ -1,6 +1,6 @@
-FROM node:20-alpine AS builder
+FROM node:20-alpine
 
-RUN apk add --no-cache python3 make g++ curl
+RUN apk add --no-cache curl
 
 WORKDIR /app
 
@@ -9,7 +9,7 @@ COPY package-lock.json ./
 COPY tsconfig.json ./
 
 COPY packages/shared/package.json ./packages/shared/
-COPY packages/server/package.json ./packages/server/
+COPY packages/llm-server/package.json ./packages/llm-server/
 
 RUN npm ci
 
@@ -18,11 +18,10 @@ COPY prisma ./prisma
 RUN npx prisma generate
 
 COPY packages/shared ./packages/shared
-COPY packages/server ./packages/server
+COPY packages/llm-server ./packages/llm-server
 
 RUN npm run build --workspace=@naiber/shared
-RUN npm run build --workspace=@naiber/server
 
-EXPOSE 3000
+EXPOSE 3001
 
-CMD ["node", "packages/server/dist/index.js"]
+CMD ["npx", "tsx", "watch", "packages/llm-server/src/index.ts"]

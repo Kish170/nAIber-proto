@@ -18,6 +18,7 @@ export interface ChatCompletionRequest {
     max_tokens?: number;
     stream?: boolean;
     user_id?: string;
+    response_format?: { type: 'json_object' | 'text' };
 }
 
 export class OpenAIClient {
@@ -38,7 +39,8 @@ export class OpenAIClient {
                 temperature: request.temperature ?? 0.7,
                 stream: false,
                 ...(request.max_tokens && { max_tokens: request.max_tokens }),
-                ...(request.user_id && { user: request.user_id })
+                ...(request.user_id && { user: request.user_id }),
+                ...(request.response_format && { response_format: request.response_format })
             };
 
             return await this.openai.chat.completions.create(oaiRequest) as OpenAI.Chat.Completions.ChatCompletion;

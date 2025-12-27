@@ -4,6 +4,7 @@ import { WebSocket } from 'ws';
 import { buildFirstMessage, buildSystemPrompt } from './SystemPromptsService.js';
 import { TwilioClient } from "../clients/TwilioClient.js";
 import { sessionManager } from "./SessionManager.js";
+import { PostCallFlow } from "../middleware/PostCallFlow.js";
 
 export interface WebSockets {
     twilioWs: WebSocket;
@@ -22,6 +23,7 @@ export class WebSocketService {
     private keepAliveInterval?: NodeJS.Timeout;
     private localConnections: Map<string, WebSockets> = new Map();
     private startedAt: Date = new Date();
+    private userProfile: UserProfile | null = null;
 
     constructor(twilioWs: WebSocket, elevenLabsConfig: ElevenLabsConfigs, twilioClient?: TwilioClient) {
         this.twilioWs = twilioWs;
@@ -63,6 +65,12 @@ export class WebSocketService {
 
     async closeWSConnection(): Promise<void> {
         console.log('[WebSocketService] Closing WebSocket connections and ending call');
+
+        // Process post-call workflow first (before cleanup)
+        // This runs asynchronously and won't block the connection cleanup
+        this.processPostCallWorkflow().catch(error => {
+            console.error('[WebSocketService] Post-call workflow failed but continuing cleanup:', error);
+        });
 
         await sessionManager.deleteSession(this.callSid);
         this.deleteLocalConnection(this.callSid);
@@ -154,6 +162,8 @@ export class WebSocketService {
     async connectToElevenLabs(userProfile: UserProfile): Promise<void> {
         try {
             console.log('[WebSocketService] Connecting to ElevenLabs');
+
+            this.userProfile = userProfile;
 
             const signedUrl = await this.elevenLabsClient.getSignedURL();
             const systemPrompt = buildSystemPrompt(userProfile);
@@ -279,6 +289,47 @@ export class WebSocketService {
         console.log(`[WebSocketService] Close code: ${code}, reason: ${reasonText}`);
 
         await this.closeWSConnection();
+    }
+
+    private async processPostCallWorkflow(): Promise<void> {
+        try {
+            if (!this.userProfile) {
+                console.error('[WebSocketService] Cannot process post-call workflow: user profile not available');
+                return;
+            }
+
+            if (!this.conversationId) {
+                console.error('[WebSocketService] Cannot process post-call workflow: conversation ID not available');
+                return;
+            }
+
+            console.log('[WebSocketService] Starting post-call workflow for conversation:', this.conversationId);
+
+            console.log('[WebSocketService] Waiting 3 seconds for transcript to be ready...');
+            await new Promise(resolve => setTimeout(resolve, 3000));
+
+            const postCallFlow = new PostCallFlow(this.userProfile.getData());
+
+            console.log('[WebSocketService] Generating and saving conversation summary...');
+            await postCallFlow.generateAndSaveConversationSummary(
+                this.userProfile.id,
+                this.conversationId
+            );
+            console.log('[WebSocketService] Conversation summary saved');
+
+            console.log('[WebSocketService] Updating conversation topics...');
+            await postCallFlow.updateConversationTopicData();
+            console.log('[WebSocketService] Conversation topics updated');
+
+            console.log('[WebSocketService] Updating vector database...');
+            await postCallFlow.updateVectorDB();
+            console.log('[WebSocketService] Vector database updated');
+
+            console.log('[WebSocketService] Post-call workflow completed successfully');
+
+        } catch (error) {
+            console.error('[WebSocketService] Error in post-call workflow:', error);
+        }
     }
 
     private async deleteLocalConnection(callSid: string): Promise<boolean> {

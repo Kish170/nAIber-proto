@@ -38,8 +38,16 @@ export interface ReturnedTopic {
 
 export async function createSummary(data: Summary) {
    try {
-        return await prismaClient.conversationSummary.create({
-            data: {
+        return await prismaClient.conversationSummary.upsert({
+            where: {
+                conversationId: data.conversationId
+            },
+            update: {
+                summaryText: data.summaryText,
+                topicsDiscussed: [...data.topicsDiscussed],
+                keyHighlights: [...data.keyHighlights]
+            },
+            create: {
                 userId: data.userId,
                 conversationId: data.conversationId,
                 summaryText: data.summaryText,
@@ -50,7 +58,7 @@ export async function createSummary(data: Summary) {
    } catch (error) {
         console.error("[Conversation Handler] Unable to create conversation summary")
         throw error;
-   } 
+   }
 }
 
 export async function createLog(data: CallLogData) {

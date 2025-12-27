@@ -21,6 +21,7 @@ yarn-error.log*
 *.rdb
 
 # ngrok (contains auth token - don't commit!)
-/*ngrok.yml
+/ngrok-local.yml
+/ngrok.yml
 
-CLAUDE.md
+*.tsbuildinfo
