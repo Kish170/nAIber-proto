@@ -11,12 +11,10 @@ async function main() {
 
   console.log(`Creating test user with phone number: ${phoneNumber}`);
 
-  // Delete existing user if exists
   await prisma.user.deleteMany({
     where: { phone: phoneNumber }
   });
 
-  // Create user with comprehensive test data
   const user = await prisma.user.create({
     data: {
       name: 'Margaret Thompson',
@@ -38,11 +36,10 @@ async function main() {
         'Spicy food'
       ],
       callFrequency: 'DAILY',
-      preferredCallTime: new Date('1970-01-01T14:00:00Z'), // 2 PM
+      preferredCallTime: new Date('1970-01-01T14:00:00Z'), 
       isFirstCall: false,
-      lastCallAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), // 1 day ago
+      lastCallAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), 
 
-      // Emergency Contact
       emergencyContact: {
         create: {
           name: 'Sarah Thompson',
@@ -54,7 +51,6 @@ async function main() {
         }
       },
 
-      // Health Conditions
       healthConditions: {
         create: [
           {
@@ -81,7 +77,6 @@ async function main() {
         ]
       },
 
-      // Medications
       medications: {
         create: [
           {
@@ -118,7 +113,6 @@ async function main() {
         ]
       },
 
-      // Create sample conversation summaries (without CallLog)
       conversationSummaries: {
         create: [
           {
@@ -131,7 +125,7 @@ async function main() {
               'Arthritis pain increased with weather change',
               'Video call with granddaughter to bake cookies together'
             ],
-            createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000) // 2 days ago
+            createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000)
           },
           {
             conversationId: 'conv_sample_002',
@@ -143,50 +137,48 @@ async function main() {
               'Taking all medications as prescribed',
               'Reading a new Agatha Christie novel'
             ],
-            createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000) // 1 day ago
+            createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000) 
           }
         ]
       },
 
-      // Create sample conversation topics with embeddings
       conversationTopics: {
         create: [
           {
             topicName: 'Gardening',
             variations: ['gardening', 'garden work', 'planting flowers', 'roses'],
             category: 'Hobby',
-            topicEmbedding: Array(1536).fill(0).map(() => Math.random() - 0.5), // Mock embedding
+            topicEmbedding: Array(1536).fill(0).map(() => Math.random() - 0.5), 
           },
           {
             topicName: 'Family time',
             variations: ['family', 'grandchildren', 'daughter', 'video calls with family'],
             category: 'Relationships',
-            topicEmbedding: Array(1536).fill(0).map(() => Math.random() - 0.5), // Mock embedding
+            topicEmbedding: Array(1536).fill(0).map(() => Math.random() - 0.5), 
           },
           {
             topicName: 'Arthritis pain',
             variations: ['arthritis', 'joint pain', 'knee pain', 'hand pain'],
             category: 'Health',
-            topicEmbedding: Array(1536).fill(0).map(() => Math.random() - 0.5), // Mock embedding
+            topicEmbedding: Array(1536).fill(0).map(() => Math.random() - 0.5), 
           },
           {
             topicName: 'Baking',
             variations: ['baking', 'cookies', 'baking with grandkids'],
             category: 'Hobby',
-            topicEmbedding: Array(1536).fill(0).map(() => Math.random() - 0.5), // Mock embedding
+            topicEmbedding: Array(1536).fill(0).map(() => Math.random() - 0.5),
           },
           {
             topicName: 'Social activities',
             variations: ['bridge game', 'friends', 'social gatherings'],
             category: 'Social',
-            topicEmbedding: Array(1536).fill(0).map(() => Math.random() - 0.5), // Mock embedding
+            topicEmbedding: Array(1536).fill(0).map(() => Math.random() - 0.5),
           }
         ]
       }
     }
   });
 
-  // Create conversation topic references to link summaries with topics
   const summaries = await prisma.conversationSummary.findMany({
     where: { userId: user.id }
   });
@@ -195,7 +187,6 @@ async function main() {
     where: { userId: user.id }
   });
 
-  // Link first conversation to its topics
   const firstSummary = summaries.find(s => s.conversationId === 'conv_sample_001');
   if (firstSummary) {
     const gardeningTopic = topics.find(t => t.topicName === 'Gardening');
@@ -227,7 +218,6 @@ async function main() {
     }
   }
 
-  // Link second conversation to its topics
   const secondSummary = summaries.find(s => s.conversationId === 'conv_sample_002');
   if (secondSummary) {
     const socialTopic = topics.find(t => t.topicName === 'Social activities');

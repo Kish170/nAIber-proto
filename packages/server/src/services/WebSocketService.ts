@@ -1,4 +1,4 @@
-import { ElevenLabsClient, ElevenLabsConfigs, OpenAIClient } from "@naiber/shared";
+import { ElevenLabsClient, ElevenLabsConfigs, OpenAIClient, RedisClient } from "@naiber/shared";
 import { UserProfile } from "@naiber/shared";
 import { WebSocket } from 'ws';
 import { buildFirstMessage, buildSystemPrompt } from './SystemPromptsService.js';
@@ -24,6 +24,7 @@ export class WebSocketService {
     private localConnections: Map<string, WebSockets> = new Map();
     private startedAt: Date = new Date();
     private userProfile: UserProfile | null = null;
+    private postCallWorkflowCompleted: boolean = false;
 
     constructor(twilioWs: WebSocket, elevenLabsConfig: ElevenLabsConfigs, twilioClient?: TwilioClient) {
         this.twilioWs = twilioWs;
@@ -66,8 +67,6 @@ export class WebSocketService {
     async closeWSConnection(): Promise<void> {
         console.log('[WebSocketService] Closing WebSocket connections and ending call');
 
-        // Process post-call workflow first (before cleanup)
-        // This runs asynchronously and won't block the connection cleanup
         this.processPostCallWorkflow().catch(error => {
             console.error('[WebSocketService] Post-call workflow failed but continuing cleanup:', error);
         });
@@ -214,6 +213,9 @@ export class WebSocketService {
                     language: 'en',
                     auto_start_conversation: true
                 },
+                llm: {
+                    user_id: this.userProfile!.id 
+                },
                 tts: {
                     voice_id: process.env.ELEVENLABS_VOICE_ID
                 },
@@ -248,6 +250,10 @@ export class WebSocketService {
             if (msg.conversation_initiation_metadata_event?.conversation_id) {
                 this.conversationId = msg.conversation_initiation_metadata_event.conversation_id;
                 console.log(`[WebSocketService] Captured conversation ID: ${this.conversationId}`);
+
+                this.registerConversationForRAG().catch(error => {
+                    console.error('[WebSocketService] Failed to register conversation for RAG:', error);
+                });
             }
             this.sendAudioToTwilio(msg);
 
@@ -293,6 +299,11 @@ export class WebSocketService {
 
     private async processPostCallWorkflow(): Promise<void> {
         try {
+            if (this.postCallWorkflowCompleted) {
+                console.log('[WebSocketService] Post-call workflow already completed, skipping');
+                return;
+            }
+
             if (!this.userProfile) {
                 console.error('[WebSocketService] Cannot process post-call workflow: user profile not available');
                 return;
@@ -325,10 +336,12 @@ export class WebSocketService {
             await postCallFlow.updateVectorDB();
             console.log('[WebSocketService] Vector database updated');
 
+            this.postCallWorkflowCompleted = true;
             console.log('[WebSocketService] Post-call workflow completed successfully');
 
         } catch (error) {
             console.error('[WebSocketService] Error in post-call workflow:', error);
+            this.postCallWorkflowCompleted = true; 
         }
     }
 
@@ -338,6 +351,39 @@ export class WebSocketService {
             console.warn('[WebSocketService] No local connection found for callSid:', callSid);
         }
         return deleted;
+    }
+
+    private async registerConversationForRAG(): Promise<void> {
+        if (!this.userProfile || !this.conversationId) {
+            console.warn('[WebSocketService] Cannot register conversation for RAG: missing userProfile or conversationId');
+            return;
+        }
+
+        const conversationData = {
+            conversationId: this.conversationId,
+            userId: this.userProfile.id,
+            phone: this.userProfile.phone,
+            callSid: this.callSid,
+            startedAt: this.startedAt.toISOString(),
+            lastMessageAt: new Date().toISOString()
+        };
+
+        const ttl = 3600; 
+
+        try {
+            const redisInstance = RedisClient.getInstance();
+
+            await redisInstance.setJSON(`rag:conversation:${this.conversationId}`, conversationData, ttl);
+            await redisInstance.set(`rag:user:${this.userProfile.id}`, this.conversationId, { EX: ttl });
+            await redisInstance.set(`rag:phone:${this.userProfile.phone}`, this.conversationId, { EX: ttl });
+
+            console.log('[WebSocketService] Registered conversation for RAG:', {
+                conversationId: this.conversationId,
+                userId: this.userProfile.id
+            });
+        } catch (error) {
+            console.error('[WebSocketService] Failed to register conversation in Redis:', error);
+        }
     }
 
     closeConnection(): void {

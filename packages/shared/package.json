@@ -20,7 +20,9 @@
   },
   "dependencies": {
     "@prisma/client": "^6.18.0",
-    "axios": "^1.7.9"
+    "axios": "^1.7.9",
+    "compromise": "^14.14.3",
+    "redis": "^4.7.0"
   },
   "devDependencies": {
     "@types/node": "^18.19.118",

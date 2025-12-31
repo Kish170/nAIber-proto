@@ -1,9 +1,28 @@
 import { Router, Request, Response } from 'express';
 import { LLMController } from '../controllers/LLMController.js';
 import type { ChatCompletionRequest } from '@naiber/shared';
+import { RedisClient, OpenAIClient, QdrantClient } from '@naiber/shared';
+import { RAGService } from '../services/RAGService.js';
+import { ConversationResolver } from '../services/ConversationResolver.js';
+import { RAGMiddleware } from '../middleware/RAGMiddleware.js';
 
 export function LLMRouter(): Router {
     const router = Router();
+
+    const redisClient = RedisClient.getInstance();
+    const openAIClient = new OpenAIClient({
+        apiKey: process.env.OPENAI_API_KEY!,
+        baseUrl: process.env.OPENAI_BASE_URL
+    });
+    const qdrantClient = new QdrantClient({
+        baseUrl: process.env.QDRANT_URL!,
+        apiKey: process.env.QDRANT_API_KEY!,
+        collectionName: process.env.QDRANT_COLLECTION!
+    });
+
+    const ragService = new RAGService(redisClient, openAIClient, qdrantClient);
+    const conversationResolver = new ConversationResolver(redisClient);
+    const ragMiddleware = new RAGMiddleware(ragService, conversationResolver);
 
     const chatCompletionHandler = async (req: Request, res: Response) => {
         try {
@@ -53,9 +72,8 @@ export function LLMRouter(): Router {
         }
     };
 
-    // Support both /v1/chat/completions (OpenAI standard) and /chat/completions (ElevenLabs)
-    router.post("/v1/chat/completions", chatCompletionHandler);
-    router.post("/chat/completions", chatCompletionHandler);
+    router.post("/v1/chat/completions", ragMiddleware.middleware, chatCompletionHandler);
+    router.post("/chat/completions", ragMiddleware.middleware, chatCompletionHandler);
 
     return router;
 }

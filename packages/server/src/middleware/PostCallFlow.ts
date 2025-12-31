@@ -1,4 +1,4 @@
-import { ElevenLabsClient, OpenAIClient, QdrantClient, createSummary, Message, TranscriptMessage, UserProfileData, createConversationTopic, getConversationTopics, createConversationReferences, ReturnedTopic, updateConversationTopic, ConversationPoint } from '@naiber/shared';
+import { ElevenLabsClient, OpenAIClient, QdrantClient, RedisClient, EmbeddingService, TextPreprocessor, createSummary, Message, TranscriptMessage, UserProfileData, createConversationTopic, getConversationTopics, createConversationReferences, ReturnedTopic, updateConversationTopic, ConversationPoint } from '@naiber/shared';
 import cosine from 'compute-cosine-similarity';
 import { randomUUID } from 'crypto';
 
@@ -14,6 +14,9 @@ export class PostCallFlow {
     private elevenLabsClient: ElevenLabsClient;
     private openAIClient: OpenAIClient;
     private qdrantClient: QdrantClient;
+    private redisClient: RedisClient;
+    private textPreprocessor: TextPreprocessor;
+    private embeddingService: EmbeddingService;
     private userProfile: UserProfileData;
     private summaryRef: SummaryRef | null = null;
 
@@ -64,6 +67,14 @@ export class PostCallFlow {
             apiKey: qdrantApiKey,
             collectionName
         })
+
+        this.redisClient = RedisClient.getInstance();
+        this.textPreprocessor = new TextPreprocessor();
+        this.embeddingService = new EmbeddingService(
+            this.openAIClient,
+            this.redisClient,
+            this.textPreprocessor
+        );
 
         this.userProfile = userProfile;
 	}
@@ -132,7 +143,8 @@ export class PostCallFlow {
     private async updateTopic(newTopic: string, existingTopics: ReturnedTopic[]) {
         const similarityThreshold = 0.85;
         let isSimilar = false;
-        const newTopicEmbedding = await this.openAIClient.generateEmbeddings(newTopic);
+        const result = await this.embeddingService.generateEmbedding(newTopic);
+        const newTopicEmbedding = result.embedding;
         for (const existingTopic of existingTopics) {
             const similarity = cosine(existingTopic.topicEmbedding, newTopicEmbedding);
             if (similarity && similarity > similarityThreshold) {
@@ -152,7 +164,8 @@ export class PostCallFlow {
 
     private async createNewTopic(topic: string) {
         try {
-            const embedding = await this.openAIClient.generateEmbeddings(topic);
+            const result = await this.embeddingService.generateEmbedding(topic);
+            const embedding = result.embedding;
             const newTopic = await createConversationTopic({
                 userId: this.userProfile.id,
                 topicName: topic,
@@ -169,21 +182,21 @@ export class PostCallFlow {
     }
 
     async updateVectorDB() {
-        const points: ConversationPoint[] = [];
+        const highlights = this.summaryRef?.keyHighlights || [];
+        if (highlights.length === 0) return;
 
-        for (let i = 0; i < (this.summaryRef?.keyHighlights || []).length; i++) {
-            const highlight = this.summaryRef!.keyHighlights[i];
-            const embedding = await this.openAIClient.generateEmbeddings(highlight);
-            points.push({
-                id: randomUUID(),
-                vector: embedding,
-                payload: {
-                    userId: this.userProfile.id,
-                    conversationId: this.summaryRef?.conversationId!,
-                    highlight: highlight,
-                }
-            });
-        }
+        // Batch generate embeddings for all highlights
+        const embeddingResults = await this.embeddingService.generateEmbeddings(highlights);
+
+        const points: ConversationPoint[] = highlights.map((highlight, i) => ({
+            id: randomUUID(),
+            vector: embeddingResults[i].embedding,
+            payload: {
+                userId: this.userProfile.id,
+                conversationId: this.summaryRef?.conversationId!,
+                highlight: highlight,  // Keep original raw text
+            }
+        }));
 
         if (points.length > 0) {
             const result = await this.qdrantClient.postToCollection(points);

@@ -1,9 +1,9 @@
-import { redisClient } from "../clients/RedisClient.js";
+import { redisClient } from "@naiber/shared";
 
 export interface SessionData {
     callSid: string;
     conversationId: string;
-    streamSid?: string; // Optional: only used for WebSocket approach (CallController)
+    streamSid?: string;
     startedAt: string;
 }
 
@@ -27,7 +27,7 @@ export class SessionManager {
     }
 
     async createSession(callSid: string, data: SessionData): Promise<void> {
-        await redisClient.setJSON(`session:${callSid}`, data, 7200); 
+        await redisClient.setJSON(`session:${callSid}`, data, 3600); 
         console.log('[SessionManager] Created session:', callSid);
     }
 
@@ -39,7 +39,7 @@ export class SessionManager {
         const existing = await this.getSession(callSid);
         if (existing) {
             const updated = { ...existing, ...updates };
-            await redisClient.setJSON(`session:${callSid}`, updated, 7200);
+            await redisClient.setJSON(`session:${callSid}`, updated, 3600);
             console.log('[SessionManager] Updated session:', callSid);
         }
     }

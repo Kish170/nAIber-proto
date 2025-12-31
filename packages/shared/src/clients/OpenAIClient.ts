@@ -3,7 +3,7 @@ import type { Stream } from 'openai/streaming';
 
 export interface OpenAIConfigs {
     apiKey: string;
-    baseUrl?: string;  // Optional, defaults to OpenAI's API
+    baseUrl?: string; 
 }
 
 export interface Message {

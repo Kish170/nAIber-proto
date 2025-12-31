@@ -68,12 +68,21 @@ export class QdrantClient {
 
     private async initializeCollection(): Promise<boolean> {
         try {
+            // Create collection
             const response = await this.client.put(`/collections/${this.config.collectionName}`, {
                 vectors: {
                     size: 1536,
                     distance: "Cosine"
                 }
             });
+
+            // Create index on userId field for filtering
+            await this.client.put(`/collections/${this.config.collectionName}/index`, {
+                field_name: "userId",
+                field_schema: "keyword"
+            });
+
+            console.log('[QdrantClient] Collection and userId index created successfully');
             return response.data.result === true || response.status === 200;
         } catch (error) {
             console.error('[QdrantClient] Error initializing collection:', error);
@@ -124,14 +133,33 @@ export class QdrantClient {
 
             await this.ensureCollectionExists();
 
-            const response = await this.client.post(`/collections/${this.config.collectionName}/points/search`, {
+            const searchRequest: any = {
                 vector: queryEmbedding,
-                filter: {
-                    must: [{ key: 'userId', match: { value: userId } }]
-                },
                 limit: limit || 5,
-                with_payload: true
-            });
+                with_payload: true,
+                score_threshold: 0.0
+            };
+
+            if (userId) {
+                searchRequest.filter = {
+                    must: [
+                        {
+                            key: 'userId',
+                            match: {
+                                value: userId
+                            }
+                        }
+                    ]
+                };
+            }
+
+            console.log('[QdrantClient] Search request:', JSON.stringify({
+                vectorLength: queryEmbedding.length,
+                hasFilter: !!searchRequest.filter,
+                limit: searchRequest.limit
+            }));
+
+            const response = await this.client.post(`/collections/${this.config.collectionName}/points/search`, searchRequest);
 
             if (!response.data || !Array.isArray(response.data.result)) {
                 console.warn('[QdrantClient] Unexpected response format from search');
@@ -151,8 +179,11 @@ export class QdrantClient {
                 };
             });
 
-        } catch (error) {
-            console.error('[QdrantClient] Error searching collection:', error);
+        } catch (error: any) {
+            console.error('[QdrantClient] Error searching collection:', error.message);
+            if (error.response?.data) {
+                console.error('[QdrantClient] Qdrant search error details:', JSON.stringify(error.response.data, null, 2));
+            }
             return [];
         }
     }

@@ -346,6 +346,9 @@ export function buildSystemPrompt(userProfile: UserProfile): string {
     const userProfileSection = `
         # USER PROFILE
 
+        User ID: ${userProfile.id}
+        Phone: ${userProfile.phone}
+
         Here is important context about the user you're speaking with:
 
         ${cleanJson({

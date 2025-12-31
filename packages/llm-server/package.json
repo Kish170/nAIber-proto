@@ -14,7 +14,9 @@
     "@naiber/shared": "*",
     "express": "^4.21.2",
     "openai": "^4.0.0",
-    "dotenv": "^16.6.1"
+    "dotenv": "^16.6.1",
+    "compromise": "^14.14.3",
+    "compute-cosine-similarity": "^1.1.0"
   },
   "devDependencies": {
     "@types/express": "^4.17.23",

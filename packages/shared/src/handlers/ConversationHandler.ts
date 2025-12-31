@@ -83,8 +83,18 @@ export async function createLog(data: CallLogData) {
 
 export async function createConversationTopic(data: ConversationTopicData): Promise<ReturnedTopic>{
     try {
-        return await prismaClient.conversationTopic.create({
-            data: {
+        return await prismaClient.conversationTopic.upsert({
+            where: {
+                userId_topicName: {
+                    userId: data.userId,
+                    topicName: data.topicName
+                }
+            },
+            update: {
+                topicEmbedding: data.topicEmbedding,
+                category: data.category,
+            },
+            create: {
                 userId: data.userId,
                 topicName: data.topicName,
                 category: data.category,
