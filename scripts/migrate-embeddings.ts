@@ -1,5 +1,6 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '../generated/prisma/index.js';
 import { QdrantClient, OpenAIClient, RedisClient, EmbeddingService, TextPreprocessor } from '@naiber/shared';
+import { randomUUID } from 'crypto';
 import 'dotenv/config';
 
 async function migrateEmbeddings() {
@@ -54,9 +55,6 @@ async function migrateEmbeddings() {
             userId: true,
             conversationId: true,
             keyHighlights: true
-        },
-        where: {
-            keyHighlights: { not: null }
         }
     });
 
@@ -70,7 +68,7 @@ async function migrateEmbeddings() {
             const results = await embeddingService.generateEmbeddings(highlights);
 
             const points = highlights.map((highlight, i) => ({
-                id: `${summary.conversationId}-highlight-${i}`,
+                id: randomUUID(),
                 vector: results[i].embedding,
                 payload: {
                     userId: summary.userId,

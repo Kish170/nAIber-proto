@@ -5,11 +5,21 @@ export interface RetrievedMemories {
     summaries: SearchPayload[];
 }
 
+interface MemoryRetrieverConfig {
+    similarityThreshold: number;
+    minResults: number;
+}
+
 export class MemoryRetriever {
     private qdrantClient: QdrantClient;
+    private config: MemoryRetrieverConfig;
 
     constructor(qdrantClient: QdrantClient) {
         this.qdrantClient = qdrantClient;
+        this.config = {
+            similarityThreshold: parseFloat(process.env.RAG_MEMORY_SIMILARITY_THRESHOLD || '0.45'),
+            minResults: parseInt(process.env.RAG_MEMORY_MIN_RESULTS || '1')
+        };
     }
 
     async retrieveMemories(userId: string, topicEmbedding: number[], limit: number = 5): Promise<RetrievedMemories> {
@@ -21,7 +31,18 @@ export class MemoryRetriever {
                 queryEmbedding: topicEmbedding,
                 limit
             });
-            const relevantResults = searchResults.filter(r => r.similarity > 0.7);
+
+            let relevantResults = searchResults.filter(
+                r => r.similarity > this.config.similarityThreshold
+            );
+
+            // Fallback: always return top N if no results above threshold
+            if (relevantResults.length === 0 && searchResults.length > 0 && this.config.minResults > 0) {
+                relevantResults = searchResults
+                    .sort((a, b) => b.similarity - a.similarity)
+                    .slice(0, this.config.minResults);
+            }
+
             const highlights = relevantResults.map(r => r.highlight);
             console.log('[MemoryRetriever] Retrieved', highlights.length, 'relevant memories');
 
