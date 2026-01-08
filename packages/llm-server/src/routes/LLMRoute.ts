@@ -5,6 +5,7 @@ import { RedisClient, OpenAIClient, QdrantClient } from '@naiber/shared';
 import { RAGService } from '../services/RAGService.js';
 import { ConversationResolver } from '../services/ConversationResolver.js';
 import { RAGMiddleware } from '../middleware/RAGMiddleware.js';
+import { TopicManager } from '../services/TopicManager.js';
 
 export function LLMRouter(): Router {
     const router = Router();
@@ -22,7 +23,8 @@ export function LLMRouter(): Router {
 
     const ragService = new RAGService(redisClient, openAIClient, qdrantClient);
     const conversationResolver = new ConversationResolver(redisClient);
-    const ragMiddleware = new RAGMiddleware(ragService, conversationResolver);
+    const topicManager = new TopicManager(redisClient);
+    const ragMiddleware = new RAGMiddleware(ragService, conversationResolver, topicManager);
 
     const chatCompletionHandler = async (req: Request, res: Response) => {
         try {

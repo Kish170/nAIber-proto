@@ -60,6 +60,9 @@ export class RAGService {
             if (topicChanged) {
                 console.log('[RAGService] Topic change detected, retrieving memories');
 
+                // Reset fatigue when topic changes
+                await this.topicManager.resetTopicFatigue(conversationId);
+
                 const memories = await this.memoryRetriever.retrieveMemories(userId, messageEmbedding, 5);
                 relevantMemories = this.memoryRetriever.formatMemoriesForContext(memories);
             }

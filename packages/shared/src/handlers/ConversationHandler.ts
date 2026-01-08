@@ -135,6 +135,44 @@ export async function createConversationReferences(data: ConversationReferenceDa
 
 export async function updateConversationTopic(userId: string, topicName: string, newTopic: string): Promise<ReturnedTopic> {
     try {
+        const existingNewTopic = await prismaClient.conversationTopic.findUnique({
+            where: {
+                userId_topicName: {
+                    userId,
+                    topicName: newTopic
+                }
+            },
+            select: {
+                id: true,
+                topicName: true,
+                topicEmbedding: true,
+                variations: true
+            }
+        });
+
+        if (existingNewTopic) {
+            console.log(`[Conversation Handler] Topic "${newTopic}" already exists, adding "${topicName}" as variation`);
+            return await prismaClient.conversationTopic.update({
+                where: {
+                    userId_topicName: {
+                        userId,
+                        topicName: newTopic
+                    }
+                },
+                data: {
+                    variations: {
+                        push: topicName
+                    }
+                },
+                select: {
+                    id: true,
+                    topicName: true,
+                    topicEmbedding: true
+                }
+            });
+        }
+
+        // Otherwise, rename the old topic to the new name
         return await prismaClient.conversationTopic.update({
             where: {
                 userId_topicName: {
@@ -147,7 +185,7 @@ export async function updateConversationTopic(userId: string, topicName: string,
                 variations: {
                     push: topicName
                 }
-            }, 
+            },
             select: {
                 id: true,
                 topicName: true,
