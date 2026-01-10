@@ -23,6 +23,7 @@ model User {
   preferredCallTime   DateTime         @db.Time
 
   isFirstCall         Boolean   @default(true)
+  enableHealthCheckIns Boolean  @default(false)
 
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
@@ -35,6 +36,7 @@ model User {
   conversationSummaries ConversationSummary[]
   conversationTopics    ConversationTopic[]
   healthLogs            HealthLog[]
+  medicationLogs        MedicationLog[]
 
   @@map("users")
 }
@@ -96,7 +98,8 @@ model UserMedication {
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
 
-  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  medicationLogs MedicationLog[]
 
   @@unique([userId, name])
   @@index([userId, isActive])
@@ -120,12 +123,15 @@ model CallLog {
   twilioCallSid            String?
   elevenlabsConversationId String?
 
+  checkInCompleted         Boolean
+
   createdAt                DateTime     @default(now())
   updatedAt                DateTime     @updatedAt
 
   user                     User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   conversationSummary      ConversationSummary?
-  healthMentions           HealthLog[]
+  healthLogs               HealthLog[]
+  medicationLogs           MedicationLog[]
 
   @@index([userId, scheduledTime])
   @@index([status])
@@ -203,27 +209,37 @@ model HealthLog {
   id                    String   @id @default(uuid())
   userId                String
   conversationId        String
-
-  mentionText           String
-  mentionType           String
-
-  severity              String?
-  bodyPart              String?
-
-  surfacedToDashboard   Boolean  @default(false)
-  stakeholderNotified   Boolean  @default(false)
-
-  detectedAt            DateTime @default(now())
-  notifiedAt            DateTime?
-
   callLogId             String?
+
+  overallWellBeing      Int?    
+  physicalSymptoms      String[] 
+  sleepQuality          Int?     
+  generalNotes          String?  
+
+  createdAt             DateTime @default(now())
 
   user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   callLog               CallLog? @relation(fields: [callLogId], references: [id], onDelete: Cascade)
 
-  @@index([userId, detectedAt])
-  @@index([surfacedToDashboard])
-  @@map("health_mentions")
+  @@map("health_logs")
+}
+
+model MedicationLog {
+  id                    String         @id @default(uuid())
+  userId                String
+  conversationId        String
+  callLogId             String?
+  medicationId          String
+
+  medicationTaken       Boolean
+
+  createdAt             DateTime       @default(now())
+
+  user                  User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  medication            UserMedication @relation(fields: [medicationId], references: [id], onDelete: Cascade)
+  callLog               CallLog?       @relation(fields: [callLogId], references: [id], onDelete: Cascade)
+
+  @@map("medication_logs")
 }
 
 enum Gender {

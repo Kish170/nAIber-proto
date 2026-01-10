@@ -54,11 +54,7 @@ export class TopicManager {
 
     async updateTopicState(conversationId: string, topicVector: number[], messageLength: number): Promise<void> {
         const currentState = await this.getCurrentTopic(conversationId);
-
-        // Increment message count or initialize to 1
         const messageCount = (currentState?.messageCount || 0) + 1;
-
-        // Calculate fatigue score
         const topicFatigue = this.calculateTopicFatigue(messageCount);
 
         const updatedTopic: TopicState = {

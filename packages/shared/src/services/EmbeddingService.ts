@@ -1,4 +1,4 @@
-import { OpenAIClient } from '../clients/OpenAIClient';
+import { OpenAIClient } from '../clients/AgentClient';
 import { RedisClient } from '../clients/RedisClient';
 import { TextPreprocessor } from './TextPreprocessor';
 

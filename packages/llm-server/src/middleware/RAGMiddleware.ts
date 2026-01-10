@@ -69,20 +69,16 @@ export class RAGMiddleware {
                 lastUserMessage.content
             );
 
-            // Get topic state for fatigue information
             const topicState = await this.topicManager.getCurrentTopic(conversation.conversationId);
             const topicFatigue = topicState?.topicFatigue || 0;
 
-            // Build context to inject
             let contextToInject = ragContext.relevantMemories;
 
-            // Add fatigue guidance if needed
             const fatigueGuidance = this.getFatigueGuidance(topicFatigue);
             if (fatigueGuidance) {
                 contextToInject += fatigueGuidance;
             }
 
-            // Inject if we have memories or fatigue guidance
             if (ragContext.shouldInjectContext || topicFatigue > 0.25) {
                 this.injectContextIntoMessages(request.messages, contextToInject);
                 console.log('[RAGMiddleware] Injected context', {
@@ -109,11 +105,11 @@ export class RAGMiddleware {
         const systemMessage = messages.find(m => m.role === 'system');
 
         if (systemMessage) {
-            systemMessage.content += context;
+            systemMessage.content += `The following is memory/context related to the current topic of discussion which can be used to enhance the conversation as needed: ${context}`;
         } else {
             messages.unshift({
                 role: 'system',
-                content: `You are nAIber, an empathetic AI companion.${context}`
+                content: `The following is memory/context related to the current topic of discussion which can be used to enhance the conversation as needed: ${context}`
             });
         }
     }
@@ -128,18 +124,15 @@ export class RAGMiddleware {
     }
 
     private getFatigueGuidance(fatigueScore: number): string {
-        // Low: 0-0.25 - Normal conversation
         if (fatigueScore < 0.25) {
-            return '';  // No guidance needed
+            return '';  
         }
 
-        // Medium: 0.25-0.5 - Subtle awareness
         if (fatigueScore < 0.5) {
             return `\n\n# TOPIC ENGAGEMENT NOTE
 Current topic has been discussed for a while. Watch for user interest cues. If engagement seems low, consider exploring related angles or gently offering to discuss something different.`;
         }
 
-        // High: 0.5-0.75 - Active awareness
         if (fatigueScore < 0.75) {
             return `\n\n# TOPIC FRESHNESS NEEDED
 This topic has been thoroughly covered. Look for natural opportunities to:
@@ -149,7 +142,6 @@ This topic has been thoroughly covered. Look for natural opportunities to:
 Keep the transition smooth and natural.`;
         }
 
-        // Critical: 0.75-1.0 - Proactive transition
         return `\n\n# TOPIC CHANGE RECOMMENDED
 This topic has been extensively discussed and may feel repetitive. Consider:
 - Acknowledging what's been covered

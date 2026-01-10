@@ -1,0 +1,13 @@
+{
+    "name": "@naiber/scheduler-server",
+    "version": "1.0.0",
+    "type": "module",
+    "description": "nAIber Express server for call scheduling",
+    "main": "./dist/index.js",
+    "scripts": {
+        "dev": "tsx watch src/index.ts",
+        "build": "tsc --build",
+        "start": "node dist/index.js",
+        "clean": "rm -rf dist tsconfig.tsbuildinfo"
+    }
+}
