@@ -28,6 +28,7 @@ export interface ChatCompletionRequest {
 export class OpenAIClient {
     private chatModel: ChatOpenAI
     private embeddingModel: OpenAIEmbeddings
+    private static instance: OpenAIClient
 
     constructor(config: OpenAIConfigs) {
         this.chatModel = new ChatOpenAI({
@@ -116,6 +117,10 @@ export class OpenAIClient {
         }
     }
 
+    returnEmbeddingModel(): OpenAIEmbeddings {
+        return this.embeddingModel
+    }
+
     private async *mapToOpenAIStream(langchainStream: AsyncIterable<AIMessageChunk>, request: ChatCompletionRequest): AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk> {
         let index = 0;
         const created = Math.floor(Date.now() / 1000);
@@ -152,5 +157,12 @@ export class OpenAIClient {
                 logprobs: null
             }]
         };
+    }
+
+    public static getInstance(config: OpenAIConfigs): OpenAIClient {
+        if (!OpenAIClient.instance) {
+            OpenAIClient.instance = new OpenAIClient(config);
+        }
+        return OpenAIClient.instance;
     }
 }
