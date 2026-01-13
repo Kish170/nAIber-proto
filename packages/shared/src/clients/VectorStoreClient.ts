@@ -1,6 +1,5 @@
 import { QdrantVectorStore } from "@langchain/qdrant";
 import { OpenAIEmbeddings } from "@langchain/openai";
-import { OpenAIClient } from "./OpenAIClient";
 
 export interface VectorStoreConfigs {
     baseUrl: string;
@@ -11,13 +10,14 @@ export interface VectorStoreConfigs {
 
 export class VectorStoreClient {
     private vectorStore: QdrantVectorStore;
+    private embeddings: OpenAIEmbeddings;
 
     constructor(config: VectorStoreConfigs) {
-        const embeddings = new OpenAIEmbeddings({
+        this.embeddings = new OpenAIEmbeddings({
             apiKey: config.openAIKey,
             modelName: "text-embedding-3-small"
         });
-        this.vectorStore = new QdrantVectorStore(embeddings, {
+        this.vectorStore = new QdrantVectorStore(this.embeddings, {
             url: config.baseUrl,
             apiKey: config.apiKey,
             collectionName: config.collectionName
@@ -41,5 +41,9 @@ export class VectorStoreClient {
         }));
 
         await this.vectorStore.addDocuments(documents);
+    }
+
+    async embedQuery(query: string): Promise<number[]> {
+        return await this.embeddings.embedQuery(query);
     }
 }
