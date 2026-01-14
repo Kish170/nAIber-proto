@@ -5,19 +5,13 @@ export interface VectorStoreConfigs {
     baseUrl: string;
     apiKey: string;
     collectionName: string;
-    openAIKey: string;
 }
 
 export class VectorStoreClient {
     private vectorStore: QdrantVectorStore;
-    private embeddings: OpenAIEmbeddings;
 
-    constructor(config: VectorStoreConfigs) {
-        this.embeddings = new OpenAIEmbeddings({
-            apiKey: config.openAIKey,
-            modelName: "text-embedding-3-small"
-        });
-        this.vectorStore = new QdrantVectorStore(this.embeddings, {
+    constructor(config: VectorStoreConfigs, embeddingModel: OpenAIEmbeddings) {
+        this.vectorStore = new QdrantVectorStore(embeddingModel, {
             url: config.baseUrl,
             apiKey: config.apiKey,
             collectionName: config.collectionName
@@ -31,7 +25,7 @@ export class VectorStoreClient {
             searchType: "similarity",
         });
 
-        return await retriever._getRelevantDocuments(query);
+        return await retriever.invoke(query);
     }
 
     async addMemories(highlights: string[], metadata: {userId: string; conversationId: string; conversationDate?: string;}) {
@@ -43,7 +37,17 @@ export class VectorStoreClient {
         await this.vectorStore.addDocuments(documents);
     }
 
-    async embedQuery(query: string): Promise<number[]> {
-        return await this.embeddings.embedQuery(query);
+    async searchByEmbedding(embedding: number[], userId: string, k: number = 5) {
+        const results = await this.vectorStore.similaritySearchVectorWithScore(
+            embedding,
+            k,
+            { must: [{ key: "userId", match: { value: userId } }] }
+        );
+
+        return results.map(([doc, score]) => ({
+            pageContent: doc.pageContent,
+            metadata: doc.metadata,
+            score
+        }));
     }
 }

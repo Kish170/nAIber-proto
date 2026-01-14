@@ -72,7 +72,6 @@ export class PostCallFlow {
         this.textPreprocessor = new TextPreprocessor();
         this.embeddingService = new EmbeddingService(
             this.openAIClient,
-            this.redisClient,
             this.textPreprocessor
         );
 
@@ -201,9 +200,9 @@ export class PostCallFlow {
         if (points.length > 0) {
             const result = await this.qdrantClient.postToCollection(points);
             if (result.success) {
-                console.log('[PostCallService] ✅ Vector DB updated with', points.length, 'highlights');
+                console.log('[PostCallService] Vector DB updated with', points.length, 'highlights');
             } else {
-                console.error('[PostCallService] ❌ Failed to update Vector DB - highlights were not stored');
+                console.error('[PostCallService] Failed to update Vector DB - highlights were not stored');
                 throw new Error('Failed to store highlights in vector database');
             }
         }

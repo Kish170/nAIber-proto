@@ -1,8 +1,14 @@
-import { QdrantClient, SearchPayload } from '@naiber/shared';
+import { VectorStoreClient } from '@naiber/shared';
+
+export interface MemoryDocument {
+    pageContent: string;
+    metadata: Record<string, any>;
+    score: number;
+}
 
 export interface RetrievedMemories {
     highlights: string[];
-    summaries: SearchPayload[];
+    documents: MemoryDocument[];
 }
 
 interface MemoryRetrieverConfig {
@@ -11,11 +17,11 @@ interface MemoryRetrieverConfig {
 }
 
 export class MemoryRetriever {
-    private qdrantClient: QdrantClient;
+    private vectorStore: VectorStoreClient;
     private config: MemoryRetrieverConfig;
 
-    constructor(qdrantClient: QdrantClient) {
-        this.qdrantClient = qdrantClient;
+    constructor(vectorStore: VectorStoreClient) {
+        this.vectorStore = vectorStore;
         this.config = {
             similarityThreshold: parseFloat(process.env.RAG_MEMORY_SIMILARITY_THRESHOLD || '0.45'),
             minResults: parseInt(process.env.RAG_MEMORY_MIN_RESULTS || '1')
@@ -26,35 +32,34 @@ export class MemoryRetriever {
         try {
             console.log('[MemoryRetriever] Retrieving memories for user:', userId);
 
-            const searchResults = await this.qdrantClient.searchCollection({
+            const searchResults = await this.vectorStore.searchByEmbedding(
+                topicEmbedding,
                 userId,
-                queryEmbedding: topicEmbedding,
                 limit
-            });
-
-            let relevantResults = searchResults.filter(
-                r => r.similarity > this.config.similarityThreshold
             );
 
-            // Fallback: always return top N if no results above threshold
+            let relevantResults = searchResults.filter(
+                r => r.score > this.config.similarityThreshold
+            );
+
             if (relevantResults.length === 0 && searchResults.length > 0 && this.config.minResults > 0) {
                 relevantResults = searchResults
-                    .sort((a, b) => b.similarity - a.similarity)
+                    .sort((a, b) => b.score - a.score)
                     .slice(0, this.config.minResults);
             }
 
-            const highlights = relevantResults.map(r => r.highlight);
+            const highlights = relevantResults.map(r => r.pageContent);
             console.log('[MemoryRetriever] Retrieved', highlights.length, 'relevant memories');
 
             return {
                 highlights,
-                summaries: relevantResults
+                documents: relevantResults
             };
         } catch (error) {
             console.error('[MemoryRetriever] Failed to retrieve memories:', error);
             return {
                 highlights: [],
-                summaries: []
+                documents: []
             };
         }
     }

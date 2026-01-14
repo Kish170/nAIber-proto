@@ -1,6 +1,5 @@
 import { Annotation } from "@langchain/langgraph";
 import { BaseMessage } from "@langchain/core/messages";
-import { z } from "zod";
 
 export const ConversationState = Annotation.Root({
     messages: Annotation<BaseMessage[]>({
@@ -15,6 +14,18 @@ export const ConversationState = Annotation.Root({
         default: () => false
     }),
     messageLength: Annotation<number>(),
+    hasSubstantiveContent: Annotation<boolean>({
+        value: (x, y) => y ?? x ?? false,
+        default: () => false
+    }),
+    isContinuation: Annotation<boolean>({
+        value: (x, y) => y ?? x ?? false,
+        default: () => false
+    }),
+    isShortResponse: Annotation<boolean>({
+        value: (x, y) => y ?? x ?? false,
+        default: () => false
+    }),
 
     currentTopicVector: Annotation<number[] | null>({
         value: (x, y) => y ?? x ?? null,
@@ -22,7 +33,7 @@ export const ConversationState = Annotation.Root({
     }),
 
     messageCount: Annotation<number>({
-        reducer: (x, y) => y, 
+        value: (x, y) => y ?? x ?? 0,
         default: () => 0
     }),
 
@@ -47,3 +58,5 @@ export const ConversationState = Annotation.Root({
     }),
     response: Annotation<string>()
 });
+
+export type ConversationStateType = typeof ConversationState.State;

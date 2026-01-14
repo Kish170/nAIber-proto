@@ -1,5 +1,7 @@
 import { Annotation } from "@langchain/langgraph";
-const PostCallState = Annotation.Root({
+import { ReturnedTopic } from "../../../shared/src/handlers/ConversationHandler.js";
+
+export const PostCallState = Annotation.Root({
     conversationId: Annotation<string>(),
     userId: Annotation<string>(),
     transcript: Annotation<string>(),
@@ -18,9 +20,9 @@ const PostCallState = Annotation.Root({
         default: () => [] 
     }),
 
-    existingTopics: Annotation<any[]>({
-        value: (x, y) => y ?? x ?? [], 
-        default: () => [] 
+    existingTopics: Annotation<ReturnedTopic[]>({
+        value: (x, y) => y ?? x ?? [],
+        default: () => []
     }),
 
     topicsToCreate: Annotation<string[]>({ 

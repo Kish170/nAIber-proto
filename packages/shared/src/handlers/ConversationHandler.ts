@@ -16,6 +16,7 @@ export interface CallLogData {
     outcome?: 'COMPLETED' | 'NO_ANSWER' | 'BUSY' | 'FAILED' | 'USER_ENDED_EARLY';
     twilioCallSid?: string;
     elevenlabsConversationId?: string;
+    checkInCompleted: boolean;
 }
 
 export interface ConversationTopicData {
@@ -71,7 +72,8 @@ export async function createLog(data: CallLogData) {
                 status: data.status || 'PENDING',
                 outcome: data.outcome,
                 twilioCallSid: data.twilioCallSid,
-                elevenlabsConversationId: data.elevenlabsConversationId
+                elevenlabsConversationId: data.elevenlabsConversationId,
+                checkInCompleted: data.checkInCompleted
             }
         });
         return callLog;

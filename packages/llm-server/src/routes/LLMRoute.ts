@@ -1,11 +1,12 @@
 import { Router, Request, Response } from 'express';
 import { LLMController } from '../controllers/LLMController.js';
 import type { ChatCompletionRequest } from '@naiber/shared';
-import { RedisClient, OpenAIClient, QdrantClient } from '@naiber/shared';
-import { RAGService } from '../services/RAGService.js';
+import { RedisClient, OpenAIClient, VectorStoreClient, EmbeddingService } from '@naiber/shared';
 import { ConversationResolver } from '../services/ConversationResolver.js';
-import { RAGMiddleware } from '../middleware/RAGMiddleware.js';
 import { TopicManager } from '../services/TopicManager.js';
+import { MemoryRetriever } from '../services/MemoryRetriever.js';
+import { ConversationGraph } from '../graphs/ConversationGraph.js';
+import { HumanMessage, AIMessage, SystemMessage } from "@langchain/core/messages";
 
 export function LLMRouter(): Router {
     const router = Router();
@@ -15,18 +16,28 @@ export function LLMRouter(): Router {
         apiKey: process.env.OPENAI_API_KEY!,
         baseUrl: process.env.OPENAI_BASE_URL
     });
-    const qdrantClient = new QdrantClient({
+
+    const embeddingModel = openAIClient.returnEmbeddingModel();
+
+    const vectorStore = new VectorStoreClient({
         baseUrl: process.env.QDRANT_URL!,
         apiKey: process.env.QDRANT_API_KEY!,
         collectionName: process.env.QDRANT_COLLECTION!
-    });
+    }, embeddingModel);
 
-    const ragService = new RAGService(redisClient, openAIClient, qdrantClient);
-    const conversationResolver = new ConversationResolver(redisClient);
+    const embeddingService = new EmbeddingService(openAIClient);
+    const memoryRetriever = new MemoryRetriever(vectorStore);
     const topicManager = new TopicManager(redisClient);
-    const ragMiddleware = new RAGMiddleware(ragService, conversationResolver, topicManager);
+    const conversationResolver = new ConversationResolver(redisClient);
 
-    const chatCompletionHandler = async (req: Request, res: Response) => {
+    const conversationGraph = new ConversationGraph(
+        process.env.OPENAI_API_KEY!,
+        embeddingService,
+        memoryRetriever,
+        topicManager
+    ).compile();
+
+    const conversationGraphHandler = async (req: Request, res: Response) => {
         try {
             const request: ChatCompletionRequest = req.body;
 
@@ -40,25 +51,50 @@ export function LLMRouter(): Router {
                 return;
             }
 
-            const controller = new LLMController();
+            const conversation = await conversationResolver.resolveConversation(request);
 
-            if (request.stream) {
-                res.setHeader('Content-Type', 'text/event-stream');
-                res.setHeader('Cache-Control', 'no-cache');
-                res.setHeader('Connection', 'keep-alive');
-
-                const stream = await controller.streamChatCompletion(request);
-
-                for await (const chunk of stream) {
-                    res.write(`data: ${JSON.stringify(chunk)}\n\n`);
-                }
-
-                res.write('data: [DONE]\n\n');
-                res.end();
-            } else {
+            if (!conversation) {
+                console.log('[LLM Route] Could not resolve conversation, falling back to LLMController');
+                const controller = new LLMController();
                 const completion = await controller.chatCompletion(request);
                 res.json(completion);
+                return;
             }
+
+            const langchainMessages = request.messages.map(msg => {
+                const content = typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content);
+                if (msg.role === 'system') return new SystemMessage(content);
+                if (msg.role === 'assistant') return new AIMessage(content);
+                return new HumanMessage(content);
+            });
+
+            const result = await conversationGraph.invoke({
+                messages: langchainMessages,
+                userId: conversation.userId,
+                conversationId: conversation.conversationId
+            });
+
+            const completion = {
+                id: `chatcmpl-${Date.now()}`,
+                object: 'chat.completion',
+                created: Math.floor(Date.now() / 1000),
+                model: request.model,
+                choices: [{
+                    index: 0,
+                    message: {
+                        role: 'assistant',
+                        content: result.response
+                    },
+                    finish_reason: 'stop'
+                }],
+                usage: {
+                    prompt_tokens: 0,
+                    completion_tokens: 0,
+                    total_tokens: 0
+                }
+            };
+
+            res.json(completion);
 
         } catch (error) {
             console.error('[LLM Route] Error:', error);
@@ -74,8 +110,8 @@ export function LLMRouter(): Router {
         }
     };
 
-    router.post("/v1/chat/completions", ragMiddleware.middleware, chatCompletionHandler);
-    router.post("/chat/completions", ragMiddleware.middleware, chatCompletionHandler);
+    router.post("/v1/chat/completions", conversationGraphHandler);
+    router.post("/chat/completions", conversationGraphHandler);
 
     return router;
 }

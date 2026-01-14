@@ -2,21 +2,30 @@
 import { StateGraph, END } from "@langchain/langgraph";
 import { ChatOpenAI } from "@langchain/openai";
 import { PromptTemplate } from "@langchain/core/prompts";
-import { ConversationState } from "../states/ConversationState.js";
-import { VectorStoreClient } from "../../../shared/src/clients/VectorStoreClient.js";
+import { ConversationState, ConversationStateType } from "../states/ConversationState.js";
+import { EmbeddingService } from "../../../shared/src/services/EmbeddingService.js";
+import { IntentClassifier } from "../services/IntentClassifier.js";
+import { MemoryRetriever } from "../services/MemoryRetriever.js";
+import { TopicManager } from "../services/TopicManager.js";
 
 export class ConversationGraph {
     private graph: any;
     private llm: ChatOpenAI;
-    private vectorStore: VectorStoreClient;
+    private embeddingService: EmbeddingService;
+    private memoryRetriever: MemoryRetriever;
+    private intentClassifier: IntentClassifier;
+    private topicManager: TopicManager;
 
-    constructor(openAIKey: string, vectorStore: VectorStoreClient) {
+    constructor(openAIKey: string, embeddingService: EmbeddingService, memoryRetriever: MemoryRetriever, topicManager: TopicManager) {
         this.llm = new ChatOpenAI({
             apiKey: openAIKey,
             model: "gpt-4o",
             temperature: 0.7
         });
-        this.vectorStore = vectorStore;
+        this.embeddingService = embeddingService;
+        this.memoryRetriever = memoryRetriever;
+        this.topicManager = topicManager;
+        this.intentClassifier = new IntentClassifier();
 
         this.graph = new StateGraph(ConversationState);
 
@@ -28,7 +37,7 @@ export class ConversationGraph {
 
         this.graph.addConditionalEdges(
             "classify_intent",
-            (state: typeof ConversationState.State) => state.shouldProcessRAG ? "retrieve_memories" : "skip_rag"
+            (state: ConversationStateType) => state.shouldProcessRAG ? "retrieve_memories" : "skip_rag"
         );
 
         this.graph.addEdge("retrieve_memories", "check_topic_fatigue");
@@ -39,28 +48,28 @@ export class ConversationGraph {
         this.graph.setEntryPoint("classify_intent");
     }
 
-    private async classifyIntent(state: typeof ConversationState.State) {
+    private async classifyIntent(state: ConversationStateType) {
         const lastMessage = state.messages[state.messages.length - 1];
         const content = typeof lastMessage.content === 'string' ? lastMessage.content : JSON.stringify(lastMessage.content);
-        const wordCount = content.split(/\s+/).length;
 
-        const shouldProcessRAG = wordCount > 5 &&
-                                !this.isFiller(lastMessage.content) &&
-                                !this.isBackchannel(lastMessage.content);
+        const classification = this.intentClassifier.classifyIntent(content);
 
         return {
-            shouldProcessRAG,
-            messageLength: wordCount
+            shouldProcessRAG: classification.shouldProcessRAG,
+            messageLength: classification.messageLength,
+            hasSubstantiveContent: classification.hasSubstantiveContent,
+            isContinuation: classification.isContinuation,
+            isShortResponse: classification.isShortResponse
         };
     }
 
-    private async retrieveMemories(state: typeof ConversationState.State) {
+    private async retrieveMemories(state: ConversationStateType) {
         const lastMessage = state.messages[state.messages.length - 1];
         const content = typeof lastMessage.content === 'string' ? lastMessage.content : JSON.stringify(lastMessage.content);
 
-        const newEmbedding = await this.vectorStore.embedQuery(content);
-        const topicChanged = this.detectTopicChange(
-            state.currentTopicVector,
+        const newEmbedding = await this.embeddingService.embedQuery(content);
+        const topicChanged = await this.topicManager.detectTopicChange(
+            state.conversationId,
             newEmbedding,
             state.messageLength
         );
@@ -68,12 +77,16 @@ export class ConversationGraph {
         let memories: string[] = [];
 
         if (topicChanged || state.topicFatigue > 0.25) {
-            const docs = await this.vectorStore.searchMemories(
-                content,
+            if (topicChanged) {
+                await this.topicManager.resetTopicFatigue(state.conversationId);
+            }
+
+            const retrievedMemories = await this.memoryRetriever.retrieveMemories(
                 state.userId,
+                newEmbedding,
                 5
             );
-            memories = docs.map(doc => doc.pageContent);
+            memories = retrievedMemories.highlights;
         }
 
         return {
@@ -84,10 +97,15 @@ export class ConversationGraph {
         };
     }
 
-    private async checkTopicFatigue(state: typeof ConversationState.State) {
-        const messageCount = state.messageCount;
-        const baseFatigue = Math.pow(messageCount / 15, 1.8);
-        const topicFatigue = Math.min(1.0, baseFatigue);
+    private async checkTopicFatigue(state: ConversationStateType) {
+        await this.topicManager.updateTopicState(
+            state.conversationId,
+            state.currentTopicVector || [],
+            state.messageLength
+        );
+
+        const topicState = await this.topicManager.getCurrentTopic(state.conversationId);
+        const topicFatigue = topicState?.topicFatigue || 0;
 
         let fatigueGuidance = "";
         if (topicFatigue >= 0.75) {
@@ -101,15 +119,14 @@ export class ConversationGraph {
         return { topicFatigue, fatigueGuidance };
     }
 
-    private async generateResponse(state: typeof ConversationState.State) {
+    private async generateResponse(state: ConversationStateType) {
         let contextSection = "";
         if (state.retrievedMemories.length > 0) {
-            contextSection = `
-# RELEVANT MEMORIES FROM PAST CONVERSATIONS
-${state.retrievedMemories.map((m, i) => `${i + 1}. ${m}`).join('\n')}
+            contextSection = `# RELEVANT MEMORIES FROM PAST CONVERSATIONS
+            ${state.retrievedMemories.map((m, i) => `${i + 1}. ${m}`).join('\n')}
 
-Use these memories to provide continuity and personalization.
-`;
+            Use these memories to provide continuity and personalization.
+            `;
         }
 
         if (state.fatigueGuidance) {
@@ -117,12 +134,12 @@ Use these memories to provide continuity and personalization.
         }
 
         const prompt = PromptTemplate.fromTemplate(`
-{systemPrompt}
+            {systemPrompt}
 
-{context}
+            {context}
 
-{conversationHistory}
-`);
+            {conversationHistory}
+        `);
 
         const chain = prompt.pipe(this.llm);
         const response = await chain.invoke({
@@ -134,76 +151,18 @@ Use these memories to provide continuity and personalization.
         return { response: response.content };
     }
 
-    private async skipRAG(state: typeof ConversationState.State) {
+    private async skipRAG(state: ConversationStateType) {
         return {
             messageCount: state.messageCount + 1
         };
     }
 
-    private detectTopicChange(
-        prevVector: number[] | null,
-        newVector: number[],
-        messageLength: number
-    ): boolean {
-        if (!prevVector) return true;
-
-        const similarity = this.cosineSimilarity(prevVector, newVector);
-
-        let threshold = 0.60;
-        if (messageLength > 15) threshold = 0.70;
-        else if (messageLength > 10) threshold = 0.65;
-
-        return similarity < threshold;
-    }
-
-    private isFiller(content: string | any[]): boolean {
-        const text = typeof content === 'string' ? content : '';
-        const fillerPatterns = [
-            /^(ok|okay|sure|yes|no|yep|yeah|nope|alright|got it|thanks|thank you)\.?$/i,
-            /^(hmm|umm|uh|ah|oh|well)\.?$/i,
-        ];
-        return fillerPatterns.some(pattern => pattern.test(text.trim()));
-    }
-
-    private isBackchannel(content: string | any[]): boolean {
-        const text = typeof content === 'string' ? content : '';
-        const backchannelPatterns = [
-            /^(uh-huh|mm-hmm|mhm|right|I see|makes sense|interesting)\.?$/i,
-        ];
-        return backchannelPatterns.some(pattern => pattern.test(text.trim()));
-    }
-
-    private cosineSimilarity(vecA: number[], vecB: number[]): number {
-        if (vecA.length !== vecB.length) {
-            throw new Error("Vectors must have the same length");
-        }
-
-        let dotProduct = 0;
-        let magnitudeA = 0;
-        let magnitudeB = 0;
-
-        for (let i = 0; i < vecA.length; i++) {
-            dotProduct += vecA[i] * vecB[i];
-            magnitudeA += vecA[i] * vecA[i];
-            magnitudeB += vecB[i] * vecB[i];
-        }
-
-        magnitudeA = Math.sqrt(magnitudeA);
-        magnitudeB = Math.sqrt(magnitudeB);
-
-        if (magnitudeA === 0 || magnitudeB === 0) {
-            return 0;
-        }
-
-        return dotProduct / (magnitudeA * magnitudeB);
-    }
-
     private getSystemPrompt(userId: string): string {
         return `You are a helpful AI assistant having a conversation with user ${userId}.
-Your goal is to provide thoughtful, contextual responses based on the conversation history and any relevant memories from past interactions.`;
+                Your goal is to provide thoughtful, contextual responses based on the conversation history and any relevant memories from past interactions.`;
     }
 
-    private formatMessages(messages: typeof ConversationState.State['messages']): string {
+    private formatMessages(messages: ConversationStateType['messages']): string {
         return messages.map((msg) => {
             const content = typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content);
             const role = msg.constructor.name.replace('Message', '').toLowerCase();
