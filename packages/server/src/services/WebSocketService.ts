@@ -4,7 +4,7 @@ import { WebSocket } from 'ws';
 import { buildFirstMessage, buildSystemPrompt } from './SystemPromptsService.js';
 import { TwilioClient } from "../clients/TwilioClient.js";
 import { sessionManager } from "./SessionManager.js";
-import { PostCallFlow } from "../middleware/PostCallFlow.js";
+import { PostCallQueue } from "../queues/PostCallQueue.js";
 
 export interface WebSockets {
     twilioWs: WebSocket;
@@ -319,25 +319,18 @@ export class WebSocketService {
             console.log('[WebSocketService] Waiting 3 seconds for transcript to be ready...');
             await new Promise(resolve => setTimeout(resolve, 3000));
 
-            const postCallFlow = new PostCallFlow(this.userProfile.getData());
+            // Add job to BullMQ queue for async processing
+            const postCallQueue = PostCallQueue.getInstance();
 
-            console.log('[WebSocketService] Generating and saving conversation summary...');
-            await postCallFlow.generateAndSaveConversationSummary(
-                this.userProfile.id,
-                this.conversationId
-            );
-            console.log('[WebSocketService] Conversation summary saved');
+            const job = await postCallQueue.add('process-post-call', {
+                conversationId: this.conversationId,
+                userId: this.userProfile.id,
+                isFirstCall: this.userProfile.isFirstCall,
+                timestamp: Date.now()
+            });
 
-            console.log('[WebSocketService] Updating conversation topics...');
-            await postCallFlow.updateConversationTopicData();
-            console.log('[WebSocketService] Conversation topics updated');
-
-            console.log('[WebSocketService] Updating vector database...');
-            await postCallFlow.updateVectorDB();
-            console.log('[WebSocketService] Vector database updated');
-
+            console.log(`[WebSocketService] Post-call job ${job.id} queued successfully`);
             this.postCallWorkflowCompleted = true;
-            console.log('[WebSocketService] Post-call workflow completed successfully');
 
         } catch (error) {
             console.error('[WebSocketService] Error in post-call workflow:', error);

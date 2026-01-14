@@ -3,6 +3,8 @@ import express from 'express';
 import http from 'http';
 import { LLMRouter } from './routes/LLMRoute.js'
 import { StatusRouter } from './routes/StatusRoute.js';
+import { BullBoardRouter } from './routes/BullBoardRoute.js';
+import { PostCallWorker } from './workers/PostCallWorker.js';
 import { RedisClient } from '@naiber/shared';
 
 const app = express();
@@ -11,23 +13,29 @@ app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
 app.use(LLMRouter());
 app.use(StatusRouter());
+app.use('/admin/queues', BullBoardRouter());
 
 const server = http.createServer(app);
 
 const PORT = process.env.LLM_PORT || 3001;
 const redisClient = RedisClient.getInstance();
 
+let postCallWorker: PostCallWorker | null = null;
+
 redisClient.connect().then(() => {
   console.log('[LLM Server] Redis connected');
+
+  postCallWorker = new PostCallWorker();
 
   server.listen(PORT, () => {
     console.log(`LLM Server running on port ${PORT}`);
     console.log(`Chat completions endpoint: http://localhost:${PORT}/v1/chat/completions`);
+    console.log(`Bull Board dashboard: http://localhost:${PORT}/admin/queues`);
     console.log(`RAG enabled: ${process.env.RAG_ENABLED !== 'false'}`);
   });
 }).catch(error => {
   console.error('[LLM Server] Failed to connect to Redis:', error);
-  console.error('[LLM Server] Starting server anyway - RAG will be disabled');
+  console.error('[LLM Server] Starting server anyway - RAG and PostCall worker disabled');
 
   server.listen(PORT, () => {
     console.log(`LLM Server running on port ${PORT} (RAG DISABLED - Redis unavailable)`);
@@ -49,6 +57,15 @@ async function gracefulShutdown(signal: string): Promise<void> {
   let exitCode = 0;
 
   try {
+    try {
+      if (postCallWorker) {
+        await postCallWorker.close();
+        console.log('PostCallWorker closed');
+      }
+    } catch (error) {
+      console.error('Error closing PostCallWorker:', error);
+    }
+
     try {
       await redisClient.disconnect();
       console.log('Redis disconnected');

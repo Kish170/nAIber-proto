@@ -6,6 +6,16 @@ export const PostCallState = Annotation.Root({
     userId: Annotation<string>(),
     transcript: Annotation<string>(),
 
+    isFirstCall: Annotation<boolean>({
+        value: (x, y) => y ?? x ?? false,
+        default: () => false
+    }),
+
+    summaryId: Annotation<string | null>({
+        value: (x, y) => y ?? x ?? null,
+        default: () => null
+    }),
+
     summary: Annotation<{
         summaryText: string;
         topicsDiscussed: string[];
@@ -15,9 +25,9 @@ export const PostCallState = Annotation.Root({
         default: () => null
     }),
 
-    newTopics: Annotation<string[]>({ 
-        value: (x, y) => y ?? x ?? [], 
-        default: () => [] 
+    newTopics: Annotation<string[]>({
+        value: (x, y) => y ?? x ?? [],
+        default: () => []
     }),
 
     existingTopics: Annotation<ReturnedTopic[]>({
@@ -25,18 +35,39 @@ export const PostCallState = Annotation.Root({
         default: () => []
     }),
 
-    topicsToCreate: Annotation<string[]>({ 
-        value: (x, y) => y ?? x ?? [], 
-        default: () => [] 
+    topicsToCreate: Annotation<string[]>({
+        value: (x, y) => y ?? x ?? [],
+        default: () => []
     }),
 
-    topicsToUpdate: Annotation<string[]>({ 
-        value: (x, y) => y ?? x ?? [], 
-        default: () => [] 
+    topicsToUpdate: Annotation<Array<{
+        oldName: string;
+        newName: string;
+        topicId: string;
+    }>>({
+        value: (x, y) => y ?? x ?? [],
+        default: () => []
     }),
 
-    completed: Annotation<boolean>({ 
-        value: (x, y) => y ?? x ?? false, 
-        default: () => false 
+    topicMatchResults: Annotation<Array<{
+        topic: string;
+        matchedExisting: boolean;
+        existingTopicId?: string;
+        similarity?: number;
+    }>>({
+        value: (x, y) => y ?? x ?? [],
+        default: () => []
+    }),
+
+    errors: Annotation<string[]>({
+        reducer: (x, y) => x.concat(y),
+        default: () => []
+    }),
+
+    completed: Annotation<boolean>({
+        value: (x, y) => y ?? x ?? false,
+        default: () => false
     })
 });
+
+export type PostCallStateType = typeof PostCallState.State;
