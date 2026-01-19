@@ -55,9 +55,9 @@ export class PostCallWorker {
                     host: new URL(redisUrl).hostname,
                     port: parseInt(new URL(redisUrl).port || '6379')
                 },
-                concurrency: 2,
+                concurrency: 1,
                 limiter: {
-                    max: 10,
+                    max: 3,
                     duration: 60000
                 }
             }

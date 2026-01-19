@@ -51,13 +51,36 @@ export function LLMRouter(): Router {
                 return;
             }
 
+            console.log('[LLM Route] Request params:', {
+                model: request.model,
+                stream: request.stream,
+                messageCount: request.messages.length
+            });
+
             const conversation = await conversationResolver.resolveConversation(request);
 
             if (!conversation) {
                 console.log('[LLM Route] Could not resolve conversation, falling back to LLMController');
                 const controller = new LLMController();
-                const completion = await controller.chatCompletion(request);
-                res.json(completion);
+
+                if (request.stream === true) {
+                    // Return SSE stream
+                    const stream = await controller.streamChatCompletion(request);
+
+                    res.setHeader('Content-Type', 'text/event-stream');
+                    res.setHeader('Cache-Control', 'no-cache');
+                    res.setHeader('Connection', 'keep-alive');
+
+                    for await (const chunk of stream) {
+                        res.write(`data: ${JSON.stringify(chunk)}\n\n`);
+                    }
+
+                    res.write('data: [DONE]\n\n');
+                    res.end();
+                } else {
+                    const completion = await controller.chatCompletion(request);
+                    res.json(completion);
+                }
                 return;
             }
 
@@ -74,27 +97,88 @@ export function LLMRouter(): Router {
                 conversationId: conversation.conversationId
             });
 
-            const completion = {
-                id: `chatcmpl-${Date.now()}`,
-                object: 'chat.completion',
-                created: Math.floor(Date.now() / 1000),
-                model: request.model,
-                choices: [{
-                    index: 0,
-                    message: {
-                        role: 'assistant',
-                        content: result.response
-                    },
-                    finish_reason: 'stop'
-                }],
-                usage: {
-                    prompt_tokens: 0,
-                    completion_tokens: 0,
-                    total_tokens: 0
-                }
-            };
+            console.log('[LLM Route] ConversationGraph result:', {
+                hasResponse: !!result.response,
+                responseType: typeof result.response,
+                responseLength: result.response?.length,
+                responsePreview: result.response?.substring(0, 100)
+            });
 
-            res.json(completion);
+            if (!result.response || typeof result.response !== 'string') {
+                console.error('[LLM Route] Invalid response from ConversationGraph:', result);
+                res.status(500).json({
+                    error: {
+                        message: 'Failed to generate valid response',
+                        type: 'api_error'
+                    }
+                });
+                return;
+            }
+
+            // Check if ElevenLabs is requesting streaming format
+            if (request.stream === true) {
+                console.log('[LLM Route] Returning SSE streaming format');
+
+                // Set SSE headers
+                res.setHeader('Content-Type', 'text/event-stream');
+                res.setHeader('Cache-Control', 'no-cache');
+                res.setHeader('Connection', 'keep-alive');
+
+                const completionId = `chatcmpl-${Date.now()}`;
+                const created = Math.floor(Date.now() / 1000);
+
+                // Send content chunk
+                res.write(`data: ${JSON.stringify({
+                    id: completionId,
+                    object: 'chat.completion.chunk',
+                    created: created,
+                    model: request.model,
+                    choices: [{
+                        index: 0,
+                        delta: { content: result.response },
+                        finish_reason: null
+                    }]
+                })}\n\n`);
+
+                // Send final chunk
+                res.write(`data: ${JSON.stringify({
+                    id: completionId,
+                    object: 'chat.completion.chunk',
+                    created: created,
+                    model: request.model,
+                    choices: [{
+                        index: 0,
+                        delta: {},
+                        finish_reason: 'stop'
+                    }]
+                })}\n\n`);
+
+                // Terminate stream
+                res.write('data: [DONE]\n\n');
+                res.end();
+
+                console.log('[LLM Route] SSE stream completed');
+            } else {
+                console.log('[LLM Route] Returning standard JSON format');
+
+                const completion = {
+                    id: `chatcmpl-${Date.now()}`,
+                    object: 'chat.completion',
+                    created: Math.floor(Date.now() / 1000),
+                    model: request.model,
+                    choices: [{
+                        index: 0,
+                        message: {
+                            role: 'assistant',
+                            content: result.response
+                        },
+                        finish_reason: 'stop'
+                    }]
+                };
+
+                res.setHeader('Content-Type', 'application/json');
+                res.status(200).json(completion);
+            }
 
         } catch (error) {
             console.error('[LLM Route] Error:', error);

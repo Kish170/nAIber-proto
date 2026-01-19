@@ -10,7 +10,7 @@ services:
     volumes:
       - ./ngrok.yml:/etc/ngrok.yml:ro
     ports:
-      - "4040:4040"  #
+      - "4040:4040"  
     environment:
       NGROK_AUTHTOKEN: ${NGROK_AUTH_TOKEN}
     restart: unless-stopped
@@ -21,9 +21,6 @@ services:
       retries: 10
       start_period: 5s
 
-  # ============================================
-  # Redis - Session Management & Caching
-  # ============================================
   redis:
     image: redis:7-alpine
     container_name: naiber-redis
@@ -108,12 +105,31 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       OPENAI_BASE_URL: ${OPENAI_BASE_URL}
 
+      QDRANT_API_KEY: ${QDRANT_API_KEY}
+      QDRANT_URL: ${QDRANT_URL}
+      QDRANT_COLLECTION: ${QDRANT_COLLECTION}
+
+      REDIS_URL: redis://redis:6379
+
+      ELEVENLABS_API_KEY: ${ELEVENLABS_API_KEY}
+      ELEVENLABS_BASE_URL: ${ELEVENLABS_BASE_URL}
+      ELEVENLABS_AGENT_ID: ${ELEVENLABS_AGENT_ID}
+      ELEVENLABS_NUMBER_ID: ${ELEVENLABS_NUMBER_ID}
+
+      TWILIO_NUMBER: ${TWILIO_NUMBER}
+
+      DATABASE_URL: ${DATABASE_URL}
+      DIRECT_URL: ${DIRECT_URL}
+
     volumes:
       - ./packages/llm-server/src:/app/packages/llm-server/src
       - ./packages/shared/src:/app/packages/shared/src
       - ./packages/shared/dist:/app/packages/shared/dist
     ports:
       - "3001:3001"
+    depends_on:
+      redis:
+        condition: service_healthy
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3001/health"]

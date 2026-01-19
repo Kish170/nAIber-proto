@@ -329,7 +329,11 @@ export class WebSocketService {
                 timestamp: Date.now()
             });
 
-            console.log(`[WebSocketService] Post-call job ${job.id} queued successfully`);
+            if (job) {
+                console.log(`[WebSocketService] Post-call job ${job.id} queued successfully`);
+            } else {
+                console.log(`[WebSocketService] Post-call job already queued for conversation ${this.conversationId}`);
+            }
             this.postCallWorkflowCompleted = true;
 
         } catch (error) {

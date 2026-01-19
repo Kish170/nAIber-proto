@@ -16,6 +16,7 @@
   },
   "scripts": {
     "build": "tsc --build",
+    "watch": "tsc --build --watch",
     "clean": "rm -rf dist tsconfig.tsbuildinfo"
   },
   "dependencies": {

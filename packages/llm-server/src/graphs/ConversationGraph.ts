@@ -1,7 +1,7 @@
 // May need to expand conversation graph to have nodes for health check in portion as well
 import { StateGraph, END } from "@langchain/langgraph";
 import { ChatOpenAI } from "@langchain/openai";
-import { PromptTemplate } from "@langchain/core/prompts";
+import { SystemMessage } from "@langchain/core/messages";
 import { ConversationState, ConversationStateType } from "../states/ConversationState.js";
 import { EmbeddingService } from "../../../shared/src/services/EmbeddingService.js";
 import { IntentClassifier } from "../services/IntentClassifier.js";
@@ -15,7 +15,6 @@ export class ConversationGraph {
     private memoryRetriever: MemoryRetriever;
     private intentClassifier: IntentClassifier;
     private topicManager: TopicManager;
-
     constructor(openAIKey: string, embeddingService: EmbeddingService, memoryRetriever: MemoryRetriever, topicManager: TopicManager) {
         this.llm = new ChatOpenAI({
             apiKey: openAIKey,
@@ -133,22 +132,31 @@ export class ConversationGraph {
             contextSection += `\n\n${state.fatigueGuidance}`;
         }
 
-        const prompt = PromptTemplate.fromTemplate(`
-            {systemPrompt}
+        const systemPromptText = `${this.getSystemPrompt(state.userId)}
 
-            {context}
+${contextSection}`;
 
-            {conversationHistory}
-        `);
+        const recentMessages = state.messages.slice(-10);
 
-        const chain = prompt.pipe(this.llm);
-        const response = await chain.invoke({
-            systemPrompt: this.getSystemPrompt(state.userId),
-            context: contextSection,
-            conversationHistory: this.formatMessages(state.messages)
-        });
+        const messages = [
+            new SystemMessage(systemPromptText),
+            ...recentMessages
+        ];
 
-        return { response: response.content };
+        const response = await this.llm.invoke(messages);
+
+        let content: string;
+        if (typeof response.content === 'string') {
+            content = response.content;
+        } else if (Array.isArray(response.content)) {
+            content = response.content
+                .map(part => typeof part === 'string' ? part : JSON.stringify(part))
+                .join('');
+        } else {
+            content = String(response.content);
+        }
+
+        return { response: content };
     }
 
     private async skipRAG(state: ConversationStateType) {
@@ -160,14 +168,6 @@ export class ConversationGraph {
     private getSystemPrompt(userId: string): string {
         return `You are a helpful AI assistant having a conversation with user ${userId}.
                 Your goal is to provide thoughtful, contextual responses based on the conversation history and any relevant memories from past interactions.`;
-    }
-
-    private formatMessages(messages: ConversationStateType['messages']): string {
-        return messages.map((msg) => {
-            const content = typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content);
-            const role = msg.constructor.name.replace('Message', '').toLowerCase();
-            return `${role}: ${content}`;
-        }).join('\n');
     }
 
     public compile() {

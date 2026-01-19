@@ -1,9 +1,8 @@
 import OpenAI from 'openai';
 import type { Stream } from 'openai/streaming';
 import { ChatOpenAI, OpenAIEmbeddings } from "@langchain/openai";
-import { ChatPromptTemplate } from "@langchain/core/prompts";
+import { HumanMessage, SystemMessage, AIMessage } from "@langchain/core/messages";
 import type { AIMessageChunk } from "@langchain/core/messages";
-import { z } from "zod";
 
 export interface OpenAIConfigs {
     apiKey: string;
@@ -49,23 +48,21 @@ export class OpenAIClient {
     async generalGPTCall(request: ChatCompletionRequest): Promise<OpenAI.Chat.Completions.ChatCompletion> {
         try {
             const messages = request.messages.map(msg => {
-                if (msg.role === 'system') return ['system', msg.content];
-                if (msg.role === 'user') return ['human', msg.content];
-                if (msg.role === 'assistant') return ['assistant', msg.content];
-                return ['human', msg.content];
-            }) as [string, string][];
+                if (msg.role === 'system') return new SystemMessage(msg.content);
+                if (msg.role === 'user') return new HumanMessage(msg.content);
+                if (msg.role === 'assistant') return new AIMessage(msg.content);
+                return new HumanMessage(msg.content);
+            });
 
             let content: string;
 
             if (request.response_format?.type === 'json_object') {
-                const jsonSchema = z.object({}).passthrough();
-                const structuredModel = this.chatModel.withStructuredOutput(jsonSchema);
-                const prompt = ChatPromptTemplate.fromMessages(messages);
-                const result = await prompt.pipe(structuredModel).invoke({});
-                content = JSON.stringify(result);
+                const aiMessage = await this.chatModel.invoke(messages, {
+                    response_format: { type: 'json_object' }
+                });
+                content = aiMessage.content as string;
             } else {
-                const prompt = ChatPromptTemplate.fromMessages(messages);
-                const aiMessage = await prompt.pipe(this.chatModel).invoke({});
+                const aiMessage = await this.chatModel.invoke(messages);
                 content = aiMessage.content as string;
             }
 
@@ -92,14 +89,13 @@ export class OpenAIClient {
     async streamChatCompletion(request: ChatCompletionRequest): Promise<Stream<OpenAI.Chat.Completions.ChatCompletionChunk>> {
         try {
             const messages = request.messages.map(msg => {
-                if (msg.role === 'system') return ['system', msg.content];
-                if (msg.role === 'user') return ['human', msg.content];
-                if (msg.role === 'assistant') return ['assistant', msg.content];
-                return ['human', msg.content];
-            }) as [string, string][];
-            
-            const prompt = ChatPromptTemplate.fromMessages(messages);
-            const stream = await prompt.pipe(this.chatModel).stream({});
+                if (msg.role === 'system') return new SystemMessage(msg.content);
+                if (msg.role === 'user') return new HumanMessage(msg.content);
+                if (msg.role === 'assistant') return new AIMessage(msg.content);
+                return new HumanMessage(msg.content);
+            });
+
+            const stream = await this.chatModel.stream(messages);
 
             return this.mapToOpenAIStream(stream, request) as any;
         } catch (error) {

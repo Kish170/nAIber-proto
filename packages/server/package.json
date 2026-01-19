@@ -5,7 +5,7 @@
     "description": "nAIber Express server with Twilio and ElevenLabs integration",
     "main": "./dist/index.js",
     "scripts": {
-        "dev": "tsx watch src/index.ts",
+        "dev": "nodemon --exec ts-node src/index.ts",
         "build": "tsc --build",
         "start": "node dist/index.js",
         "clean": "rm -rf dist tsconfig.tsbuildinfo"
