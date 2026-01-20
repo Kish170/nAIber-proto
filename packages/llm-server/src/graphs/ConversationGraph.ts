@@ -34,15 +34,34 @@ export class ConversationGraph {
         this.graph.addNode("generate_response", this.generateResponse.bind(this));
         this.graph.addNode("skip_rag", this.skipRAG.bind(this));
 
+        this.graph.addNode("start_health_check", this.startHealthCheck.bind(this));
+        this.graph.addNode("ask_health_question", this.askHealthQuestion.bind(this));
+        this.graph.addNode("process_health_answer", this.processHealthAnswer.bind(this));
+        this.graph.addNode("end_health_check", this.endHealthCheck.bind(this));
+
         this.graph.addConditionalEdges(
             "classify_intent",
-            (state: ConversationStateType) => state.shouldProcessRAG ? "retrieve_memories" : "skip_rag"
+            (state: ConversationStateType) => {
+                if (state.isEndCall && !state.isHealthCheckComplete) return "start_health_check"
+                return state.shouldProcessRAG ? "retrieve_memories" : "skip_rag"
+            }
         );
 
         this.graph.addEdge("retrieve_memories", "check_topic_fatigue");
         this.graph.addEdge("check_topic_fatigue", "generate_response");
         this.graph.addEdge("skip_rag", "generate_response");
         this.graph.addEdge("generate_response", END);
+
+        this.graph.addEdge("start_health_check", "ask_health_question");
+        this.graph.addEdge("ask_health_question", "process_health_answer");
+        this.graph.addConditionalEdges("process_health_answer", (state: ConversationStateType) => {
+        if (state.currentQuestionIndex < state.healthQuestions.length) {
+            return "ask_health_question";
+        } else {
+            return "end_health_check";
+        }
+        });
+        this.graph.addEdge("end_health_check", END);
 
         this.graph.setEntryPoint("classify_intent");
     }
@@ -134,7 +153,7 @@ export class ConversationGraph {
 
         const systemPromptText = `${this.getSystemPrompt(state.userId)}
 
-${contextSection}`;
+        ${contextSection}`;
 
         const recentMessages = state.messages.slice(-10);
 
@@ -143,7 +162,9 @@ ${contextSection}`;
             ...recentMessages
         ];
 
-        const response = await this.llm.invoke(messages);
+        const response = await this.llm.invoke(messages, {
+            response_format: { type: 'json_object' }
+        });
 
         let content: string;
         if (typeof response.content === 'string') {
@@ -156,7 +177,32 @@ ${contextSection}`;
             content = String(response.content);
         }
 
-        return { response: content };
+        let parsedResponse: { response: string; is_end_call_detected: boolean };
+        try {
+            parsedResponse = JSON.parse(content);
+        } catch (error) {
+            console.error('[ConversationGraph] Failed to parse JSON response:', error);
+            console.error('[ConversationGraph] Raw content:', content);
+            return { response: content, isEndCall: false };
+        }
+
+        if (!parsedResponse.response || typeof parsedResponse.is_end_call_detected !== 'boolean') {
+            console.error('[ConversationGraph] Invalid response structure:', parsedResponse);
+            return {
+                response: parsedResponse.response || content,
+                isEndCall: parsedResponse.is_end_call_detected ?? false
+            };
+        }
+
+        console.log('[ConversationGraph] End call detection:', {
+            isEndCallDetected: parsedResponse.is_end_call_detected,
+            response: parsedResponse.response.substring(0, 100)
+        });
+
+        return {
+            response: parsedResponse.response,
+            isEndCall: parsedResponse.is_end_call_detected
+        };
     }
 
     private async skipRAG(state: ConversationStateType) {
@@ -166,8 +212,77 @@ ${contextSection}`;
     }
 
     private getSystemPrompt(userId: string): string {
-        return `You are a helpful AI assistant having a conversation with user ${userId}.
-                Your goal is to provide thoughtful, contextual responses based on the conversation history and any relevant memories from past interactions.`;
+        return `
+            You are a helpful AI assistant having a conversation with user ${userId}.
+            Your goal is to provide contextual, natural responses.
+
+            If you think the user is about to end the call (e.g., says goodbye, mentions ending, or closing remarks), 
+            set "is_end_call_detected" to true. Otherwise, set it to false.
+
+            Return your output in JSON with these fields:
+            {
+            "response": "assistant's next message",
+            "is_end_call_detected": boolean
+            }
+        `;
+    }
+
+    private async startHealthCheck(state: ConversationStateType) {
+        console.log('[ConversationGraph] Starting health check');
+        return {
+            healthQuestions: [
+                "On a scale of 1–10, how are you feeling overall right now?",
+                "Are you experiencing any physical symptoms at the moment?",
+                "Have you taken your prescribed medications today?",
+                "How would you rate your sleep last night from 1–10?",
+                "Is there anything else you'd like to note about how you're feeling?"
+            ],
+            currentQuestionIndex: 0
+        };
+    }
+
+    private async askHealthQuestion(state: ConversationStateType) {
+        const question = state.healthQuestions[state.currentQuestionIndex];
+        return { response: question };
+    }
+
+    private async processHealthAnswer(state: ConversationStateType) {
+        const lastMessage = state.messages[state.messages.length - 1];
+
+        let answer: string;
+        if (typeof lastMessage.content === 'string') {
+            answer = lastMessage.content;
+        } else if (Array.isArray(lastMessage.content)) {
+            answer = lastMessage.content
+                .map(part => typeof part === 'string' ? part : JSON.stringify(part))
+                .join('');
+        } else {
+            answer = String(lastMessage.content);
+        }
+
+        const currentIndex = state.currentQuestionIndex;
+        const currentQuestion = state.healthQuestions[currentIndex];
+        let validatedAnswer: string;
+
+        if (currentQuestion.includes("scale of 1–10")) {
+            const num = parseInt(answer.trim());
+            if (isNaN(num) || num < 1 || num > 10) {
+                validatedAnswer = "not answered";
+            } else {
+                validatedAnswer = num.toString();
+            }
+        } else {
+            validatedAnswer = answer.trim() || "not answered";
+        }
+
+        return {
+            healthAnswer: [validatedAnswer],
+            currentQuestionIndex: currentIndex + 1
+        };
+    }
+
+    private async endHealthCheck(state: ConversationStateType) {
+
     }
 
     public compile() {

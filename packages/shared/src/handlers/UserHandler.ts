@@ -1,6 +1,5 @@
-import { prismaClient } from '../clients/PrismaDBClient.js';
+import { UserRepository } from '../repositories/UserRepository.js';
 import {
-    userProfileInclude,
     UserProfileData,
     EmergencyContact,
     HealthCondition,
@@ -18,10 +17,7 @@ export class UserProfile {
     }
 
     static async loadByPhone(phone: string): Promise<UserProfile | null> {
-        const userData = await prismaClient.user.findUnique({
-            where: { phone },
-            include: userProfileInclude
-        });
+        const userData = await UserRepository.findByPhone(phone);
 
         if (!userData) {
             return null;
@@ -30,14 +26,14 @@ export class UserProfile {
         return new UserProfile(userData);
     }
 
-    static async loadByPhoneOrThrow(phone: string): Promise<UserProfile> {
-        const user = await this.loadByPhone(phone);
+    static async loadById(id: string): Promise<UserProfile | null> {
+        const userData = await UserRepository.findById(id);
 
-        if (!user) {
-            throw new Error(`User with phone ${phone} not found`);
+        if (!userData) {
+            return null;
         }
 
-        return user;
+        return new UserProfile(userData);
     }
 
     get id(): string {
@@ -101,12 +97,6 @@ export class UserProfile {
     getConversationTopics(limit?: number): ConversationTopic[] {
         return limit ? this.data.conversationTopics.slice(0, limit) : this.data.conversationTopics;
     }
-
-    // getTopTopicsByEngagement(limit: number = 5): ConversationTopic[] {
-    //     return [...this.data.conversationTopics]
-    //         .sort((a, b) => b.userInterestScore - a.userInterestScore)
-    //         .slice(0, limit);
-    // }
 
     hasConversationTopics(): boolean {
         return this.data.conversationTopics.length > 0;
