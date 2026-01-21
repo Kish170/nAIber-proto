@@ -60,7 +60,7 @@ export class ConversationRepository {
 
     static async createCallLog(data: CallLogData) {
         try {
-            const callLog = await prismaClient.callLog.create({
+            return await prismaClient.callLog.create({
                 data: {
                     userId: data.userId,
                     scheduledTime: data.scheduledTime,
@@ -72,7 +72,6 @@ export class ConversationRepository {
                     checkInCompleted: data.checkInCompleted
                 }
             });
-            return callLog;
         } catch (error) {
             console.error('[ConversationRepository] Unable to create call log:', error);
             throw error;
@@ -113,7 +112,7 @@ export class ConversationRepository {
 
     static async upsertTopicReference(data: ConversationReferenceData) {
         try {
-            const reference = await prismaClient.conversationTopicReference.upsert({
+            return await prismaClient.conversationTopicReference.upsert({
                 where: {
                     conversationSummaryId_conversationTopicId: {
                         conversationSummaryId: data.conversationSummaryId,
@@ -129,7 +128,6 @@ export class ConversationRepository {
                     mentionedAt: new Date()
                 }
             });
-            return reference;
         } catch (error) {
             console.error('[ConversationRepository] Unable to upsert conversation reference:', error);
             throw error;
@@ -138,7 +136,7 @@ export class ConversationRepository {
 
     static async findTopicByName(userId: string, topicName: string) {
         try {
-            const topic = await prismaClient.conversationTopic.findUnique({
+            return await prismaClient.conversationTopic.findUnique({
                 where: {
                     userId_topicName: {
                         userId,
@@ -152,7 +150,6 @@ export class ConversationRepository {
                     variations: true
                 }
             });
-            return topic;
         } catch (error) {
             console.error('[ConversationRepository] Unable to find topic by name:', error);
             throw error;
@@ -214,12 +211,11 @@ export class ConversationRepository {
 
     static async findTopicReferenceBySummaryId(conversationSummaryId: string) {
         try {
-            const reference = await prismaClient.conversationTopicReference.findFirst({
+            return await prismaClient.conversationTopicReference.findFirst({
                 where: {
                     conversationSummaryId
                 }
             });
-            return reference;
         } catch (error) {
             console.error('[ConversationRepository] Unable to find topic reference:', error);
             throw error;
@@ -228,7 +224,7 @@ export class ConversationRepository {
 
     static async updateTopicReferenceById(referenceId: string, conversationTopicId: string) {
         try {
-            const updated = await prismaClient.conversationTopicReference.update({
+            return await prismaClient.conversationTopicReference.update({
                 where: {
                     id: referenceId
                 },
@@ -236,7 +232,6 @@ export class ConversationRepository {
                     conversationTopicId
                 }
             });
-            return updated;
         } catch (error) {
             console.error('[ConversationRepository] Unable to update topic reference:', error);
             throw error;
@@ -245,7 +240,7 @@ export class ConversationRepository {
 
     static async findTopicsByUserId(userId: string) {
         try {
-            const allTopics = await prismaClient.conversationTopic.findMany({
+            return await prismaClient.conversationTopic.findMany({
                 where: {
                     userId
                 },
@@ -255,7 +250,6 @@ export class ConversationRepository {
                     topicEmbedding: true
                 }
             });
-            return allTopics;
         } catch (error) {
             console.error('[ConversationRepository] Unable to get conversation topics:', error);
             throw error;
@@ -264,13 +258,12 @@ export class ConversationRepository {
 
     static async findTopicById(userId: string, topicId: string) {
         try {
-            const topic = await prismaClient.conversationTopic.findUnique({
+            return await prismaClient.conversationTopic.findUnique({
                 where: {
                     userId,
                     id: topicId
                 },
             });
-            return topic;
         } catch (error) {
             console.error('[ConversationRepository] Unable to get conversation topic:', error);
             throw error;
@@ -279,12 +272,11 @@ export class ConversationRepository {
 
     static async findTopicReferenceById(topicId: string) {
         try {
-            const topicReference = await prismaClient.conversationTopicReference.findUnique({
+            return await prismaClient.conversationTopicReference.findUnique({
                 where: {
                     id: topicId
                 }
             });
-            return topicReference;
         } catch (error) {
             console.error('[ConversationRepository] Unable to get topic reference:', error);
             throw error;

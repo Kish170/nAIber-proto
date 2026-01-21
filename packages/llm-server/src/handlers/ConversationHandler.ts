@@ -1,4 +1,35 @@
-import { ConversationRepository, Summary, CallLogData, ConversationTopicData, ConversationReferenceData } from '../repositories/ConversationRepository.js';
+import { ConversationRepository } from "@naiber/shared";
+
+export interface Summary {
+    userId: string;
+    conversationId: string;
+    summaryText: string;
+    topicsDiscussed: string[];
+    keyHighlights: string[];
+}
+
+export interface CallLogData {
+    userId: string;
+    scheduledTime: Date;
+    endTime?: Date;
+    status?: 'PENDING' | 'QUEUED' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED';
+    outcome?: 'COMPLETED' | 'NO_ANSWER' | 'BUSY' | 'FAILED' | 'USER_ENDED_EARLY';
+    twilioCallSid?: string;
+    elevenlabsConversationId?: string;
+    checkInCompleted: boolean;
+}
+
+export interface ConversationTopicData {
+    userId: string;
+    topicName: string;
+    category?: string;
+    topicEmbedding: number[];
+}
+
+export interface ConversationReferenceData {
+    conversationSummaryId: string;
+    conversationTopicId: string;
+}
 
 export interface ReturnedTopic {
     id: string;

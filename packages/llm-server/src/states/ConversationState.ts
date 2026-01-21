@@ -1,5 +1,15 @@
 import { Annotation } from "@langchain/langgraph";
 import { BaseMessage } from "@langchain/core/messages";
+import { Question } from "../handlers/questions/index.js";
+
+export interface HealthCheckAnswer {
+    questionIndex: number;
+    question: Question;
+    rawAnswer: string;
+    validatedAnswer: string;
+    isValid: boolean;
+    attemptCount: number;
+}
 
 export const ConversationState = Annotation.Root({
     messages: Annotation<BaseMessage[]>({
@@ -73,27 +83,21 @@ export const ConversationState = Annotation.Root({
         default: () => 0
     }),
 
-    healthQuestions: Annotation<string[]>({
-        value: (x, y) => y ?? x ?? [
-            "On a scale of 1–10, how are you feeling overall right now?",
-            "Are you experiencing any physical symptoms at the moment?",
-            "Have you taken your prescribed medications today?",
-            "How would you rate your sleep last night from 1–10?",
-            "Is there anything else you'd like to note about how you're feeling?"
-        ],
-        default: () => [
-            "On a scale of 1–10, how are you feeling overall right now?",
-            "Are you experiencing any physical symptoms at the moment?",
-            "Have you taken your prescribed medications today?",
-            "How would you rate your sleep last night from 1–10?",
-            "Is there anything else you'd like to note about how you're feeling?"
-        ]
+    healthCheckQuestions: Annotation<Question[]>({
+        value: (x, y) => y ?? x ?? [],
+        default: () => []
     }),
 
-    healthAnswer: Annotation<string[]>({
+    healthCheckAnswers: Annotation<Array<HealthCheckAnswer>>({
         reducer: (x, y) => x.concat(y),
         default: () => []
-    })
+    }),
+
+    questionAttempts: Annotation<number>({
+        value: (x, y) => y ?? x ?? 0,
+        default: () => 0
+    }),
+
 
 });
 

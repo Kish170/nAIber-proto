@@ -1,2 +1,2 @@
-export * from './EmbeddingService';
-export * from './TextPreprocessor';
+export * from './EmbeddingService.js';
+export * from './TextPreprocessor.js';

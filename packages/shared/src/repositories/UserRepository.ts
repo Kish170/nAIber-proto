@@ -4,12 +4,10 @@ import { userProfileInclude, UserProfileData } from '../types/database.js';
 export class UserRepository {
     static async findByPhone(phone: string): Promise<UserProfileData | null> {
         try {
-            const userData = await prismaClient.user.findUnique({
+            return await prismaClient.user.findUnique({
                 where: { phone },
                 include: userProfileInclude
             });
-
-            return userData;
         } catch (error) {
             console.error('[UserRepository] Error finding user by phone:', error);
             throw error;
@@ -18,12 +16,10 @@ export class UserRepository {
 
     static async findById(id: string): Promise<UserProfileData | null> {
         try {
-            const userData = await prismaClient.user.findUnique({
+            return await prismaClient.user.findUnique({
                 where: { id },
                 include: userProfileInclude
             });
-
-            return userData;
         } catch (error) {
             console.error('[UserRepository] Error finding user by ID:', error);
             throw error;

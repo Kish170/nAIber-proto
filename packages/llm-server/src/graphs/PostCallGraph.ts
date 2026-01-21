@@ -6,14 +6,16 @@ import {
     VectorStoreClient,
     ElevenLabsClient,
     TranscriptMessage,
-    Message,
+    Message
+} from "@naiber/shared";
+import {
     createSummary,
     getConversationTopics,
     createConversationTopic,
     updateConversationTopic,
     createConversationReferences,
     ReturnedTopic
-} from "@naiber/shared";
+} from "../handlers/ConversationHandler.js"
 import cosine from 'compute-cosine-similarity';
 
 export class PostCallGraph {
@@ -318,7 +320,6 @@ export class PostCallGraph {
             const highlights = state.summary.keyHighlights;
 
             if (highlights.length > 0) {
-                // VectorStoreClient.addMemories handles embedding generation internally
                 await this.vectorStore.addMemories(highlights, {
                     userId: state.userId,
                     conversationId: state.conversationId

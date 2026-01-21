@@ -37,6 +37,7 @@ model User {
   conversationTopics    ConversationTopic[]
   healthLogs            HealthLog[]
   medicationLogs        MedicationLog[]
+  healthConditionLogs   HealthConditionLog[]
 
   @@map("users")
 }
@@ -77,6 +78,9 @@ model UserHealthCondition {
 
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  medicationConditions MedicationCondition[]
+  healthConditionLogs  HealthConditionLog[]
+
   @@unique([userId, condition])
   @@index([userId, isActive])
   @@map("user_health_conditions")
@@ -100,6 +104,8 @@ model UserMedication {
 
   user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   medicationLogs MedicationLog[]
+
+  medicationConditions MedicationCondition[]
 
   @@unique([userId, name])
   @@index([userId, isActive])
@@ -132,6 +138,7 @@ model CallLog {
   conversationSummary      ConversationSummary?
   healthLogs               HealthLog[]
   medicationLogs           MedicationLog[]
+  healthConditionLogs      HealthConditionLog[]
 
   @@index([userId, scheduledTime])
   @@index([status])
@@ -241,6 +248,42 @@ model MedicationLog {
 
   @@map("medication_logs")
 }
+
+model HealthConditionLog {
+  id                    String              @id @default(uuid())
+  userId                String
+  conversationId        String
+  callLogId             String?
+  healthConditionId     String
+
+  symptoms              String[]
+  notes                 String?
+
+  createdAt             DateTime            @default(now())
+
+  user                  User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  healthCondition       UserHealthCondition @relation(fields: [healthConditionId], references: [id], onDelete: Cascade)
+  callLog               CallLog?            @relation(fields: [callLogId], references: [id], onDelete: Cascade)
+
+  @@map("health_condition_logs")
+}
+
+model MedicationCondition {                                                                                                                                                                             
+    id                    String               @id @default(uuid())                                                                                                                                       
+    medicationId          String                                                                                                                                                                          
+    healthConditionId     String                                                                                                                                                                                                                                                                                                                 
+                                                                                                                                                                                                          
+    createdAt             DateTime             @default(now())                                                                                                                                            
+    updatedAt             DateTime             @updatedAt                                                                                                                                                 
+                                                                                                                                                                                                          
+    medication            UserMedication       @relation(fields: [medicationId], references: [id], onDelete: Cascade)                                                                                     
+    healthCondition       UserHealthCondition  @relation(fields: [healthConditionId], references: [id], onDelete: Cascade)                                                                                
+                                                                                                                                                                                                          
+    @@unique([medicationId, healthConditionId])                                                                                                                                                           
+    @@index([medicationId])                                                                                                                                                                               
+    @@index([healthConditionId])                                                                                                                                                                          
+    @@map("medication_conditions")                                                                                                                                                                        
+  }                                     
 
 enum Gender {
   MALE

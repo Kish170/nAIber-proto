@@ -1,5 +1,5 @@
 import { Annotation } from "@langchain/langgraph";
-import { ReturnedTopic } from "../../../shared/src/handlers/ConversationHandler.js";
+import { ReturnedTopic } from "../handlers/ConversationHandler.js";
 
 export const PostCallState = Annotation.Root({
     conversationId: Annotation<string>(),
@@ -13,6 +13,7 @@ export const PostCallState = Annotation.Root({
 
     summaryId: Annotation<string | null>({
         value: (x, y) => y ?? x ?? null,
+        
         default: () => null
     }),
 
