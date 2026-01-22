@@ -1,7 +1,7 @@
 import { TwilioClient } from '../clients/TwilioClient.js';
 import { WebSocketServer, WebSocket } from 'ws';
 import http from 'http';
-import { ElevenLabsConfigs } from '@naiber/shared';
+import { ElevenLabsConfigs, RedisClient } from '@naiber/shared';
 import { UserProfile } from '@naiber/shared';
 import { WebSocketService } from '../services/WebSocketService.js';
 
@@ -9,6 +9,7 @@ export class CallController {
     private elevenLabsConfigs: ElevenLabsConfigs;
     private twilioClient: TwilioClient;
     private userNumber: string;
+    private callType: 'general' | 'health_check' = 'general';
 
     constructor() {
         const elevenLabsApiKey = process.env.ELEVENLABS_API_KEY;
@@ -48,7 +49,7 @@ export class CallController {
 
     }
 
-    async initializeWSServer(server: http.Server): Promise<WebSocketServer> {
+    async initializeWSServer(server: http.Server, callType: 'general' | 'health_check' = 'general'): Promise<WebSocketServer> {
         try {
             if (!server) {
                 throw new Error('HTTP server is required to create WebSocket server');
@@ -62,9 +63,9 @@ export class CallController {
             console.log('[CallController] WebSocket server created at /outbound-media-stream');
 
             wss.on("connection", (ws: WebSocket): void => {
-                console.log('[CallController] Twilio WebSocket connected');
+                console.log('[CallController] Twilio WebSocket connected with callType:', callType);
 
-                const webSocketService = new WebSocketService(ws, this.elevenLabsConfigs, this.twilioClient);
+                const webSocketService = new WebSocketService(ws, this.elevenLabsConfigs, callType, this.twilioClient);
 
                 ws.on("message", async (rawData): Promise<void> => {
                     const buffer = Buffer.isBuffer(rawData) ? rawData : Buffer.from(rawData.toString());
@@ -107,14 +108,18 @@ export class CallController {
         }
     }
 
-    async createCall(): Promise<{ success: boolean; callSid?: string; error?: string }> {
+    async createCall(callType: 'general' | 'health_check' = 'general'): Promise<{ success: boolean; callSid?: string; error?: string }> {
         try {
-            console.log('[CallController] Creating outbound call to:', this.userNumber);
+            console.log('[CallController] Creating outbound call to:', this.userNumber, 'with callType:', callType);
 
             const result = await this.twilioClient.createCall(this.userNumber);
 
-            if (result.success) {
-                console.log('[CallController] Call created successfully:', result.callSid);
+            if (result.success && result.callSid) {
+                // Store callType temporarily for WebSocket lookup
+                const redisClient = RedisClient.getInstance();
+                await redisClient.set(`call_type:${result.callSid}`, callType, { EX: 60 });
+                console.log('[CallController] Stored callType for callSid:', result.callSid, callType);
+
                 return {
                     success: true,
                     callSid: result.callSid

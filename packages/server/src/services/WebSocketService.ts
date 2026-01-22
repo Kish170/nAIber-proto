@@ -25,6 +25,7 @@ export class WebSocketService {
     private startedAt: Date = new Date();
     private userProfile: UserProfile | null = null;
     private postCallWorkflowCompleted: boolean = false;
+    private callType: 'general' | 'health_check' = 'general';
 
     constructor(twilioWs: WebSocket, elevenLabsConfig: ElevenLabsConfigs, twilioClient?: TwilioClient) {
         this.twilioWs = twilioWs;
@@ -71,7 +72,9 @@ export class WebSocketService {
             console.error('[WebSocketService] Post-call workflow failed but continuing cleanup:', error);
         });
 
-        await sessionManager.deleteSession(this.callSid);
+        if (this.conversationId) {
+            await sessionManager.deleteSession(this.conversationId);
+        }
         this.deleteLocalConnection(this.callSid);
 
         if (this.keepAliveInterval) {
@@ -115,12 +118,14 @@ export class WebSocketService {
         this.callSid = data.start.callSid;
         console.log('[WebSocketService] Twilio stream started - streamSid:', this.streamSID, 'callSid:', this.callSid);
 
-        await sessionManager.createSession(this.callSid, {
-            callSid: this.callSid,
-            conversationId: this.conversationId || '',
-            streamSid: this.streamSID,
-            startedAt: this.startedAt.toISOString()
-        });
+        // Lookup callType from temporary Redis storage
+        const redisClient = RedisClient.getInstance();
+        const storedCallType = await redisClient.get(`call_type:${this.callSid}`);
+        this.callType = (storedCallType as 'general' | 'health_check') || 'general';
+
+        console.log('[WebSocketService] Retrieved callType for callSid:', this.callSid, this.callType);
+
+        // Note: Session will be created with conversationId in registerConversationForRAG()
     }
 
     private manageMediaEvent(data: any): void {
@@ -251,8 +256,8 @@ export class WebSocketService {
                 this.conversationId = msg.conversation_initiation_metadata_event.conversation_id;
                 console.log(`[WebSocketService] Captured conversation ID: ${this.conversationId}`);
 
-                this.registerConversationForRAG().catch(error => {
-                    console.error('[WebSocketService] Failed to register conversation for RAG:', error);
+                this.registerSession().catch(error => {
+                    console.error('[WebSocketService] Failed to register session:', error);
                 });
             }
             this.sendAudioToTwilio(msg);
@@ -319,7 +324,6 @@ export class WebSocketService {
             console.log('[WebSocketService] Waiting 3 seconds for transcript to be ready...');
             await new Promise(resolve => setTimeout(resolve, 3000));
 
-            // Add job to BullMQ queue for async processing
             const postCallQueue = PostCallQueue.getInstance();
 
             const job = await postCallQueue.add('process-post-call', {
@@ -350,36 +354,40 @@ export class WebSocketService {
         return deleted;
     }
 
-    private async registerConversationForRAG(): Promise<void> {
+    private async registerSession(): Promise<void> {
         if (!this.userProfile || !this.conversationId) {
-            console.warn('[WebSocketService] Cannot register conversation for RAG: missing userProfile or conversationId');
+            console.warn('[WebSocketService] Cannot register session: missing userProfile or conversationId');
             return;
         }
 
-        const conversationData = {
-            conversationId: this.conversationId,
-            userId: this.userProfile.id,
-            phone: this.userProfile.phone,
-            callSid: this.callSid,
-            startedAt: this.startedAt.toISOString(),
-            lastMessageAt: new Date().toISOString()
-        };
-
-        const ttl = 3600; 
+        const ttl = 3600;
 
         try {
             const redisInstance = RedisClient.getInstance();
 
-            await redisInstance.setJSON(`rag:conversation:${this.conversationId}`, conversationData, ttl);
+            // Create unified session with all data (for both RAG and routing)
+            await sessionManager.createSession(this.conversationId, {
+                callSid: this.callSid,
+                conversationId: this.conversationId,
+                userId: this.userProfile.id,
+                phone: this.userProfile.phone,
+                streamSid: this.streamSID,
+                startedAt: this.startedAt.toISOString(),
+                lastMessageAt: new Date().toISOString(),
+                callType: this.callType
+            });
+
+            // Keep user and phone lookup keys for quick access
             await redisInstance.set(`rag:user:${this.userProfile.id}`, this.conversationId, { EX: ttl });
             await redisInstance.set(`rag:phone:${this.userProfile.phone}`, this.conversationId, { EX: ttl });
 
-            console.log('[WebSocketService] Registered conversation for RAG:', {
+            console.log('[WebSocketService] Registered session:', {
                 conversationId: this.conversationId,
-                userId: this.userProfile.id
+                userId: this.userProfile.id,
+                callType: this.callType
             });
         } catch (error) {
-            console.error('[WebSocketService] Failed to register conversation in Redis:', error);
+            console.error('[WebSocketService] Failed to register session in Redis:', error);
         }
     }
 

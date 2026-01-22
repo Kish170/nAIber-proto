@@ -75,7 +75,7 @@ export class ConversationResolver {
 
     private async getConversationDetails(conversationId: string): Promise<ResolvedConversation | null> {
         return await this.redisClient.getJSON<ResolvedConversation>(
-            `rag:conversation:${conversationId}`
+            `session:${conversationId}`
         );
     }
 

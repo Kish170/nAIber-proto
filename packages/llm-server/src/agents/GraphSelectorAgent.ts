@@ -1,5 +1,4 @@
 import { BaseMessage } from "@langchain/core/messages";
-import { DynamicStructuredTool } from "@langchain/core/tools";
 import { ConversationGraph } from "../graphs/ConversationGraph.js";
 import { AskHealthQuestionGraph } from "../graphs/AskHealthQuestionGraph.js";
 import { ValidateHealthAnswerGraph } from "../graphs/ValidateHealthAnswerGraph.js";
@@ -8,7 +7,6 @@ import { OpenAIClient, EmbeddingService, RedisClient } from "@naiber/shared";
 import { MemoryRetriever } from "../services/MemoryRetriever.js";
 import { TopicManager } from "../services/TopicManager.js";
 import { HealthCheckSessionManager } from "../services/HealthCheckSessionManager.js";
-import { createDetectEndOfCallTool } from "../tools/controller/GeneralTools.js";
 
 export class GraphSelectorAgent {
     private conversationGraph: ConversationGraph;
@@ -17,8 +15,8 @@ export class GraphSelectorAgent {
     private compiledConversationGraph: any;
     private compiledAskHealthQuestionGraph: any;
     private compiledValidateHealthAnswerGraph: any;
-    private detectEndOfCallTool: DynamicStructuredTool;
     private sessionManager: HealthCheckSessionManager;
+    private redisClient: RedisClient;
 
     constructor(
         openAIClient: OpenAIClient,
@@ -28,6 +26,7 @@ export class GraphSelectorAgent {
         redisClient: RedisClient,
         openAIKey: string
     ) {
+        this.redisClient = redisClient;
         this.sessionManager = new HealthCheckSessionManager(redisClient);
 
         this.conversationGraph = new ConversationGraph(
@@ -48,9 +47,6 @@ export class GraphSelectorAgent {
         this.compiledAskHealthQuestionGraph = this.askHealthQuestionGraph.compile();
         this.compiledValidateHealthAnswerGraph = this.validateHealthAnswerGraph.compile();
 
-        const chatModel = openAIClient.returnChatModel();
-        this.detectEndOfCallTool = createDetectEndOfCallTool(chatModel as any);
-
         console.log('[GraphSelectorAgent] Initialized with compiled graphs and session manager');
     }
 
@@ -65,71 +61,85 @@ export class GraphSelectorAgent {
             messageCount: langchainMessages.length
         });
 
-        const hasActiveSession = await this.sessionManager.hasActiveSession(userId);
+        // 1. Get session from Redis using conversationId as key
+        const session = await this.redisClient.getJSON<any>(`session:${conversationId}`);
 
-        if (hasActiveSession) {
-            console.log('[GraphSelectorAgent] Active health check session found, validating answer');
-
-            const validateResult = await this.compiledValidateHealthAnswerGraph.invoke({
+        if (!session) {
+            console.log('[GraphSelectorAgent] No session found, defaulting to general conversation');
+            return await this.compiledConversationGraph.invoke({
                 messages: langchainMessages,
                 userId,
                 conversationId
             });
+        }
 
-            console.log('[GraphSelectorAgent] Validation completed:', {
-                needsNextQuestion: validateResult.needsNextQuestion,
-                isHealthCheckComplete: validateResult.isHealthCheckComplete
-            });
+        console.log('[GraphSelectorAgent] Session callType:', session.callType);
 
-            if (validateResult.needsNextQuestion) {
-                console.log('[GraphSelectorAgent] Asking next health check question');
+        // 2. Route based on callType field
+        if (session.callType === 'health_check') {
+            console.log('[GraphSelectorAgent] Health check call detected');
+
+            const healthSession = await this.sessionManager.getSession(userId);
+
+            if (!healthSession) {
+                // First health check message - initialize session
+                console.log('[GraphSelectorAgent] Initializing new health check session');
+                await this.sessionManager.initializeSession(userId, conversationId);
 
                 return await this.compiledAskHealthQuestionGraph.invoke({
                     messages: langchainMessages,
                     userId,
                     conversationId
                 });
+            } else if (!healthSession.isComplete) {
+                // Ongoing health check - validate answer and ask next
+                console.log('[GraphSelectorAgent] Continuing health check session');
+
+                const validateResult = await this.compiledValidateHealthAnswerGraph.invoke({
+                    messages: langchainMessages,
+                    userId,
+                    conversationId
+                });
+
+                console.log('[GraphSelectorAgent] Validation completed:', {
+                    needsNextQuestion: validateResult.needsNextQuestion,
+                    isHealthCheckComplete: validateResult.isHealthCheckComplete
+                });
+
+                if (validateResult.needsNextQuestion) {
+                    console.log('[GraphSelectorAgent] Asking next health check question');
+
+                    return await this.compiledAskHealthQuestionGraph.invoke({
+                        messages: langchainMessages,
+                        userId,
+                        conversationId
+                    });
+                }
+
+                return validateResult;
+            } else {
+                // Health check complete
+                console.log('[GraphSelectorAgent] Health check session already complete');
+                return {
+                    response: "Your health check for this session is complete. Thank you!",
+                    isHealthCheckComplete: true
+                } as ConversationStateType;
             }
+        } else {
+            // General conversation (callType === 'general' or undefined)
+            console.log('[GraphSelectorAgent] General conversation detected');
 
-            return validateResult;
-        }
-
-        const result = await this.compiledConversationGraph.invoke({
-            messages: langchainMessages,
-            userId,
-            conversationId
-        });
-
-        console.log('[GraphSelectorAgent] ConversationGraph completed:', {
-            hasResponse: !!result.response,
-            isEndCall: result.isEndCall
-        });
-
-        const lastMessage = langchainMessages[langchainMessages.length - 1];
-        const lastMessageContent = typeof lastMessage.content === 'string'
-            ? lastMessage.content
-            : JSON.stringify(lastMessage.content);
-
-        const detection = await this.detectEndOfCallTool.invoke({
-            lastMessage: lastMessageContent
-        });
-
-        console.log('[GraphSelectorAgent] End-call detection result:', detection);
-
-        if (detection.detected || result.isEndCall) {
-            console.log('[GraphSelectorAgent] End call detected, initializing health check session');
-
-            await this.sessionManager.initializeSession(userId, conversationId);
-
-            console.log('[GraphSelectorAgent] Asking first health check question');
-
-            return await this.compiledAskHealthQuestionGraph.invoke({
+            const result = await this.compiledConversationGraph.invoke({
                 messages: langchainMessages,
                 userId,
                 conversationId
             });
-        }
 
-        return result;
+            console.log('[GraphSelectorAgent] ConversationGraph completed:', {
+                hasResponse: !!result.response
+            });
+
+            return result;
+        }
     }
 }

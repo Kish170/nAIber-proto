@@ -7,13 +7,26 @@ export function createCallRouter(callController: CallController, callController2
 
     router.post('/call', async (req, res) => {
         try {
-            const result = await callController.createCall();
+            const result = await callController.createCall('general');
             res.json(result);
         } catch (error) {
             console.error('[CallRoutes] Error creating call:', error);
             res.status(500).json({
                 success: false,
                 error: 'Failed to create call'
+            });
+        }
+    });
+
+    router.post('/call/health-check', async (req, res) => {
+        try {
+            const result = await callController.createCall('health_check');
+            res.json(result);
+        } catch (error) {
+            console.error('[CallRoutes] Error creating health check call:', error);
+            res.status(500).json({
+                success: false,
+                error: 'Failed to create health check call'
             });
         }
     });

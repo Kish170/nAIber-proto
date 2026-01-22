@@ -3,8 +3,12 @@ import { redisClient } from "@naiber/shared";
 export interface SessionData {
     callSid: string;
     conversationId: string;
+    userId: string;
+    phone: string;
     streamSid?: string;
     startedAt: string;
+    lastMessageAt: string;
+    callType: 'general' | 'health_check';
 }
 
 export class SessionManager {
@@ -26,28 +30,28 @@ export class SessionManager {
         }
     }
 
-    async createSession(callSid: string, data: SessionData): Promise<void> {
-        await redisClient.setJSON(`session:${callSid}`, data, 3600); 
-        console.log('[SessionManager] Created session:', callSid);
+    async createSession(conversationId: string, data: SessionData): Promise<void> {
+        await redisClient.setJSON(`session:${conversationId}`, data, 3600);
+        console.log('[SessionManager] Created session:', conversationId);
     }
 
-    async getSession(callSid: string): Promise<SessionData | null> {
-        return await redisClient.getJSON<SessionData>(`session:${callSid}`);
+    async getSession(conversationId: string): Promise<SessionData | null> {
+        return await redisClient.getJSON<SessionData>(`session:${conversationId}`);
     }
 
-    async updateSession(callSid: string, updates: Partial<SessionData>): Promise<void> {
-        const existing = await this.getSession(callSid);
+    async updateSession(conversationId: string, updates: Partial<SessionData>): Promise<void> {
+        const existing = await this.getSession(conversationId);
         if (existing) {
             const updated = { ...existing, ...updates };
-            await redisClient.setJSON(`session:${callSid}`, updated, 3600);
-            console.log('[SessionManager] Updated session:', callSid);
+            await redisClient.setJSON(`session:${conversationId}`, updated, 3600);
+            console.log('[SessionManager] Updated session:', conversationId);
         }
     }
 
-    async deleteSession(callSid: string): Promise<void> {
+    async deleteSession(conversationId: string): Promise<void> {
         const client = redisClient.getClient();
-        await client.del(`session:${callSid}`);
-        console.log('[SessionManager] Deleted session:', callSid);
+        await client.del(`session:${conversationId}`);
+        console.log('[SessionManager] Deleted session:', conversationId);
     }
 
     async getAllActiveSessions(): Promise<SessionData[]> {

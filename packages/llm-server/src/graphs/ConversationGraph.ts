@@ -123,30 +123,33 @@ export class ConversationGraph {
         let contextSection = "";
         if (state.retrievedMemories.length > 0) {
             contextSection = `# RELEVANT MEMORIES FROM PAST CONVERSATIONS
-            ${state.retrievedMemories.map((m, i) => `${i + 1}. ${m}`).join('\n')}
+${state.retrievedMemories.map((m, i) => `${i + 1}. ${m}`).join('\n')}
 
-            Use these memories to provide continuity and personalization.
-            `;
+Use these memories to provide continuity and personalization.
+`;
         }
 
         if (state.fatigueGuidance) {
             contextSection += `\n\n${state.fatigueGuidance}`;
         }
 
-        const systemPromptText = `${this.getSystemPrompt(state.userId)}
-
-        ${contextSection}`;
-
         const recentMessages = state.messages.slice(-10);
 
-        const messages = [
-            new SystemMessage(systemPromptText),
-            ...recentMessages
-        ];
+        let messages = [...recentMessages];
 
-        const response = await this.llm.invoke(messages, {
-            response_format: { type: 'json_object' }
-        });
+        if (contextSection) {
+            const firstSystemIndex = messages.findIndex(m => m instanceof SystemMessage);
+            if (firstSystemIndex >= 0) {
+                const existingContent = typeof messages[firstSystemIndex].content === 'string'
+                    ? messages[firstSystemIndex].content
+                    : JSON.stringify(messages[firstSystemIndex].content);
+                messages[firstSystemIndex] = new SystemMessage(`${existingContent}\n\n${contextSection}`);
+            } else {
+                messages = [new SystemMessage(contextSection), ...messages];
+            }
+        }
+
+        const response = await this.llm.invoke(messages);
 
         let content: string;
         if (typeof response.content === 'string') {
@@ -159,31 +162,12 @@ export class ConversationGraph {
             content = String(response.content);
         }
 
-        let parsedResponse: { response: string; is_end_call_detected: boolean };
-        try {
-            parsedResponse = JSON.parse(content);
-        } catch (error) {
-            console.error('[ConversationGraph] Failed to parse JSON response:', error);
-            console.error('[ConversationGraph] Raw content:', content);
-            return { response: content, isEndCall: false };
-        }
-
-        if (!parsedResponse.response || typeof parsedResponse.is_end_call_detected !== 'boolean') {
-            console.error('[ConversationGraph] Invalid response structure:', parsedResponse);
-            return {
-                response: parsedResponse.response || content,
-                isEndCall: parsedResponse.is_end_call_detected ?? false
-            };
-        }
-
-        console.log('[ConversationGraph] End call detection:', {
-            isEndCallDetected: parsedResponse.is_end_call_detected,
-            response: parsedResponse.response.substring(0, 100)
+        console.log('[ConversationGraph] Generated response:', {
+            responseLength: content.length
         });
 
         return {
-            response: parsedResponse.response,
-            isEndCall: parsedResponse.is_end_call_detected
+            response: content
         };
     }
 
@@ -193,21 +177,6 @@ export class ConversationGraph {
         };
     }
 
-    private getSystemPrompt(userId: string): string {
-        return `
-            You are a helpful AI assistant having a conversation with user ${userId}.
-            Your goal is to provide contextual, natural responses.
-
-            If you think the user is about to end the call (e.g., says goodbye, mentions ending, or closing remarks), 
-            set "is_end_call_detected" to true. Otherwise, set it to false.
-
-            Return your output in JSON with these fields:
-            {
-            "response": "assistant's next message",
-            "is_end_call_detected": boolean
-            }
-        `;
-    }
 
     public compile() {
         return this.graph.compile();
