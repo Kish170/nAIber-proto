@@ -117,6 +117,10 @@ export class OpenAIClient {
         return this.embeddingModel
     }
 
+    returnChatModel(): ChatOpenAI {
+        return this.chatModel
+    }
+
     private async *mapToOpenAIStream(langchainStream: AsyncIterable<AIMessageChunk>, request: ChatCompletionRequest): AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk> {
         let index = 0;
         const created = Math.floor(Date.now() / 1000);

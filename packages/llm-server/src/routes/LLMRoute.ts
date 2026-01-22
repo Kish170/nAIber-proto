@@ -5,7 +5,7 @@ import { RedisClient, OpenAIClient, VectorStoreClient, EmbeddingService } from '
 import { ConversationResolver } from '../services/ConversationResolver.js';
 import { TopicManager } from '../services/TopicManager.js';
 import { MemoryRetriever } from '../services/MemoryRetriever.js';
-import { ConversationGraph } from '../graphs/ConversationGraph.js';
+import { GraphSelectorAgent } from '../agents/GraphSelectorAgent.js';
 import { HumanMessage, AIMessage, SystemMessage } from "@langchain/core/messages";
 
 export function LLMRouter(): Router {
@@ -30,12 +30,14 @@ export function LLMRouter(): Router {
     const topicManager = new TopicManager(redisClient);
     const conversationResolver = new ConversationResolver(redisClient);
 
-    const conversationGraph = new ConversationGraph(
-        process.env.OPENAI_API_KEY!,
+    const graphSelectorAgent = new GraphSelectorAgent(
+        openAIClient,
         embeddingService,
         memoryRetriever,
-        topicManager
-    ).compile();
+        topicManager,
+        redisClient,
+        process.env.OPENAI_API_KEY!
+    );
 
     const conversationGraphHandler = async (req: Request, res: Response) => {
         try {
@@ -64,7 +66,6 @@ export function LLMRouter(): Router {
                 const controller = new LLMController();
 
                 if (request.stream === true) {
-                    // Return SSE stream
                     const stream = await controller.streamChatCompletion(request);
 
                     res.setHeader('Content-Type', 'text/event-stream');
@@ -91,11 +92,11 @@ export function LLMRouter(): Router {
                 return new HumanMessage(content);
             });
 
-            const result = await conversationGraph.invoke({
-                messages: langchainMessages,
-                userId: conversation.userId,
-                conversationId: conversation.conversationId
-            });
+            const result = await graphSelectorAgent.processConversation(
+                langchainMessages,
+                conversation.userId,
+                conversation.conversationId
+            );
 
             console.log('[LLM Route] ConversationGraph result:', {
                 hasResponse: !!result.response,
@@ -115,11 +116,9 @@ export function LLMRouter(): Router {
                 return;
             }
 
-            // Check if ElevenLabs is requesting streaming format
             if (request.stream === true) {
                 console.log('[LLM Route] Returning SSE streaming format');
 
-                // Set SSE headers
                 res.setHeader('Content-Type', 'text/event-stream');
                 res.setHeader('Cache-Control', 'no-cache');
                 res.setHeader('Connection', 'keep-alive');
@@ -127,7 +126,6 @@ export function LLMRouter(): Router {
                 const completionId = `chatcmpl-${Date.now()}`;
                 const created = Math.floor(Date.now() / 1000);
 
-                // Send content chunk
                 res.write(`data: ${JSON.stringify({
                     id: completionId,
                     object: 'chat.completion.chunk',
@@ -140,7 +138,6 @@ export function LLMRouter(): Router {
                     }]
                 })}\n\n`);
 
-                // Send final chunk
                 res.write(`data: ${JSON.stringify({
                     id: completionId,
                     object: 'chat.completion.chunk',
@@ -153,7 +150,6 @@ export function LLMRouter(): Router {
                     }]
                 })}\n\n`);
 
-                // Terminate stream
                 res.write('data: [DONE]\n\n');
                 res.end();
 

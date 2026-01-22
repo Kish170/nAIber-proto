@@ -98,6 +98,25 @@ export const ConversationState = Annotation.Root({
         default: () => 0
     }),
 
+    rawAnswer: Annotation<string>({
+        value: (x, y) => y ?? x ?? "",
+        default: () => ""
+    }),
+
+    validatedAnswer: Annotation<string>({
+        value: (x, y) => y ?? x ?? "",
+        default: () => ""
+    }),
+
+    isValid: Annotation<boolean>({
+        value: (x, y) => y ?? x ?? false,
+        default: () => false
+    }),
+
+    needsNextQuestion: Annotation<boolean>({
+        value: (x, y) => y ?? x ?? false,
+        default: () => false
+    }),
 
 });
 
