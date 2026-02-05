@@ -61,7 +61,6 @@ export class GraphSelectorAgent {
             messageCount: langchainMessages.length
         });
 
-        // 1. Get session from Redis using conversationId as key
         const session = await this.redisClient.getJSON<any>(`session:${conversationId}`);
 
         if (!session) {
@@ -75,14 +74,12 @@ export class GraphSelectorAgent {
 
         console.log('[GraphSelectorAgent] Session callType:', session.callType);
 
-        // 2. Route based on callType field
         if (session.callType === 'health_check') {
             console.log('[GraphSelectorAgent] Health check call detected');
 
             const healthSession = await this.sessionManager.getSession(userId);
 
             if (!healthSession) {
-                // First health check message - initialize session
                 console.log('[GraphSelectorAgent] Initializing new health check session');
                 await this.sessionManager.initializeSession(userId, conversationId);
 
@@ -92,7 +89,6 @@ export class GraphSelectorAgent {
                     conversationId
                 });
             } else if (!healthSession.isComplete) {
-                // Ongoing health check - validate answer and ask next
                 console.log('[GraphSelectorAgent] Continuing health check session');
 
                 const validateResult = await this.compiledValidateHealthAnswerGraph.invoke({
@@ -126,7 +122,6 @@ export class GraphSelectorAgent {
                 } as ConversationStateType;
             }
         } else {
-            // General conversation (callType === 'general' or undefined)
             console.log('[GraphSelectorAgent] General conversation detected');
 
             const result = await this.compiledConversationGraph.invoke({

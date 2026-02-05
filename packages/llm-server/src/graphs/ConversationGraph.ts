@@ -15,7 +15,7 @@ export class ConversationGraph {
     private intentClassifier: IntentClassifier;
     private topicManager: TopicManager;
     constructor(openAIKey: string, embeddingService: EmbeddingService, memoryRetriever: MemoryRetriever, topicManager: TopicManager) {
-        this.llm = new ChatOpenAI({
+        this.llm = new ChatOpenAI({ // use llm from openaicleint
             apiKey: openAIKey,
             model: "gpt-4o",
             temperature: 0.7
@@ -29,19 +29,22 @@ export class ConversationGraph {
 
         this.graph.addNode("classify_intent", this.classifyIntent.bind(this));
         this.graph.addNode("retrieve_memories", this.retrieveMemories.bind(this));
-        this.graph.addNode("check_topic_fatigue", this.checkTopicFatigue.bind(this));
+        this.graph.addNode("manage_topic_state", this.manageTopicState.bind(this))
+        // this.graph.addNode("check_topic_fatigue", this.checkTopicFatigue.bind(this));
         this.graph.addNode("generate_response", this.generateResponse.bind(this));
         this.graph.addNode("skip_rag", this.skipRAG.bind(this));
 
         this.graph.addConditionalEdges(
             "classify_intent",
             (state: ConversationStateType) => {
-                return state.shouldProcessRAG ? "retrieve_memories" : "skip_rag"
+                return state.shouldProcessRAG ? "manage_topic_state" : "skip_rag"
             }
         );
 
-        this.graph.addEdge("retrieve_memories", "check_topic_fatigue");
-        this.graph.addEdge("check_topic_fatigue", "generate_response");
+        // this.graph.addEdge("retrieve_memories", "check_topic_fatigue");
+        // this.graph.addEdge("check_topic_fatigue", "generate_response");
+        this.graph.addEdge("manage_topic_state", "retrieve_memories");
+        this.graph.addEdge("retrieve_memories", "generate_response");
         this.graph.addEdge("skip_rag", "generate_response");
         this.graph.addEdge("generate_response", END);
 
@@ -63,7 +66,7 @@ export class ConversationGraph {
         };
     }
 
-    private async retrieveMemories(state: ConversationStateType) {
+    private async manageTopicState(state: ConversationStateType) {
         const lastMessage = state.messages[state.messages.length - 1];
         const content = typeof lastMessage.content === 'string' ? lastMessage.content : JSON.stringify(lastMessage.content);
 
@@ -74,50 +77,65 @@ export class ConversationGraph {
             state.messageLength
         );
 
-        let memories: string[] = [];
-
-        if (topicChanged || state.topicFatigue > 0.25) {
-            if (topicChanged) {
-                await this.topicManager.resetTopicFatigue(state.conversationId);
-            }
-
-            const retrievedMemories = await this.memoryRetriever.retrieveMemories(
-                state.userId,
-                newEmbedding,
-                5
-            );
-            memories = retrievedMemories.highlights;
-        }
+        await this.topicManager.manageTopicState(
+            state.conversationId,
+            newEmbedding,
+            state.messageLength,
+            topicChanged
+        );
 
         return {
-            retrievedMemories: memories,
             currentTopicVector: newEmbedding,
             topicChanged,
             messageCount: topicChanged ? 1 : state.messageCount + 1
         };
     }
 
-    private async checkTopicFatigue(state: ConversationStateType) {
-        await this.topicManager.updateTopicState(
-            state.conversationId,
-            state.currentTopicVector || [],
-            state.messageLength
-        );
+    private async retrieveMemories(state: ConversationStateType) {
+        let memories: string[] = [];
 
-        const topicState = await this.topicManager.getCurrentTopic(state.conversationId);
-        const topicFatigue = topicState?.topicFatigue || 0;
+        if (state.topicChanged) {
+            const retrievedMemories = await this.memoryRetriever.retrieveMemories(
+                state.userId,
+                state.currentTopicVector || [],
+                5
+            );
+            memories = retrievedMemories.highlights;
 
-        let fatigueGuidance = "";
-        if (topicFatigue >= 0.75) {
-            fatigueGuidance = "TOPIC CHANGE RECOMMENDED: Topic extensively discussed...";
-        } else if (topicFatigue >= 0.50) {
-            fatigueGuidance = "TOPIC FRESHNESS NEEDED: Topic thoroughly covered...";
-        } else if (topicFatigue >= 0.25) {
-            fatigueGuidance = "TOPIC ENGAGEMENT NOTE: Watch for user interest cues...";
+            await this.topicManager.updateCachedHighlights(
+                state.conversationId,
+                memories
+            );
+        } else {
+            memories = await this.topicManager.getCachedHighlights(state.conversationId);
         }
 
-        return { topicFatigue, fatigueGuidance };
+        return {
+            retrievedMemories: memories
+        };
     }
+
+    // private async checkTopicFatigue(state: ConversationStateType) {
+    //     await this.topicManager.updateTopicState(
+    //         state.conversationId,
+    //         state.currentTopicVector || [],
+    //         state.messageLength
+    //     );
+
+    //     const topicState = await this.topicManager.getCurrentTopic(state.conversationId);
+    //     const topicFatigue = topicState?.topicFatigue || 0;
+
+    //     let fatigueGuidance = "";
+    //     if (topicFatigue >= 0.75) {
+    //         fatigueGuidance = "TOPIC CHANGE RECOMMENDED: Topic extensively discussed...";
+    //     } else if (topicFatigue >= 0.50) {
+    //         fatigueGuidance = "TOPIC FRESHNESS NEEDED: Topic thoroughly covered...";
+    //     } else if (topicFatigue >= 0.25) {
+    //         fatigueGuidance = "TOPIC ENGAGEMENT NOTE: Watch for user interest cues...";
+    //     }
+
+    //     return { topicFatigue, fatigueGuidance };
+    // }
 
     private async generateResponse(state: ConversationStateType) {
         let contextSection = "";
@@ -129,9 +147,9 @@ Use these memories to provide continuity and personalization.
 `;
         }
 
-        if (state.fatigueGuidance) {
-            contextSection += `\n\n${state.fatigueGuidance}`;
-        }
+        // if (state.fatigueGuidance) {
+        //     contextSection += `\n\n${state.fatigueGuidance}`;
+        // }
 
         const recentMessages = state.messages.slice(-10);
 

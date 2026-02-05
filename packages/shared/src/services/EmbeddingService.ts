@@ -22,7 +22,7 @@ export class EmbeddingService {
     constructor(openAIClient: OpenAIClient, textPreprocessor?: TextPreprocessor) {
         const underlyingEmbeddings = openAIClient.returnEmbeddingModel();
 
-        const inMemoryStore = new InMemoryStore();
+        const inMemoryStore = new InMemoryStore(); // only alive for the session but can be upgraded for more persistence by using QDrant 
 
         this.embeddings = CacheBackedEmbeddings.fromBytesStore(
             underlyingEmbeddings,

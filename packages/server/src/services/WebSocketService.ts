@@ -365,7 +365,6 @@ export class WebSocketService {
         try {
             const redisInstance = RedisClient.getInstance();
 
-            // Create unified session with all data (for both RAG and routing)
             await sessionManager.createSession(this.conversationId, {
                 callSid: this.callSid,
                 conversationId: this.conversationId,
@@ -377,7 +376,6 @@ export class WebSocketService {
                 callType: this.callType
             });
 
-            // Keep user and phone lookup keys for quick access
             await redisInstance.set(`rag:user:${this.userProfile.id}`, this.conversationId, { EX: ttl });
             await redisInstance.set(`rag:phone:${this.userProfile.phone}`, this.conversationId, { EX: ttl });
 

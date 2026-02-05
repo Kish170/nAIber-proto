@@ -401,27 +401,27 @@ export function buildSystemPrompt(userProfile: UserProfile): string {
     const recentTopics = userProfile.getConversationTopics();
 
     if (recentTopics.length > 0) {
-        // Analyze topic frequency for fatigue detection
-        const topicMentions = new Map<string, number>();
-        recentTopics.forEach(topic => {
-            const count = topic.conversationReferences?.length || 0;
-            if (count > 0) {
-                topicMentions.set(topic.topicName, count);
-            }
-        });
+        // // Analyze topic frequency for fatigue detection
+        // const topicMentions = new Map<string, number>();
+        // recentTopics.forEach(topic => {
+        //     const count = topic.conversationReferences?.length || 0;
+        //     if (count > 0) {
+        //         topicMentions.set(topic.topicName, count);
+        //     }
+        // });
 
-        // Identify frequently discussed topics (3+ mentions)
-        const frequentTopics = Array.from(topicMentions.entries())
-            .filter(([_, count]) => count >= 3)
-            .sort((a, b) => b[1] - a[1])
-            .map(([topic, _]) => topic);
+        // // Identify frequently discussed topics (3+ mentions)
+        // const frequentTopics = Array.from(topicMentions.entries())
+        //     .filter(([_, count]) => count >= 3)
+        //     .sort((a, b) => b[1] - a[1])
+        //     .map(([topic, _]) => topic);
 
-        // Find fresh topics from user interests
-        const userInterests = userProfile.getBasicInfo().interests || [];
-        const discussedTopicNames = new Set(recentTopics.map(t => t.topicName.toLowerCase()));
-        const freshTopics = userInterests.filter(interest =>
-            !discussedTopicNames.has(interest.toLowerCase())
-        );
+        // // Find fresh topics from user interests
+        // const userInterests = userProfile.getBasicInfo().interests || [];
+        // const discussedTopicNames = new Set(recentTopics.map(t => t.topicName.toLowerCase()));
+        // const freshTopics = userInterests.filter(interest =>
+        //     !discussedTopicNames.has(interest.toLowerCase())
+        // );
 
         recentTopicsSection = `
             # RECENT CONVERSATION TOPICS
@@ -443,16 +443,16 @@ export function buildSystemPrompt(userProfile: UserProfile): string {
             - Use these as conversation starters if the dialogue stalls
             - Don't overuse these - the user should lead the conversation
 
-            ${frequentTopics.length > 0 ? `**⚠️ Frequently Discussed Topics:**
+            ${/* frequentTopics.length > 0 ? `**⚠️ Frequently Discussed Topics:**
             ${frequentTopics.map(t => `- ${t}`).join('\n            ')}
 
             These topics have been covered extensively. Be mindful of potential topic fatigue. Reference naturally if relevant, but watch for signs the user wants fresh conversation angles.
-            ` : ''}
-            ${freshTopics.length > 0 ? `**🌟 Fresh Topics to Explore:**
+            ` : '' */ ''}
+            ${/* freshTopics.length > 0 ? `**🌟 Fresh Topics to Explore:**
             ${freshTopics.map(t => `- ${t}`).join('\n            ')}
 
             These are user interests that haven't been discussed recently. Consider these for natural conversation transitions when appropriate.
-            ` : ''}
+            ` : '' */ ''}
         `.trim();
     }
 

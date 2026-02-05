@@ -3,12 +3,13 @@ import { RedisClient } from '@naiber/shared';
 import { IntentClassifier } from './IntentClassifier.js';
 
 export interface TopicState {
-    currentTopicVector: number[];
+    currentTopicVector: number[];      
+    topicCentroidVector: number[];     
+    cachedHighlights: string[];        
     messageLength: number;
-    messageCount: number;         
-    topicFatigue: number;        
-    topicStartedAt?: number;        
-    lastSimilarity?: number;       
+    messageCount: number;
+    topicStartedAt?: number;
+    lastSimilarity?: number;
 }
 
 export class TopicManager {
@@ -23,12 +24,12 @@ export class TopicManager {
     async detectTopicChange(conversationId: string, messageEmbedding: number[], messageLength: number): Promise<boolean> {
         const currentTopic = await this.getCurrentTopic(conversationId);
 
-        if (!currentTopic || !currentTopic.currentTopicVector || currentTopic.currentTopicVector.length === 0) {
+        if (!currentTopic || !currentTopic.topicCentroidVector || currentTopic.topicCentroidVector.length === 0) {
             console.log('[TopicManager] No previous topic - treating as new topic');
             return true;
         }
 
-        const similarity = cosine(currentTopic.currentTopicVector, messageEmbedding);
+        const similarity = cosine(currentTopic.topicCentroidVector, messageEmbedding);
 
         if (similarity === null || similarity === undefined) {
             console.warn('[TopicManager] Similarity calculation returned null/undefined');
@@ -45,25 +46,44 @@ export class TopicManager {
             threshold: threshold.toFixed(3),
             topicChanged,
             messageLength,
-            messageCount: currentTopic.messageCount || 0,
-            topicFatigue: (currentTopic.topicFatigue || 0).toFixed(3)
+            messageCount: currentTopic.messageCount || 0
         });
 
         return topicChanged;
     }
 
-    async updateTopicState(conversationId: string, topicVector: number[], messageLength: number): Promise<void> {
-        const currentState = await this.getCurrentTopic(conversationId);
-        const messageCount = (currentState?.messageCount || 0) + 1;
-        const topicFatigue = this.calculateTopicFatigue(messageCount);
+    async manageTopicState(conversationId: string, messageVector: number[], messageLength: number, isTopicChange: boolean): Promise<void> {
+        const currentTopic = await this.getCurrentTopic(conversationId);
+
+        let topicCentroidVector: number[];
+        let messageCount: number;
+        let cachedHighlights: string[];
+        let topicStartedAt: number;
+
+        if (isTopicChange || !currentTopic) {
+            topicCentroidVector = messageVector;
+            messageCount = 1;
+            cachedHighlights = [];
+            topicStartedAt = Date.now();
+        } else {
+            messageCount = (currentTopic.messageCount || 0) + 1;
+            topicCentroidVector = this.calculateIncrementalCentroid(
+                currentTopic.topicCentroidVector,
+                messageVector,
+                messageCount
+            );
+            cachedHighlights = currentTopic.cachedHighlights || [];
+            topicStartedAt = currentTopic.topicStartedAt || Date.now();
+        }
 
         const updatedTopic: TopicState = {
-            currentTopicVector: topicVector,
+            currentTopicVector: messageVector,
+            topicCentroidVector,
+            cachedHighlights,
             messageLength,
             messageCount,
-            topicFatigue,
-            topicStartedAt: currentState?.topicStartedAt || Date.now(),
-            lastSimilarity: currentState?.lastSimilarity
+            topicStartedAt,
+            lastSimilarity: currentTopic?.lastSimilarity
         };
 
         await this.redisClient.setJSON(
@@ -75,34 +95,30 @@ export class TopicManager {
         console.log('[TopicManager] Updated topic state', {
             conversationId,
             messageCount,
-            topicFatigue: topicFatigue.toFixed(3)
+            isTopicChange,
+            cachedHighlightsCount: cachedHighlights.length
         });
+    }
+
+    async updateCachedHighlights(conversationId: string, highlights: string[]): Promise<void> {
+        const currentTopic = await this.getCurrentTopic(conversationId);
+        if (currentTopic) {
+            currentTopic.cachedHighlights = highlights;
+            await this.redisClient.setJSON(
+                `rag:topic:${conversationId}`,
+                currentTopic,
+                3600
+            );
+        }
+    }
+
+    async getCachedHighlights(conversationId: string): Promise<string[]> {
+        const currentTopic = await this.getCurrentTopic(conversationId);
+        return currentTopic?.cachedHighlights || [];
     }
 
     async getCurrentTopic(conversationId: string): Promise<TopicState | null> {
         return await this.redisClient.getJSON<TopicState>(`rag:topic:${conversationId}`);
-    }
-
-    async resetTopicFatigue(conversationId: string): Promise<void> {
-        const currentState = await this.getCurrentTopic(conversationId);
-
-        if (currentState) {
-            const resetTopic: TopicState = {
-                ...currentState,
-                messageCount: 0,
-                topicFatigue: 0,
-                topicStartedAt: Date.now(),
-                lastSimilarity: undefined
-            };
-
-            await this.redisClient.setJSON(
-                `rag:topic:${conversationId}`,
-                resetTopic,
-                3600
-            );
-
-            console.log('[TopicManager] Reset topic fatigue for conversation:', conversationId);
-        }
     }
 
     async clearTopicState(conversationId: string): Promise<void> {
@@ -111,8 +127,9 @@ export class TopicManager {
         console.log('[TopicManager] Cleared topic state for conversation:', conversationId);
     }
 
-    private calculateTopicFatigue(messageCount: number): number {
-        const baseFatigue = Math.pow(messageCount / 15, 1.8);
-        return Math.min(1.0, baseFatigue);
+    private calculateIncrementalCentroid(oldCentroid: number[], newVector: number[], messageCount: number): number[] {
+        return oldCentroid.map((val, i) =>
+            (val * (messageCount - 1) + newVector[i]) / messageCount
+        );
     }
 }
