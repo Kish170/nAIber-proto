@@ -1,7 +1,8 @@
 import { ElevenLabsClient, ElevenLabsConfigs, OpenAIClient, RedisClient } from "@naiber/shared";
 import { UserProfile } from "@naiber/shared";
 import { WebSocket } from 'ws';
-import { buildFirstMessage, buildSystemPrompt } from './SystemPromptsService.js';
+import { buildGeneralFirstMessage, buildGeneralSystemPrompt } from './GeneralPrompt.js';
+import { buildHealthFirstMessage, buildHealthSystemPrompt } from './HealthPrompt.js';
 import { TwilioClient } from "../clients/TwilioClient.js";
 import { sessionManager } from "./SessionManager.js";
 import { PostCallQueue } from "../queues/PostCallQueue.js";
@@ -27,7 +28,7 @@ export class WebSocketService {
     private postCallWorkflowCompleted: boolean = false;
     private callType: 'general' | 'health_check' = 'general';
 
-    constructor(twilioWs: WebSocket, elevenLabsConfig: ElevenLabsConfigs, twilioClient?: TwilioClient) {
+    constructor(twilioWs: WebSocket, elevenLabsConfig: ElevenLabsConfigs, callType: string, twilioClient?: TwilioClient) {
         this.twilioWs = twilioWs;
         this.elevenLabsClient = new ElevenLabsClient(elevenLabsConfig);
         this.twilioClient = twilioClient || null;
@@ -35,6 +36,7 @@ export class WebSocketService {
             apiKey: process.env.OPENAI_API_KEY!,
             baseUrl: process.env.OPENAI_BASE_URL!
         });
+        this.callType = callType === 'health_check' ? 'health_check' : 'general';
     }
 
     async twilioEventProcessor(message: Buffer): Promise<void> {
@@ -118,14 +120,11 @@ export class WebSocketService {
         this.callSid = data.start.callSid;
         console.log('[WebSocketService] Twilio stream started - streamSid:', this.streamSID, 'callSid:', this.callSid);
 
-        // Lookup callType from temporary Redis storage
         const redisClient = RedisClient.getInstance();
         const storedCallType = await redisClient.get(`call_type:${this.callSid}`);
         this.callType = (storedCallType as 'general' | 'health_check') || 'general';
 
         console.log('[WebSocketService] Retrieved callType for callSid:', this.callSid, this.callType);
-
-        // Note: Session will be created with conversationId in registerConversationForRAG()
     }
 
     private manageMediaEvent(data: any): void {
@@ -170,8 +169,23 @@ export class WebSocketService {
             this.userProfile = userProfile;
 
             const signedUrl = await this.elevenLabsClient.getSignedURL();
-            const systemPrompt = buildSystemPrompt(userProfile);
-            const firstMessage = await buildFirstMessage(userProfile, this.openAIClient);
+
+            let systemPrompt: string;
+            let firstMessage: string;
+
+            switch (this.callType) {
+                case 'health_check':
+                    systemPrompt = buildHealthSystemPrompt();
+                    firstMessage = await buildHealthFirstMessage(userProfile, this.openAIClient);
+                    break;
+
+                case 'general':
+                default:
+                    systemPrompt = buildGeneralSystemPrompt();
+                    firstMessage = await buildGeneralFirstMessage(userProfile, this.openAIClient);
+                    break;
+            }
+
 
             console.log('[WebSocketService] Creating ElevenLabs WebSocket connection');
             this.elevenlabsWs = new WebSocket(signedUrl);
