@@ -4,6 +4,7 @@ export interface PostCallJobData {
     conversationId: string;
     userId: string;
     isFirstCall: boolean;
+    callType: 'general' | 'health_check';
     timestamp: number;
 }
 

@@ -313,8 +313,9 @@ export class HealthPrompt extends SystemPrompt {
         - Allow the system to transition or end naturally
     `.trim();
 
-    generateSystemPrompt(): string {
+    generateSystemPrompt(userProfile: UserProfile): string {
         const sections = [
+            this.buildUserContext(userProfile),
             this.coreIdentity,
             this.roleBoundaries,
             this.questionScope,
@@ -357,7 +358,7 @@ export class HealthPrompt extends SystemPrompt {
         const hours = now.getHours();
         const partOfDay = hours < 12 ? "morning" : hours < 18 ? "afternoon" : "evening";
         const name = userProfile.name;
-        const HealthPrompt = this.generateSystemPrompt();
+        const healthSystemPrompt = this.generateSystemPrompt(userProfile);
 
         const baseInfo = `
             Here is some background information about the user to help you start a personalized conversation:
@@ -440,7 +441,7 @@ export class HealthPrompt extends SystemPrompt {
 
             finalMessage = `
                 With the information below create a personalized first message to greet the user with:
-                ${HealthPrompt}
+                ${healthSystemPrompt}
                 ${baseInfo}
                 ${lastConversation}
                 ${greetingNotes}
@@ -476,8 +477,8 @@ export class HealthPrompt extends SystemPrompt {
     }
 }
 
-export function buildHealthSystemPrompt(): string {
-    return HealthPrompt.getInstance().generateSystemPrompt();
+export function buildHealthSystemPrompt(userProfile: UserProfile): string {
+    return HealthPrompt.getInstance().generateSystemPrompt(userProfile);
 }
 
 export async function buildHealthFirstMessage(userProfile: UserProfile, openAIClient: OpenAIClient): Promise<string> {

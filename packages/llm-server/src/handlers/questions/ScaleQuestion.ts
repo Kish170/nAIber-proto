@@ -4,8 +4,8 @@ export class ScaleQuestion extends Question {
     private readonly min: number;
     private readonly max: number;
 
-    constructor(questionText: string, category: QuestionCategory, min: number = 1, max: number = 10, relatedTo?: string) {
-        super(questionText, category, relatedTo);
+    constructor(id: string, questionText: string, category: QuestionCategory, context: string, min: number = 1, max: number = 10, relatedTo?: string) {
+        super(id, questionText, category, context, relatedTo);
         this.min = min;
         this.max = max;
     }
@@ -55,6 +55,10 @@ export class ScaleQuestion extends Question {
 
     getMax(): number {
         return this.max;
+    }
+
+    getValidationProcess(): string {
+        return "Checking if the number is within the defined range (e.g., 1-10).";
     }
 
     toJSON() {

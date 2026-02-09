@@ -242,8 +242,9 @@ export class GeneralPrompt extends SystemPrompt {
         - If uncertain about something, say so: "I'm not sure about that, but it might be worth asking your doctor."
     `.trim();
 
-    generateSystemPrompt(): string {
+    generateSystemPrompt(userProfile: UserProfile): string {
         const generalSections = [
+            this.buildUserContext(userProfile),
             this.coreIdentity,
             this.roleBoundaries,
             this.internalObjective,
@@ -279,7 +280,7 @@ export class GeneralPrompt extends SystemPrompt {
         const hours = now.getHours();
         const partOfDay = hours < 12 ? "morning" : hours < 18 ? "afternoon" : "evening";
         const name = userProfile.name;
-        const generalPrompt = this.generateSystemPrompt();
+        const generalPrompt = this.generateSystemPrompt(userProfile);
 
         const baseInfo = `
             Here is some background information about the user to help you start a personalized conversation:
@@ -398,8 +399,8 @@ export class GeneralPrompt extends SystemPrompt {
     }
 }
 
-export function buildGeneralSystemPrompt(): string {
-    return GeneralPrompt.getInstance().generateSystemPrompt();
+export function buildGeneralSystemPrompt(userProfile: UserProfile): string {
+    return GeneralPrompt.getInstance().generateSystemPrompt(userProfile);
 }
 
 export async function buildGeneralFirstMessage(userProfile: UserProfile, openAIClient: OpenAIClient): Promise<string> {

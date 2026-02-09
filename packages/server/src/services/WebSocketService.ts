@@ -175,13 +175,13 @@ export class WebSocketService {
 
             switch (this.callType) {
                 case 'health_check':
-                    systemPrompt = buildHealthSystemPrompt();
+                    systemPrompt = buildHealthSystemPrompt(userProfile);
                     firstMessage = await buildHealthFirstMessage(userProfile, this.openAIClient);
                     break;
 
                 case 'general':
                 default:
-                    systemPrompt = buildGeneralSystemPrompt();
+                    systemPrompt = buildGeneralSystemPrompt(userProfile);
                     firstMessage = await buildGeneralFirstMessage(userProfile, this.openAIClient);
                     break;
             }
@@ -344,6 +344,7 @@ export class WebSocketService {
                 conversationId: this.conversationId,
                 userId: this.userProfile.id,
                 isFirstCall: this.userProfile.isFirstCall,
+                callType: this.callType,
                 timestamp: Date.now()
             });
 

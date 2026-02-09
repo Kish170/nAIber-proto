@@ -1,11 +1,12 @@
 import { Worker, Job } from 'bullmq';
 import { OpenAIClient, EmbeddingService, VectorStoreClient, ElevenLabsClient } from '@naiber/shared';
-import { PostCallGraph } from '../graphs/PostCallGraph.js';
+import { GeneralPostCallGraph } from '../graphs/GeneralPostCallGraph.js';
 
 export interface PostCallJobData {
     conversationId: string;
     userId: string;
     isFirstCall: boolean;
+    callType: 'general' | 'health_check';
     timestamp: number;
 }
 
@@ -38,7 +39,7 @@ export class PostCallWorker {
             agentNumberId: process.env.ELEVENLABS_NUMBER_ID!
         });
 
-        this.postCallGraph = new PostCallGraph(
+        this.postCallGraph = new GeneralPostCallGraph(
             openAIClient,
             embeddingService,
             vectorStore,
@@ -80,36 +81,38 @@ export class PostCallWorker {
     }
 
     private async processJob(job: Job<PostCallJobData>): Promise<any> {
-        const { conversationId, userId, isFirstCall } = job.data;
+        const { conversationId, userId, isFirstCall, callType } = job.data;
 
         console.log(`[PostCallWorker] Processing job ${job.id} for conversation ${conversationId}`);
 
-        try {
-            const result = await this.postCallGraph.invoke({
-                conversationId,
-                userId,
-                isFirstCall,
-                transcript: '',  
-            });
+        if (callType == 'general') {
+            try {
+                const result = await this.postCallGraph.invoke({
+                    conversationId,
+                    userId,
+                    isFirstCall,
+                    transcript: '',  
+                });
 
-            if (result.errors && result.errors.length > 0) {
-                throw new Error(`PostCallGraph errors: ${result.errors.join(', ')}`);
+                if (result.errors && result.errors.length > 0) {
+                    throw new Error(`PostCallGraph errors: ${result.errors.join(', ')}`);
+                }
+
+                console.log(`[PostCallWorker] Job ${job.id} completed successfully`);
+                console.log(`[PostCallWorker] Topics created: ${result.topicsToCreate?.length || 0}`);
+                console.log(`[PostCallWorker] Topics updated: ${result.topicsToUpdate?.length || 0}`);
+
+                return {
+                    success: true,
+                    conversationId,
+                    topicsCreated: result.topicsToCreate?.length || 0,
+                    topicsUpdated: result.topicsToUpdate?.length || 0
+                };
+
+            } catch (error) {
+                console.error(`[PostCallWorker] Job ${job.id} failed:`, error);
+                throw error;  
             }
-
-            console.log(`[PostCallWorker] Job ${job.id} completed successfully`);
-            console.log(`[PostCallWorker] Topics created: ${result.topicsToCreate?.length || 0}`);
-            console.log(`[PostCallWorker] Topics updated: ${result.topicsToUpdate?.length || 0}`);
-
-            return {
-                success: true,
-                conversationId,
-                topicsCreated: result.topicsToCreate?.length || 0,
-                topicsUpdated: result.topicsToUpdate?.length || 0
-            };
-
-        } catch (error) {
-            console.error(`[PostCallWorker] Job ${job.id} failed:`, error);
-            throw error;  
         }
     }
 

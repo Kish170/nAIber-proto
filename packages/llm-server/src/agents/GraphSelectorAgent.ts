@@ -1,21 +1,17 @@
 import { BaseMessage } from "@langchain/core/messages";
+import { Command } from "@langchain/langgraph";
+import { BaseCheckpointSaver } from "@langchain/langgraph-checkpoint";
 import { ConversationGraph } from "../graphs/ConversationGraph.js";
-import { AskHealthQuestionGraph } from "../graphs/AskHealthQuestionGraph.js";
-import { ValidateHealthAnswerGraph } from "../graphs/ValidateHealthAnswerGraph.js";
+import { HealthCheckGraph } from "../graphs/HealthCheckGraph.js";
 import { ConversationStateType } from "../states/ConversationState.js";
 import { OpenAIClient, EmbeddingService, RedisClient } from "@naiber/shared";
 import { MemoryRetriever } from "../services/MemoryRetriever.js";
 import { TopicManager } from "../services/TopicManager.js";
-import { HealthCheckSessionManager } from "../services/HealthCheckSessionManager.js";
 
 export class GraphSelectorAgent {
     private conversationGraph: ConversationGraph;
-    private askHealthQuestionGraph: AskHealthQuestionGraph;
-    private validateHealthAnswerGraph: ValidateHealthAnswerGraph;
+    private healthCheckGraph: HealthCheckGraph;
     private compiledConversationGraph: any;
-    private compiledAskHealthQuestionGraph: any;
-    private compiledValidateHealthAnswerGraph: any;
-    private sessionManager: HealthCheckSessionManager;
     private redisClient: RedisClient;
 
     constructor(
@@ -24,10 +20,10 @@ export class GraphSelectorAgent {
         memoryRetriever: MemoryRetriever,
         topicManager: TopicManager,
         redisClient: RedisClient,
-        openAIKey: string
+        openAIKey: string,
+        checkpointer: BaseCheckpointSaver
     ) {
         this.redisClient = redisClient;
-        this.sessionManager = new HealthCheckSessionManager(redisClient);
 
         this.conversationGraph = new ConversationGraph(
             openAIKey,
@@ -35,19 +31,11 @@ export class GraphSelectorAgent {
             memoryRetriever,
             topicManager
         );
-        this.askHealthQuestionGraph = new AskHealthQuestionGraph(
-            openAIClient,
-            this.sessionManager
-        );
-        this.validateHealthAnswerGraph = new ValidateHealthAnswerGraph(
-            this.sessionManager
-        );
+        this.healthCheckGraph = new HealthCheckGraph(openAIClient, checkpointer);
 
         this.compiledConversationGraph = this.conversationGraph.compile();
-        this.compiledAskHealthQuestionGraph = this.askHealthQuestionGraph.compile();
-        this.compiledValidateHealthAnswerGraph = this.validateHealthAnswerGraph.compile();
 
-        console.log('[GraphSelectorAgent] Initialized with compiled graphs and session manager');
+        console.log('[GraphSelectorAgent] Initialized with compiled graphs');
     }
 
     async processConversation(
@@ -75,52 +63,7 @@ export class GraphSelectorAgent {
         console.log('[GraphSelectorAgent] Session callType:', session.callType);
 
         if (session.callType === 'health_check') {
-            console.log('[GraphSelectorAgent] Health check call detected');
-
-            const healthSession = await this.sessionManager.getSession(userId);
-
-            if (!healthSession) {
-                console.log('[GraphSelectorAgent] Initializing new health check session');
-                await this.sessionManager.initializeSession(userId, conversationId);
-
-                return await this.compiledAskHealthQuestionGraph.invoke({
-                    messages: langchainMessages,
-                    userId,
-                    conversationId
-                });
-            } else if (!healthSession.isComplete) {
-                console.log('[GraphSelectorAgent] Continuing health check session');
-
-                const validateResult = await this.compiledValidateHealthAnswerGraph.invoke({
-                    messages: langchainMessages,
-                    userId,
-                    conversationId
-                });
-
-                console.log('[GraphSelectorAgent] Validation completed:', {
-                    needsNextQuestion: validateResult.needsNextQuestion,
-                    isHealthCheckComplete: validateResult.isHealthCheckComplete
-                });
-
-                if (validateResult.needsNextQuestion) {
-                    console.log('[GraphSelectorAgent] Asking next health check question');
-
-                    return await this.compiledAskHealthQuestionGraph.invoke({
-                        messages: langchainMessages,
-                        userId,
-                        conversationId
-                    });
-                }
-
-                return validateResult;
-            } else {
-                // Health check complete
-                console.log('[GraphSelectorAgent] Health check session already complete');
-                return {
-                    response: "Your health check for this session is complete. Thank you!",
-                    isHealthCheckComplete: true
-                } as ConversationStateType;
-            }
+            return await this.handleHealthCheck(langchainMessages, userId, conversationId);
         } else {
             console.log('[GraphSelectorAgent] General conversation detected');
 
@@ -135,6 +78,56 @@ export class GraphSelectorAgent {
             });
 
             return result;
+        }
+    }
+
+    private async handleHealthCheck(
+        langchainMessages: BaseMessage[],
+        userId: string,
+        conversationId: string
+    ): Promise<ConversationStateType> {
+        const threadId = `health_check:${userId}:${conversationId}`;
+        const config = { configurable: { thread_id: threadId } };
+
+        console.log('[GraphSelectorAgent] Health check call detected, threadId:', threadId);
+
+        const currentState = await this.healthCheckGraph.graph.getState(config);
+
+        if (!currentState.values || Object.keys(currentState.values).length === 0) {
+            console.log('[GraphSelectorAgent] Starting new health check');
+
+            const result = await this.healthCheckGraph.graph.invoke(
+                { messages: langchainMessages, userId, conversationId },
+                config
+            );
+
+            return {
+                response: result.response,
+                isHealthCheckComplete: result.isHealthCheckComplete ?? false
+            } as ConversationStateType;
+        } else if (currentState.next && currentState.next.length > 0) {
+            console.log('[GraphSelectorAgent] Resuming health check at:', currentState.next);
+
+            const lastMessage = langchainMessages[langchainMessages.length - 1];
+            const userAnswer = typeof lastMessage.content === 'string'
+                ? lastMessage.content
+                : JSON.stringify(lastMessage.content);
+
+            const result = await this.healthCheckGraph.graph.invoke(
+                new Command({ resume: userAnswer }),
+                config
+            );
+
+            return {
+                response: result.response,
+                isHealthCheckComplete: result.isHealthCheckComplete ?? false
+            } as ConversationStateType;
+        } else {
+            console.log('[GraphSelectorAgent] Health check already complete');
+            return {
+                response: "Your health check for this session is complete. Thank you!",
+                isHealthCheckComplete: true
+            } as ConversationStateType;
         }
     }
 }

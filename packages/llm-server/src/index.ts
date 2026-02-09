@@ -6,12 +6,12 @@ import { StatusRouter } from './routes/StatusRoute.js';
 import { BullBoardRouter } from './routes/BullBoardRoute.js';
 import { PostCallWorker } from './workers/PostCallWorker.js';
 import { RedisClient } from '@naiber/shared';
+import { MemorySaver } from '@langchain/langgraph';
 
 const app = express();
 
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
-app.use(LLMRouter());
 app.use(StatusRouter());
 app.use('/admin/queues', BullBoardRouter());
 
@@ -24,6 +24,12 @@ let postCallWorker: PostCallWorker | null = null;
 
 redisClient.connect().then(() => {
   console.log('[LLM Server] Redis connected');
+
+  // MemorySaver for now — swap to RedisSaver when Redis Stack (RedisJSON + RediSearch) is available
+  const checkpointer = new MemorySaver();
+  console.log('[LLM Server] MemorySaver checkpointer initialized');
+
+  app.use(LLMRouter(checkpointer));
 
   postCallWorker = new PostCallWorker();
 

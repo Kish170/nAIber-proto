@@ -59,6 +59,14 @@ export abstract class SystemPrompt {
         - Log the mention for their care team to review
     `.trim();
 
+    protected buildUserContext(userProfile: UserProfile): string {
+        return `
+            # USER CONTEXT
+            User ID: ${userProfile.id}
+            Phone: ${userProfile.phone}
+        `.trim();
+    }
+
     protected cleanJson(obj: any): string {
         return JSON.stringify(
             Object.fromEntries(Object.entries(obj).filter(([_, v]) => v != null)),
@@ -67,6 +75,6 @@ export abstract class SystemPrompt {
         );
     }
 
-    abstract generateSystemPrompt(): string;
+    abstract generateSystemPrompt(userProfile: UserProfile): string;
     abstract generateFirstMessage(userProfile: UserProfile, openAIClient: OpenAIClient): Promise<string>;
 }

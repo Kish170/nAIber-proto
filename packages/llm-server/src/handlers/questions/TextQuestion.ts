@@ -3,8 +3,8 @@ import { Question, ValidatedAnswer, QuestionCategory } from './Question.js';
 export class TextQuestion extends Question {
     private readonly optional: boolean;
 
-    constructor(questionText: string, category: QuestionCategory, optional: boolean = true, relatedTo?: string) {
-        super(questionText, category, relatedTo);
+    constructor(id: string, questionText: string, category: QuestionCategory, context: string, optional: boolean = true, relatedTo?: string) {
+        super(id, questionText, category, context, relatedTo);
         this.optional = optional;
     }
 
@@ -38,6 +38,10 @@ export class TextQuestion extends Question {
 
     isOptional(): boolean {
         return this.optional;
+    }
+
+    getValidationProcess(): string {
+        return "Ensuring the input isn't empty or exceeds a specific character limit and is summarized; no raw data";
     }
 
     toJSON() {

@@ -2,13 +2,14 @@ import { Router, Request, Response } from 'express';
 import { LLMController } from '../controllers/LLMController.js';
 import type { ChatCompletionRequest } from '@naiber/shared';
 import { RedisClient, OpenAIClient, VectorStoreClient, EmbeddingService } from '@naiber/shared';
+import { BaseCheckpointSaver } from '@langchain/langgraph-checkpoint';
 import { ConversationResolver } from '../services/ConversationResolver.js';
 import { TopicManager } from '../services/TopicManager.js';
 import { MemoryRetriever } from '../services/MemoryRetriever.js';
 import { GraphSelectorAgent } from '../agents/GraphSelectorAgent.js';
 import { HumanMessage, AIMessage, SystemMessage } from "@langchain/core/messages";
 
-export function LLMRouter(): Router {
+export function LLMRouter(checkpointer: BaseCheckpointSaver): Router {
     const router = Router();
 
     const redisClient = RedisClient.getInstance();
@@ -36,7 +37,8 @@ export function LLMRouter(): Router {
         memoryRetriever,
         topicManager,
         redisClient,
-        process.env.OPENAI_API_KEY!
+        process.env.OPENAI_API_KEY!,
+        checkpointer
     );
 
     const conversationGraphHandler = async (req: Request, res: Response) => {

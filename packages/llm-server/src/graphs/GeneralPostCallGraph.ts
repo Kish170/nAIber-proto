@@ -18,7 +18,7 @@ import {
 } from "../handlers/ConversationHandler.js"
 import cosine from 'compute-cosine-similarity';
 
-export class PostCallGraph {
+export class GeneralPostCallGraph {
     private graph: any;
     private openAIClient: OpenAIClient;
     private embeddingService: EmbeddingService;

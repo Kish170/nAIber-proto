@@ -1,5 +1,3 @@
-
-
 export class HealthDataService {
   async healthLogger(parameters: any) {
     try {

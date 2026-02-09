@@ -1,15 +1,5 @@
 import { Annotation } from "@langchain/langgraph";
 import { BaseMessage } from "@langchain/core/messages";
-import { Question } from "../handlers/questions/index.js";
-
-export interface HealthCheckAnswer {
-    questionIndex: number;
-    question: Question;
-    rawAnswer: string;
-    validatedAnswer: string;
-    isValid: boolean;
-    attemptCount: number;
-}
 
 export const ConversationState = Annotation.Root({
     messages: Annotation<BaseMessage[]>({
@@ -47,11 +37,6 @@ export const ConversationState = Annotation.Root({
         default: () => 0
     }),
 
-    // topicFatigue: Annotation<number>({
-    //     value: (x, y) => y ?? x ?? 0.0,
-    //     default: () => 0.0
-    // }),
-
     topicChanged: Annotation<boolean>({
         value: (x, y) => y ?? x ?? false,
         default: () => false
@@ -62,10 +47,6 @@ export const ConversationState = Annotation.Root({
         default: () => []
     }),
 
-    // fatigueGuidance: Annotation<string>({
-    //     value: (x, y) => y ?? x ?? "",
-    //     default: () => ""
-    // }),
     response: Annotation<string>(),
 
     isEndCall: Annotation<boolean>({
@@ -77,47 +58,6 @@ export const ConversationState = Annotation.Root({
         value: (x, y) => y ?? x ?? false,
         default: () => false
     }),
-
-    currentQuestionIndex: Annotation<number>({
-        value: (x, y) => y ?? x ?? 0,
-        default: () => 0
-    }),
-
-    healthCheckQuestions: Annotation<Question[]>({
-        value: (x, y) => y ?? x ?? [],
-        default: () => []
-    }),
-
-    healthCheckAnswers: Annotation<Array<HealthCheckAnswer>>({
-        reducer: (x, y) => x.concat(y),
-        default: () => []
-    }),
-
-    questionAttempts: Annotation<number>({
-        value: (x, y) => y ?? x ?? 0,
-        default: () => 0
-    }),
-
-    rawAnswer: Annotation<string>({
-        value: (x, y) => y ?? x ?? "",
-        default: () => ""
-    }),
-
-    validatedAnswer: Annotation<string>({
-        value: (x, y) => y ?? x ?? "",
-        default: () => ""
-    }),
-
-    isValid: Annotation<boolean>({
-        value: (x, y) => y ?? x ?? false,
-        default: () => false
-    }),
-
-    needsNextQuestion: Annotation<boolean>({
-        value: (x, y) => y ?? x ?? false,
-        default: () => false
-    }),
-
 });
 
 export type ConversationStateType = typeof ConversationState.State;
