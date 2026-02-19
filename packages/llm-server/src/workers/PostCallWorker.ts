@@ -83,7 +83,12 @@ export class PostCallWorker {
     private async processJob(job: Job<PostCallJobData>): Promise<any> {
         const { conversationId, userId, isFirstCall, callType } = job.data;
 
-        console.log(`[PostCallWorker] Processing job ${job.id} for conversation ${conversationId}`);
+        console.log(`[PostCallWorker] Processing job ${job.id} for conversation ${conversationId}, callType: ${callType}`);
+
+        if (callType === 'health_check') {
+            console.log(`[PostCallWorker] Skipping post-call processing for health_check conversation ${conversationId}`);
+            return { success: true, conversationId, skipped: true };
+        }
 
         if (callType == 'general') {
             try {

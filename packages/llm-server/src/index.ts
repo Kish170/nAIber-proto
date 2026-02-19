@@ -22,31 +22,22 @@ const redisClient = RedisClient.getInstance();
 
 let postCallWorker: PostCallWorker | null = null;
 
+const checkpointer = new MemorySaver();
+
+app.use(LLMRouter(checkpointer));
+server.listen(PORT, () => {
+  console.log(`LLM Server running on port ${PORT}`);
+  console.log(`Chat completions endpoint: http://localhost:${PORT}/v1/chat/completions`);
+  console.log(`Bull Board dashboard: http://localhost:${PORT}/admin/queues`);
+  console.log(`RAG enabled: ${process.env.RAG_ENABLED !== 'false'}`);
+});
+
 redisClient.connect().then(() => {
   console.log('[LLM Server] Redis connected');
-
-  // MemorySaver for now — swap to RedisSaver when Redis Stack (RedisJSON + RediSearch) is available
-  const checkpointer = new MemorySaver();
-  console.log('[LLM Server] MemorySaver checkpointer initialized');
-
-  app.use(LLMRouter(checkpointer));
-
   postCallWorker = new PostCallWorker();
-
-  server.listen(PORT, () => {
-    console.log(`LLM Server running on port ${PORT}`);
-    console.log(`Chat completions endpoint: http://localhost:${PORT}/v1/chat/completions`);
-    console.log(`Bull Board dashboard: http://localhost:${PORT}/admin/queues`);
-    console.log(`RAG enabled: ${process.env.RAG_ENABLED !== 'false'}`);
-  });
 }).catch(error => {
   console.error('[LLM Server] Failed to connect to Redis:', error);
-  console.error('[LLM Server] Starting server anyway - RAG and PostCall worker disabled');
-
-  server.listen(PORT, () => {
-    console.log(`LLM Server running on port ${PORT} (RAG DISABLED - Redis unavailable)`);
-    console.log(`Chat completions endpoint: http://localhost:${PORT}/v1/chat/completions`);
-  });
+  console.error('[LLM Server] PostCall worker disabled');
 });
 
 let isShuttingDown = false;
@@ -104,12 +95,10 @@ async function gracefulShutdown(signal: string): Promise<void> {
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 
-process.on('uncaughtException', async (error) => {
+process.on('uncaughtException', (error) => {
   console.error('Uncaught Exception:', error);
-  await gracefulShutdown('UNCAUGHT_EXCEPTION');
 });
 
-process.on('unhandledRejection', async (reason, promise) => {
+process.on('unhandledRejection', (reason, promise) => {
   console.error('Unhandled Rejection at:', promise, 'reason:', reason);
-  await gracefulShutdown('UNHANDLED_REJECTION');
 });

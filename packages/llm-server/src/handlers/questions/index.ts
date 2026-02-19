@@ -3,4 +3,3 @@ export type { ValidatedAnswer, QuestionCategory, QuestionData, BaseQuestionData,
 export { ScaleQuestion } from './ScaleQuestion.js';
 export { BooleanQuestion } from './BooleanQuestion.js';
 export { TextQuestion } from './TextQuestion.js';
-export { validateQuestionData } from './validateQuestionData.js';

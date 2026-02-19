@@ -2,7 +2,6 @@ import { TwilioClient } from '../clients/TwilioClient.js';
 import { WebSocketServer, WebSocket } from 'ws';
 import http from 'http';
 import { ElevenLabsConfigs, RedisClient } from '@naiber/shared';
-import { UserProfile } from '@naiber/shared';
 import { WebSocketService } from '../services/WebSocketService.js';
 
 export class CallController {
@@ -49,7 +48,7 @@ export class CallController {
 
     }
 
-    async initializeWSServer(server: http.Server, callType: 'general' | 'health_check' = 'general'): Promise<WebSocketServer> {
+    async initializeWSServer(server: http.Server): Promise<WebSocketServer> {
         try {
             if (!server) {
                 throw new Error('HTTP server is required to create WebSocket server');
@@ -63,9 +62,9 @@ export class CallController {
             console.log('[CallController] WebSocket server created at /outbound-media-stream');
 
             wss.on("connection", (ws: WebSocket): void => {
-                console.log('[CallController] Twilio WebSocket connected with callType:', callType);
+                console.log('[CallController] Twilio WebSocket connected');
 
-                const webSocketService = new WebSocketService(ws, this.elevenLabsConfigs, callType, this.twilioClient);
+                const webSocketService = new WebSocketService(ws, this.elevenLabsConfigs, 'general', this.twilioClient);
 
                 ws.on("message", async (rawData): Promise<void> => {
                     const buffer = Buffer.isBuffer(rawData) ? rawData : Buffer.from(rawData.toString());
@@ -75,27 +74,6 @@ export class CallController {
                 ws.on("close", async (): Promise<void> => {
                     await webSocketService.closeWSConnection();
                 });
-
-                (async () => {
-                    const userNumber = process.env.PHONE_NUMBER;
-                    if (!userNumber) {
-                        console.error('[CallController] Missing phone number');
-                        ws.close();
-                        return;
-                    }
-
-                    console.log('[CallController] Looking up user with phone:', userNumber);
-                    const userProfile = await UserProfile.loadByPhone(userNumber);
-                    if (!userProfile) {
-                        console.error('[CallController] User profile not found for phone:', userNumber);
-                        console.error('[CallController] Make sure a user exists in the database with this phone number');
-                        ws.close();
-                        return;
-                    }
-
-                    console.log('[CallController] User profile loaded successfully');
-                    await webSocketService.connectToElevenLabs(userProfile);
-                })();
             });
 
             return wss;

@@ -125,6 +125,22 @@ export class WebSocketService {
         this.callType = (storedCallType as 'general' | 'health_check') || 'general';
 
         console.log('[WebSocketService] Retrieved callType for callSid:', this.callSid, this.callType);
+
+        const userNumber = process.env.PHONE_NUMBER;
+        if (!userNumber) {
+            console.error('[WebSocketService] Missing PHONE_NUMBER env var');
+            this.twilioWs.close();
+            return;
+        }
+
+        const userProfile = await UserProfile.loadByPhone(userNumber);
+        if (!userProfile) {
+            console.error('[WebSocketService] User profile not found for phone:', userNumber);
+            this.twilioWs.close();
+            return;
+        }
+
+        await this.connectToElevenLabs(userProfile);
     }
 
     private manageMediaEvent(data: any): void {
@@ -162,7 +178,7 @@ export class WebSocketService {
         }
     }
 
-    async connectToElevenLabs(userProfile: UserProfile): Promise<void> {
+    private async connectToElevenLabs(userProfile: UserProfile): Promise<void> {
         try {
             console.log('[WebSocketService] Connecting to ElevenLabs');
 
