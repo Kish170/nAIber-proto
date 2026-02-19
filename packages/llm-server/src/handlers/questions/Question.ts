@@ -18,6 +18,8 @@ export interface BaseQuestionData {
 
 export interface BooleanQuestionData extends BaseQuestionData {
     type: 'boolean';
+    acceptedTrue?: string[];
+    acceptedFalse?: string[];
 }
 
 export interface ScaleQuestionData extends BaseQuestionData {

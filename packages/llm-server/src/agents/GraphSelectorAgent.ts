@@ -1,4 +1,4 @@
-import { BaseMessage } from "@langchain/core/messages";
+import { BaseMessage, AIMessage, HumanMessage } from "@langchain/core/messages";
 import { Command } from "@langchain/langgraph";
 import { BaseCheckpointSaver } from "@langchain/langgraph-checkpoint";
 import { ConversationGraph } from "../graphs/ConversationGraph.js";
@@ -81,11 +81,7 @@ export class GraphSelectorAgent {
         }
     }
 
-    private async handleHealthCheck(
-        langchainMessages: BaseMessage[],
-        userId: string,
-        conversationId: string
-    ): Promise<ConversationStateType> {
+    private async handleHealthCheck(langchainMessages: BaseMessage[], userId: string, conversationId: string): Promise<ConversationStateType> {
         const threadId = `health_check:${userId}:${conversationId}`;
         const config = { configurable: { thread_id: threadId } };
 
@@ -112,6 +108,19 @@ export class GraphSelectorAgent {
             const userAnswer = typeof lastMessage.content === 'string'
                 ? lastMessage.content
                 : JSON.stringify(lastMessage.content);
+
+            const aiQuestion = currentState.values?.response;
+            const messagesToAdd: BaseMessage[] = [];
+            if (aiQuestion) {
+                messagesToAdd.push(new AIMessage(aiQuestion));
+            }
+            messagesToAdd.push(new HumanMessage(userAnswer));
+
+            await this.healthCheckGraph.graph.updateState(config, {
+                messages: messagesToAdd
+            });
+
+            console.log('[GraphSelectorAgent] Updated state with', messagesToAdd.length, 'messages');
 
             const result = await this.healthCheckGraph.graph.invoke(
                 new Command({ resume: userAnswer }),

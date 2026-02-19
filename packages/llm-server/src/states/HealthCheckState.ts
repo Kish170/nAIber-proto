@@ -55,6 +55,19 @@ export const HealthCheckState = Annotation.Root({
         default: () => false
     }),
 
+    lastValidationError: Annotation<string>({
+        value: (x, y) => y ?? x ?? "",
+        default: () => ""
+    }),
+    pendingClarification: Annotation<boolean>({
+        value: (x, y) => y ?? x ?? false,
+        default: () => false
+    }),
+    clarificationContext: Annotation<string>({
+        value: (x, y) => y ?? x ?? "",
+        default: () => ""
+    }),
+
     response: Annotation<string>({
         value: (x, y) => y ?? x ?? "",
         default: () => ""
