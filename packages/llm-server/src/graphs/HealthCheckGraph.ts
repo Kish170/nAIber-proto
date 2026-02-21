@@ -226,7 +226,7 @@ export class HealthCheckGraph {
         );
 
         return {
-            response: "Thank you for completing the health check! Your responses have been recorded. Is there anything else I can help you with?",
+            response: "Thank you for completing your health check! All your responses have been recorded. Take care, goodbye!",
             isHealthCheckComplete: true
         };
     }
