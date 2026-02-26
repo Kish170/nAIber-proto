@@ -6,7 +6,7 @@ import { BaseCheckpointSaver } from '@langchain/langgraph-checkpoint';
 import { ConversationResolver } from '../services/ConversationResolver.js';
 import { TopicManager } from '../services/TopicManager.js';
 import { MemoryRetriever } from '../services/MemoryRetriever.js';
-import { GraphSelectorAgent } from '../agents/GraphSelectorAgent.js';
+import { SupervisorGraph } from '../graphs/SupervisorGraph.js';
 import { HumanMessage, AIMessage, SystemMessage } from "@langchain/core/messages";
 
 export function LLMRouter(checkpointer: BaseCheckpointSaver): Router {
@@ -31,7 +31,7 @@ export function LLMRouter(checkpointer: BaseCheckpointSaver): Router {
     const topicManager = new TopicManager(redisClient);
     const conversationResolver = new ConversationResolver(redisClient);
 
-    const graphSelectorAgent = new GraphSelectorAgent(
+    const supervisorGraph = new SupervisorGraph(
         openAIClient,
         embeddingService,
         memoryRetriever,
@@ -94,11 +94,11 @@ export function LLMRouter(checkpointer: BaseCheckpointSaver): Router {
                 return new HumanMessage(content);
             });
 
-            const result = await graphSelectorAgent.processConversation(
-                langchainMessages,
-                conversation.userId,
-                conversation.conversationId
-            );
+            const result = await supervisorGraph.graph.invoke({
+                messages: langchainMessages,
+                userId: conversation.userId,
+                conversationId: conversation.conversationId
+            });
 
             console.log('[LLM Route] ConversationGraph result:', {
                 hasResponse: !!result.response,
