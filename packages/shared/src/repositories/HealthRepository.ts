@@ -1,30 +1,10 @@
 import { prismaClient } from '../clients/PrismaDBClient.js';
 
-export interface HealthLog {
+export interface HealthCheckLogData {
     userId: string;
     conversationId: string;
     callLogId?: string;
-    overallWellBeing?: number;
-    physicalSymptoms?: string[];
-    sleepQuality?: number;
-    generalNotes?: string;
-}
-
-export interface MedicationLog {
-    userId: string;
-    conversationId: string;
-    callLogId?: string;
-    medicationId: string;
-    medicationTaken: boolean;
-}
-
-export interface HealthConditionLog {
-    userId: string;
-    conversationId: string;
-    callLogId?: string;
-    healthConditionId: string;
-    symptoms: string[];
-    notes?: string;
+    answers: object[];
 }
 
 export class HealthRepository {
@@ -96,57 +76,11 @@ export class HealthRepository {
         }
     }
 
-    // static async getMedicationsForCondition(userId: string, condition: string) {
-    //     try {
-    //         return await prismaClient.medicationCondition.findMany({
-    //             where: {
-    //                 healthCondition: {
-    //                     isActive: true
-    //                 },
-    //                 medication: {
-    //                     isActive: true
-    //                 }
-    //             },
-    //             include: {
-    //                 medication: true,
-    //                 healthCondition: true
-    //             }
-    //         });
-    //     } catch (error) {
-    //         console.error('[HealthRepository] Unable to get medications for condition:', error);
-    //         throw error;
-    //     }
-    // }
-
-    static async createHealthLog(data: HealthLog) {
+    static async createHealthCheckLog(data: HealthCheckLogData) {
         try {
-            return await prismaClient.healthLog.create({
-                data
-            });
+            return await prismaClient.healthCheckLog.create({ data });
         } catch (error) {
-            console.error('[HealthRepository] Unable to create health log:', error);
-            throw error;
-        }
-    }
-
-    static async createMedicationLog(data: MedicationLog) {
-        try {
-            return await prismaClient.medicationLog.create({
-                data
-            });
-        } catch (error) {
-            console.error('[HealthRepository] Unable to create medication log:', error);
-            throw error;
-        }
-    }
-
-    static async createHealthConditionLog(data: HealthConditionLog) {
-        try {
-            return await prismaClient.healthConditionLog.create({
-                data
-            });
-        } catch (error) {
-            console.error('[HealthRepository] Unable to create health condition log:', error);
+            console.error('[HealthRepository] Unable to create health check log:', error);
             throw error;
         }
     }

@@ -219,12 +219,6 @@ export class HealthCheckGraph {
             validAnswers: state.healthCheckAnswers.filter(a => a.isValid).length
         });
 
-        const validAnswers = state.healthCheckAnswers.filter(a => a.isValid);
-        HealthCheckHandler.parseHealthCheckAnswers(
-            validAnswers.map(a => a.question),
-            validAnswers.map(a => a.validatedAnswer)
-        );
-
         return {
             response: "Thank you for completing your health check! All your responses have been recorded. Take care, goodbye!",
             isHealthCheckComplete: true

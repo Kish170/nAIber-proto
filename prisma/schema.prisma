@@ -35,9 +35,7 @@ model User {
   callLogs              CallLog[]
   conversationSummaries ConversationSummary[]
   conversationTopics    ConversationTopic[]
-  healthLogs            HealthLog[]
-  medicationLogs        MedicationLog[]
-  healthConditionLogs   HealthConditionLog[]
+  healthCheckLogs       HealthCheckLog[]
 
   @@map("users")
 }
@@ -79,7 +77,6 @@ model UserHealthCondition {
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   medicationConditions MedicationCondition[]
-  healthConditionLogs  HealthConditionLog[]
 
   @@unique([userId, condition])
   @@index([userId, isActive])
@@ -103,7 +100,6 @@ model UserMedication {
   updatedAt  DateTime  @updatedAt
 
   user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  medicationLogs MedicationLog[]
 
   medicationConditions MedicationCondition[]
 
@@ -136,9 +132,7 @@ model CallLog {
 
   user                     User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   conversationSummary      ConversationSummary?
-  healthLogs               HealthLog[]
-  medicationLogs           MedicationLog[]
-  healthConditionLogs      HealthConditionLog[]
+  healthCheckLogs          HealthCheckLog[]
 
   @@index([userId, scheduledTime])
   @@index([status])
@@ -212,60 +206,21 @@ model ConversationTopicReference {
   @@map("conversation_topic_references")
 }
 
-model HealthLog {
-  id                    String   @id @default(uuid())
-  userId                String
-  conversationId        String
-  callLogId             String?
+model HealthCheckLog {
+  id             String   @id @default(uuid())
+  userId         String
+  conversationId String
+  callLogId      String?
 
-  overallWellBeing      Int?    
-  physicalSymptoms      String[] 
-  sleepQuality          Int?     
-  generalNotes          String?  
+  answers        Json
 
-  createdAt             DateTime @default(now())
+  createdAt      DateTime @default(now())
 
-  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  callLog               CallLog? @relation(fields: [callLogId], references: [id], onDelete: Cascade)
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  callLog        CallLog? @relation(fields: [callLogId], references: [id], onDelete: Cascade)
 
-  @@map("health_logs")
-}
-
-model MedicationLog {
-  id                    String         @id @default(uuid())
-  userId                String
-  conversationId        String
-  callLogId             String?
-  medicationId          String
-
-  medicationTaken       Boolean
-
-  createdAt             DateTime       @default(now())
-
-  user                  User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  medication            UserMedication @relation(fields: [medicationId], references: [id], onDelete: Cascade)
-  callLog               CallLog?       @relation(fields: [callLogId], references: [id], onDelete: Cascade)
-
-  @@map("medication_logs")
-}
-
-model HealthConditionLog {
-  id                    String              @id @default(uuid())
-  userId                String
-  conversationId        String
-  callLogId             String?
-  healthConditionId     String
-
-  symptoms              String[]
-  notes                 String?
-
-  createdAt             DateTime            @default(now())
-
-  user                  User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  healthCondition       UserHealthCondition @relation(fields: [healthConditionId], references: [id], onDelete: Cascade)
-  callLog               CallLog?            @relation(fields: [callLogId], references: [id], onDelete: Cascade)
-
-  @@map("health_condition_logs")
+  @@index([userId, createdAt])
+  @@map("health_check_logs")
 }
 
 model MedicationCondition {                                                                                                                                                                             

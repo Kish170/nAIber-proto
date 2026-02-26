@@ -6,7 +6,7 @@ import { StatusRouter } from './routes/StatusRoute.js';
 import { BullBoardRouter } from './routes/BullBoardRoute.js';
 import { PostCallWorker } from './workers/PostCallWorker.js';
 import { RedisClient } from '@naiber/shared';
-import { MemorySaver } from '@langchain/langgraph';
+import { RedisSaver } from '@langchain/langgraph-checkpoint-redis';
 
 const app = express();
 
@@ -19,25 +19,29 @@ const server = http.createServer(app);
 
 const PORT = process.env.LLM_PORT || 3001;
 const redisClient = RedisClient.getInstance();
+const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
 
 let postCallWorker: PostCallWorker | null = null;
+let checkpointer: RedisSaver | null = null;
 
-const checkpointer = new MemorySaver();
-
-app.use(LLMRouter(checkpointer));
-server.listen(PORT, () => {
-  console.log(`LLM Server running on port ${PORT}`);
-  console.log(`Chat completions endpoint: http://localhost:${PORT}/v1/chat/completions`);
-  console.log(`Bull Board dashboard: http://localhost:${PORT}/admin/queues`);
-  console.log(`RAG enabled: ${process.env.RAG_ENABLED !== 'false'}`);
-});
-
-redisClient.connect().then(() => {
+redisClient.connect().then(async () => {
   console.log('[LLM Server] Redis connected');
-  postCallWorker = new PostCallWorker();
+
+  checkpointer = await RedisSaver.fromUrl(REDIS_URL);
+  console.log('[LLM Server] RedisSaver checkpointer initialized');
+
+  app.use(LLMRouter(checkpointer));
+  server.listen(PORT, () => {
+    console.log(`LLM Server running on port ${PORT}`);
+    console.log(`Chat completions endpoint: http://localhost:${PORT}/v1/chat/completions`);
+    console.log(`Bull Board dashboard: http://localhost:${PORT}/admin/queues`);
+    console.log(`RAG enabled: ${process.env.RAG_ENABLED !== 'false'}`);
+  });
+
+  postCallWorker = new PostCallWorker(checkpointer);
 }).catch(error => {
   console.error('[LLM Server] Failed to connect to Redis:', error);
-  console.error('[LLM Server] PostCall worker disabled');
+  process.exit(1);
 });
 
 let isShuttingDown = false;
@@ -61,6 +65,15 @@ async function gracefulShutdown(signal: string): Promise<void> {
       }
     } catch (error) {
       console.error('Error closing PostCallWorker:', error);
+    }
+
+    try {
+      if (checkpointer) {
+        await checkpointer.end();
+        console.log('RedisSaver closed');
+      }
+    } catch (error) {
+      console.error('Error closing RedisSaver:', error);
     }
 
     try {

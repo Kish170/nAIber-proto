@@ -1,6 +1,8 @@
 import { Worker, Job } from 'bullmq';
 import { OpenAIClient, EmbeddingService, VectorStoreClient, ElevenLabsClient } from '@naiber/shared';
+import { RedisSaver } from '@langchain/langgraph-checkpoint-redis';
 import { GeneralPostCallGraph } from '../graphs/GeneralPostCallGraph.js';
+import { HealthPostCallGraph } from '../graphs/HealthPostCallGraph.js';
 
 export interface PostCallJobData {
     conversationId: string;
@@ -12,9 +14,13 @@ export interface PostCallJobData {
 
 export class PostCallWorker {
     private worker: Worker<PostCallJobData>;
-    private postCallGraph: any;
+    private generalPostCallGraph: any;
+    private healthPostCallGraph: any;
+    private checkpointer: RedisSaver;
 
-    constructor() {
+    constructor(checkpointer: RedisSaver) {
+        this.checkpointer = checkpointer;
+
         const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
 
         const openAIClient = new OpenAIClient({
@@ -22,8 +28,8 @@ export class PostCallWorker {
             baseUrl: process.env.OPENAI_BASE_URL
         });
 
-        const embeddingModel = openAIClient.returnEmbeddingModel();
         const embeddingService = new EmbeddingService(openAIClient);
+        const embeddingModel = openAIClient.returnEmbeddingModel();
 
         const vectorStore = new VectorStoreClient({
             baseUrl: process.env.QDRANT_URL!,
@@ -39,12 +45,14 @@ export class PostCallWorker {
             agentNumberId: process.env.ELEVENLABS_NUMBER_ID!
         });
 
-        this.postCallGraph = new GeneralPostCallGraph(
+        this.generalPostCallGraph = new GeneralPostCallGraph(
             openAIClient,
             embeddingService,
             vectorStore,
             elevenLabsClient
         ).compile();
+
+        this.healthPostCallGraph = new HealthPostCallGraph().compile();
 
         this.worker = new Worker<PostCallJobData>(
             'post-call-processing',
@@ -86,17 +94,16 @@ export class PostCallWorker {
         console.log(`[PostCallWorker] Processing job ${job.id} for conversation ${conversationId}, callType: ${callType}`);
 
         if (callType === 'health_check') {
-            console.log(`[PostCallWorker] Skipping post-call processing for health_check conversation ${conversationId}`);
-            return { success: true, conversationId, skipped: true };
+            return await this.processHealthCheckJob(userId, conversationId);
         }
 
-        if (callType == 'general') {
+        if (callType === 'general') {
             try {
-                const result = await this.postCallGraph.invoke({
+                const result = await this.generalPostCallGraph.invoke({
                     conversationId,
                     userId,
                     isFirstCall,
-                    transcript: '',  
+                    transcript: '',
                 });
 
                 if (result.errors && result.errors.length > 0) {
@@ -116,9 +123,40 @@ export class PostCallWorker {
 
             } catch (error) {
                 console.error(`[PostCallWorker] Job ${job.id} failed:`, error);
-                throw error;  
+                throw error;
             }
         }
+    }
+
+    private async processHealthCheckJob(userId: string, conversationId: string): Promise<any> {
+        const threadId = `health_check:${userId}:${conversationId}`;
+
+        console.log(`[PostCallWorker] Processing health check for thread: ${threadId}`);
+
+        const tuple = await this.checkpointer.getTuple({ configurable: { thread_id: threadId } });
+        const rawAnswers: any[] = (tuple?.checkpoint?.channel_values?.healthCheckAnswers as any[]) ?? [];
+
+        console.log(`[PostCallWorker] Found ${rawAnswers.length} answers in thread state`);
+
+        const answers = rawAnswers.map((a: any) => ({
+            id: a.question?.id ?? '',
+            question: a.question?.question ?? '',
+            category: a.question?.category ?? '',
+            type: a.question?.type ?? '',
+            answer: a.isValid ? a.validatedAnswer : null,
+            isValid: a.isValid
+        }));
+
+        const result = await this.healthPostCallGraph.invoke({ userId, conversationId, answers });
+
+        if (result.error) {
+            throw new Error(result.error);
+        }
+
+        await this.checkpointer.deleteThread(threadId);
+        console.log(`[PostCallWorker] Cleaned up thread: ${threadId}`);
+
+        return { success: true, conversationId, answersRecorded: answers.length };
     }
 
     async close(): Promise<void> {
