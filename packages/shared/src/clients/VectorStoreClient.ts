@@ -28,7 +28,7 @@ export class VectorStoreClient {
         return await retriever.invoke(query);
     }
 
-    async addMemories(highlights: string[], metadata: {userId: string; conversationId: string; conversationDate?: string;}) {
+    async addMemories(highlights: string[], metadata: {userId: string; conversationId: string; createdAt?: string;}) {
         const documents = highlights.map(highlight => ({
             pageContent: highlight,
             metadata

@@ -45,6 +45,8 @@ export const PostCallState = Annotation.Root({
         oldName: string;
         newName: string;
         topicId: string;
+        existingEmbedding: number[];
+        newEmbedding: number[];
     }>>({
         value: (x, y) => y ?? x ?? [],
         default: () => []

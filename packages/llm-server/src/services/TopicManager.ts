@@ -3,13 +3,14 @@ import { RedisClient } from '@naiber/shared';
 import { IntentClassifier } from './IntentClassifier.js';
 
 export interface TopicState {
-    currentTopicVector: number[];      
-    topicCentroidVector: number[];     
-    cachedHighlights: string[];        
+    currentTopicVector: number[];
+    topicCentroidVector: number[];
+    cachedHighlights: string[];
     messageLength: number;
     messageCount: number;
     topicStartedAt?: number;
     lastSimilarity?: number;
+    cacheAnchorCentroid?: number[];    // centroid snapshot at last cache fill
 }
 
 export class TopicManager {
@@ -104,12 +105,30 @@ export class TopicManager {
         const currentTopic = await this.getCurrentTopic(conversationId);
         if (currentTopic) {
             currentTopic.cachedHighlights = highlights;
+            currentTopic.cacheAnchorCentroid = [...currentTopic.topicCentroidVector];
             await this.redisClient.setJSON(
                 `rag:topic:${conversationId}`,
                 currentTopic,
                 3600
             );
         }
+    }
+
+    async shouldRefreshCache(conversationId: string): Promise<boolean> {
+        const currentTopic = await this.getCurrentTopic(conversationId);
+        if (!currentTopic?.cacheAnchorCentroid || !currentTopic.topicCentroidVector) {
+            return true;
+        }
+        const similarity = cosine(currentTopic.cacheAnchorCentroid, currentTopic.topicCentroidVector);
+        if (similarity === null || similarity === undefined) return true;
+        const DRIFT_THRESHOLD = 0.88;
+        const shouldRefresh = similarity < DRIFT_THRESHOLD;
+        console.log('[TopicManager] Cache drift check:', {
+            conversationId,
+            similarity: similarity.toFixed(3),
+            shouldRefresh
+        });
+        return shouldRefresh;
     }
 
     async getCachedHighlights(conversationId: string): Promise<string[]> {

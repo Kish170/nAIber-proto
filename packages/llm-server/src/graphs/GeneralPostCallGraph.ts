@@ -15,7 +15,8 @@ import {
     updateConversationTopic,
     createConversationReferences,
     ReturnedTopic
-} from "../handlers/ConversationHandler.js"
+} from "../handlers/ConversationHandler.js";
+import { ConversationRepository } from "@naiber/shared";
 import cosine from 'compute-cosine-similarity';
 
 export class GeneralPostCallGraph {
@@ -24,7 +25,7 @@ export class GeneralPostCallGraph {
     private embeddingService: EmbeddingService;
     private vectorStore: VectorStoreClient;
     private elevenLabsClient: ElevenLabsClient;
-    private similarityThreshold: number = 0.85;
+    private similarityThreshold: number = 0.78;
 
     constructor(openAIClient: OpenAIClient, embeddingService: EmbeddingService, vectorStore: VectorStoreClient, elevenLabsClient: ElevenLabsClient) {
         this.openAIClient = openAIClient;
@@ -179,7 +180,7 @@ export class GeneralPostCallGraph {
             const existingTopics = await getConversationTopics(state.userId);
 
             const topicsToCreate: string[] = [];
-            const topicsToUpdate: Array<{ oldName: string; newName: string; topicId: string }> = [];
+            const topicsToUpdate: Array<{ oldName: string; newName: string; topicId: string; existingEmbedding: number[]; newEmbedding: number[] }> = [];
             const topicMatchResults: Array<{
                 topic: string;
                 matchedExisting: boolean;
@@ -207,7 +208,9 @@ export class GeneralPostCallGraph {
                     topicsToUpdate.push({
                         oldName: bestMatch.topic.topicName,
                         newName: newTopic,
-                        topicId: bestMatch.topic.id
+                        topicId: bestMatch.topic.id,
+                        existingEmbedding: bestMatch.topic.topicEmbedding,
+                        newEmbedding: newTopicEmbedding
                     });
                     topicMatchResults.push({
                         topic: newTopic,
@@ -275,16 +278,23 @@ export class GeneralPostCallGraph {
                 }
             }
 
-            for (const { oldName, newName, topicId } of state.topicsToUpdate) {
+            for (const { oldName, newName, topicId, existingEmbedding, newEmbedding } of state.topicsToUpdate) {
                 try {
                     await updateConversationTopic(state.userId, oldName, newName);
+
+                    const avgEmbedding = existingEmbedding.map((v, i) => (v + newEmbedding[i]) / 2);
+                    await ConversationRepository.upsertTopic({
+                        userId: state.userId,
+                        topicName: newName,
+                        topicEmbedding: avgEmbedding
+                    });
 
                     await createConversationReferences({
                         conversationSummaryId: state.summaryId!,
                         conversationTopicId: topicId
                     });
 
-                    console.log(`[PostCallGraph] Updated topic: "${oldName}" → "${newName}"`);
+                    console.log(`[PostCallGraph] Updated topic: "${oldName}" → "${newName}" (embedding updated)`);
                 } catch (error) {
                     const errorMsg = `Failed to update topic "${oldName}": ${error instanceof Error ? error.message : 'Unknown error'}`;
                     console.error('[PostCallGraph]', errorMsg);
@@ -322,7 +332,8 @@ export class GeneralPostCallGraph {
             if (highlights.length > 0) {
                 await this.vectorStore.addMemories(highlights, {
                     userId: state.userId,
-                    conversationId: state.conversationId
+                    conversationId: state.conversationId,
+                    createdAt: new Date().toISOString()
                 });
                 console.log(`[PostCallGraph] Stored ${highlights.length} highlights in vector database`);
             }

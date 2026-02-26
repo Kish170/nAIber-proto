@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { LLMController } from '../controllers/LLMController.js';
 import type { ChatCompletionRequest } from '@naiber/shared';
-import { RedisClient, OpenAIClient, VectorStoreClient, EmbeddingService } from '@naiber/shared';
+import { RedisClient, OpenAIClient, VectorStoreClient, EmbeddingService, RedisEmbeddingStore } from '@naiber/shared';
 import { BaseCheckpointSaver } from '@langchain/langgraph-checkpoint';
 import { ConversationResolver } from '../services/ConversationResolver.js';
 import { TopicManager } from '../services/TopicManager.js';
@@ -26,7 +26,8 @@ export function LLMRouter(checkpointer: BaseCheckpointSaver): Router {
         collectionName: process.env.QDRANT_COLLECTION!
     }, embeddingModel);
 
-    const embeddingService = new EmbeddingService(openAIClient);
+    const redisEmbeddingStore = new RedisEmbeddingStore(redisClient);
+    const embeddingService = new EmbeddingService(openAIClient, undefined, redisEmbeddingStore);
     const memoryRetriever = new MemoryRetriever(vectorStore);
     const topicManager = new TopicManager(redisClient);
     const conversationResolver = new ConversationResolver(redisClient);

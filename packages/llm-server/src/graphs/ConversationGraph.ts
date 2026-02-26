@@ -70,7 +70,7 @@ export class ConversationGraph {
         const lastMessage = state.messages[state.messages.length - 1];
         const content = typeof lastMessage.content === 'string' ? lastMessage.content : JSON.stringify(lastMessage.content);
 
-        const newEmbedding = await this.embeddingService.embedQuery(content);
+        const { embedding: newEmbedding } = await this.embeddingService.generateEmbedding(content);
         const topicChanged = await this.topicManager.detectTopicChange(
             state.conversationId,
             newEmbedding,
@@ -94,7 +94,10 @@ export class ConversationGraph {
     private async retrieveMemories(state: ConversationStateType) {
         let memories: string[] = [];
 
-        if (state.topicChanged) {
+        const needsRefresh = state.topicChanged ||
+            await this.topicManager.shouldRefreshCache(state.conversationId);
+
+        if (needsRefresh) {
             const retrievedMemories = await this.memoryRetriever.retrieveMemories(
                 state.userId,
                 state.currentTopicVector || [],
@@ -106,6 +109,11 @@ export class ConversationGraph {
                 state.conversationId,
                 memories
             );
+
+            console.log('[ConversationGraph] Cache refreshed:', {
+                reason: state.topicChanged ? 'topic_changed' : 'centroid_drift',
+                memoryCount: memories.length
+            });
         } else {
             memories = await this.topicManager.getCachedHighlights(state.conversationId);
         }

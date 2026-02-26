@@ -1,5 +1,5 @@
 import { CacheBackedEmbeddings } from "@langchain/classic/embeddings/cache_backed";
-import { InMemoryStore } from "@langchain/core/stores";
+import { InMemoryStore, BaseStore } from "@langchain/core/stores";
 import { OpenAIClient } from "../clients/OpenAIClient.js";
 import { TextPreprocessor } from "./TextPreprocessor.js";
 
@@ -19,14 +19,14 @@ export class EmbeddingService {
     private embeddings: CacheBackedEmbeddings;
     private textPreprocessor: TextPreprocessor;
 
-    constructor(openAIClient: OpenAIClient, textPreprocessor?: TextPreprocessor) {
+    constructor(openAIClient: OpenAIClient, textPreprocessor?: TextPreprocessor, store?: BaseStore<string, Uint8Array>) {
         const underlyingEmbeddings = openAIClient.returnEmbeddingModel();
 
-        const inMemoryStore = new InMemoryStore(); // only alive for the session but can be upgraded for more persistence by using QDrant 
+        const bytesStore = store ?? new InMemoryStore();
 
         this.embeddings = CacheBackedEmbeddings.fromBytesStore(
             underlyingEmbeddings,
-            inMemoryStore,
+            bytesStore,
             { namespace: "embeddings:v1" }
         );
 

@@ -13,7 +13,6 @@ export interface RetrievedMemories {
 
 interface MemoryRetrieverConfig {
     similarityThreshold: number;
-    minResults: number;
 }
 
 export class MemoryRetriever {
@@ -24,7 +23,6 @@ export class MemoryRetriever {
         this.vectorStore = vectorStore;
         this.config = {
             similarityThreshold: parseFloat(process.env.RAG_MEMORY_SIMILARITY_THRESHOLD || '0.45'),
-            minResults: parseInt(process.env.RAG_MEMORY_MIN_RESULTS || '1')
         };
     }
 
@@ -38,15 +36,9 @@ export class MemoryRetriever {
                 limit
             );
 
-            let relevantResults = searchResults.filter(
+            const relevantResults = searchResults.filter(
                 r => r.score > this.config.similarityThreshold
             );
-
-            if (relevantResults.length === 0 && searchResults.length > 0 && this.config.minResults > 0) {
-                relevantResults = searchResults
-                    .sort((a, b) => b.score - a.score)
-                    .slice(0, this.config.minResults);
-            }
 
             const highlights = relevantResults.map(r => r.pageContent);
             console.log('[MemoryRetriever] Retrieved', highlights.length, 'relevant memories');
