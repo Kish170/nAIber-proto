@@ -1,5 +1,7 @@
 import { prismaClient } from '../clients/PrismaDBClient.js';
 
+const MAX_TOPIC_VARIATIONS = 10;
+
 export interface Summary {
     userId: string;
     conversationId: string;
@@ -158,18 +160,17 @@ export class ConversationRepository {
 
     static async addVariationToTopic(userId: string, topicName: string, variation: string) {
         try {
+            const current = await prismaClient.conversationTopic.findUnique({
+                where: { userId_topicName: { userId, topicName } },
+                select: { variations: true }
+            });
+            const updatedVariations = [variation, ...(current?.variations ?? [])].slice(0, MAX_TOPIC_VARIATIONS);
+
             return await prismaClient.conversationTopic.update({
                 where: {
-                    userId_topicName: {
-                        userId,
-                        topicName
-                    }
+                    userId_topicName: { userId, topicName }
                 },
-                data: {
-                    variations: {
-                        push: variation
-                    }
-                },
+                data: { variations: updatedVariations },
                 select: {
                     id: true,
                     topicName: true,
@@ -184,18 +185,19 @@ export class ConversationRepository {
 
     static async renameTopic(userId: string, oldTopicName: string, newTopicName: string) {
         try {
+            const current = await prismaClient.conversationTopic.findUnique({
+                where: { userId_topicName: { userId, topicName: oldTopicName } },
+                select: { variations: true }
+            });
+            const updatedVariations = [oldTopicName, ...(current?.variations ?? [])].slice(0, MAX_TOPIC_VARIATIONS);
+
             return await prismaClient.conversationTopic.update({
                 where: {
-                    userId_topicName: {
-                        userId,
-                        topicName: oldTopicName
-                    }
+                    userId_topicName: { userId, topicName: oldTopicName }
                 },
                 data: {
                     topicName: newTopicName,
-                    variations: {
-                        push: oldTopicName
-                    }
+                    variations: updatedVariations
                 },
                 select: {
                     id: true,

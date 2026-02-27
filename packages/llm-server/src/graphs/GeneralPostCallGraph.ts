@@ -333,7 +333,8 @@ export class GeneralPostCallGraph {
                 await this.vectorStore.addMemories(highlights, {
                     userId: state.userId,
                     conversationId: state.conversationId,
-                    createdAt: new Date().toISOString()
+                    createdAt: new Date().toISOString(),
+                    summaryId: state.summaryId ?? undefined
                 });
                 console.log(`[PostCallGraph] Stored ${highlights.length} highlights in vector database`);
             }

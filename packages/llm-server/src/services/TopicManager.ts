@@ -10,7 +10,7 @@ export interface TopicState {
     messageCount: number;
     topicStartedAt?: number;
     lastSimilarity?: number;
-    cacheAnchorCentroid?: number[];    // centroid snapshot at last cache fill
+    cacheAnchorCentroid?: number[];
 }
 
 export class TopicManager {

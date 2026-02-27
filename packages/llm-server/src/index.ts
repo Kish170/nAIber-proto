@@ -6,7 +6,7 @@ import { StatusRouter } from './routes/StatusRoute.js';
 import { BullBoardRouter } from './routes/BullBoardRoute.js';
 import { PostCallWorker } from './workers/PostCallWorker.js';
 import { RedisClient } from '@naiber/shared';
-import { RedisSaver } from '@langchain/langgraph-checkpoint-redis';
+import { ShallowRedisSaver } from '@langchain/langgraph-checkpoint-redis/shallow';
 
 const app = express();
 
@@ -22,13 +22,13 @@ const redisClient = RedisClient.getInstance();
 const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
 
 let postCallWorker: PostCallWorker | null = null;
-let checkpointer: RedisSaver | null = null;
+let checkpointer: ShallowRedisSaver | null = null;
 
 redisClient.connect().then(async () => {
   console.log('[LLM Server] Redis connected');
 
-  checkpointer = await RedisSaver.fromUrl(REDIS_URL);
-  console.log('[LLM Server] RedisSaver checkpointer initialized');
+  checkpointer = await ShallowRedisSaver.fromUrl(REDIS_URL);
+  console.log('[LLM Server] ShallowRedisSaver checkpointer initialized');
 
   app.use(LLMRouter(checkpointer));
   server.listen(PORT, () => {
@@ -70,7 +70,7 @@ async function gracefulShutdown(signal: string): Promise<void> {
     try {
       if (checkpointer) {
         await checkpointer.end();
-        console.log('RedisSaver closed');
+        console.log('ShallowRedisSaver closed');
       }
     } catch (error) {
       console.error('Error closing RedisSaver:', error);

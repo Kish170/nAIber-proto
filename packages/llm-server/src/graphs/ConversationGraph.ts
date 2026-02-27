@@ -52,75 +52,89 @@ export class ConversationGraph {
     }
 
     private async classifyIntent(state: ConversationStateType) {
-        const lastMessage = state.messages[state.messages.length - 1];
-        const content = typeof lastMessage.content === 'string' ? lastMessage.content : JSON.stringify(lastMessage.content);
+        try {
+            const lastMessage = state.messages[state.messages.length - 1];
+            const content = typeof lastMessage.content === 'string' ? lastMessage.content : JSON.stringify(lastMessage.content);
 
-        const classification = this.intentClassifier.classifyIntent(content);
+            const classification = this.intentClassifier.classifyIntent(content);
 
-        return {
-            shouldProcessRAG: classification.shouldProcessRAG,
-            messageLength: classification.messageLength,
-            hasSubstantiveContent: classification.hasSubstantiveContent,
-            isContinuation: classification.isContinuation,
-            isShortResponse: classification.isShortResponse
-        };
+            return {
+                shouldProcessRAG: classification.shouldProcessRAG,
+                messageLength: classification.messageLength,
+                hasSubstantiveContent: classification.hasSubstantiveContent,
+                isContinuation: classification.isContinuation,
+                isShortResponse: classification.isShortResponse
+            };
+        } catch (error) {
+            console.error('[ConversationGraph] classifyIntent failed, defaulting to process RAG:', error);
+            return { shouldProcessRAG: true, messageLength: 0, hasSubstantiveContent: true, isContinuation: false, isShortResponse: false };
+        }
     }
 
     private async manageTopicState(state: ConversationStateType) {
-        const lastMessage = state.messages[state.messages.length - 1];
-        const content = typeof lastMessage.content === 'string' ? lastMessage.content : JSON.stringify(lastMessage.content);
+        try {
+            const lastMessage = state.messages[state.messages.length - 1];
+            const content = typeof lastMessage.content === 'string' ? lastMessage.content : JSON.stringify(lastMessage.content);
 
-        const { embedding: newEmbedding } = await this.embeddingService.generateEmbedding(content);
-        const topicChanged = await this.topicManager.detectTopicChange(
-            state.conversationId,
-            newEmbedding,
-            state.messageLength
-        );
+            const { embedding: newEmbedding } = await this.embeddingService.generateEmbedding(content);
+            const topicChanged = await this.topicManager.detectTopicChange(
+                state.conversationId,
+                newEmbedding,
+                state.messageLength
+            );
 
-        await this.topicManager.manageTopicState(
-            state.conversationId,
-            newEmbedding,
-            state.messageLength,
-            topicChanged
-        );
+            await this.topicManager.manageTopicState(
+                state.conversationId,
+                newEmbedding,
+                state.messageLength,
+                topicChanged
+            );
 
-        return {
-            currentTopicVector: newEmbedding,
-            topicChanged,
-            messageCount: topicChanged ? 1 : state.messageCount + 1
-        };
+            return {
+                currentTopicVector: newEmbedding,
+                topicChanged,
+                messageCount: topicChanged ? 1 : state.messageCount + 1
+            };
+        } catch (error) {
+            console.error('[ConversationGraph] manageTopicState failed, serving from cache:', error);
+            return { topicChanged: false, currentTopicVector: state.currentTopicVector, messageCount: state.messageCount + 1 };
+        }
     }
 
     private async retrieveMemories(state: ConversationStateType) {
-        let memories: string[] = [];
+        try {
+            let memories: string[] = [];
 
-        const needsRefresh = state.topicChanged ||
-            await this.topicManager.shouldRefreshCache(state.conversationId);
+            const hasVector = state.currentTopicVector && state.currentTopicVector.length > 0;
+            const needsRefresh = state.topicChanged ||
+                await this.topicManager.shouldRefreshCache(state.conversationId);
 
-        if (needsRefresh) {
-            const retrievedMemories = await this.memoryRetriever.retrieveMemories(
-                state.userId,
-                state.currentTopicVector || [],
-                5
-            );
-            memories = retrievedMemories.highlights;
+            if (needsRefresh && hasVector) {
+                const retrievedMemories = await this.memoryRetriever.retrieveMemories(
+                    state.userId,
+                    state.currentTopicVector!,
+                    5
+                );
+                memories = retrievedMemories.highlights;
 
-            await this.topicManager.updateCachedHighlights(
-                state.conversationId,
-                memories
-            );
+                await this.topicManager.updateCachedHighlights(
+                    state.conversationId,
+                    memories
+                );
 
-            console.log('[ConversationGraph] Cache refreshed:', {
-                reason: state.topicChanged ? 'topic_changed' : 'centroid_drift',
-                memoryCount: memories.length
-            });
-        } else {
-            memories = await this.topicManager.getCachedHighlights(state.conversationId);
+                console.log('[ConversationGraph] Cache refreshed:', {
+                    reason: state.topicChanged ? 'topic_changed' : 'centroid_drift',
+                    memoryCount: memories.length
+                });
+            } else {
+                memories = await this.topicManager.getCachedHighlights(state.conversationId);
+            }
+
+            return { retrievedMemories: memories };
+        } catch (error) {
+            console.error('[ConversationGraph] retrieveMemories failed, continuing without memories:', error);
+            return { retrievedMemories: [] };
         }
-
-        return {
-            retrievedMemories: memories
-        };
     }
 
     // private async checkTopicFatigue(state: ConversationStateType) {

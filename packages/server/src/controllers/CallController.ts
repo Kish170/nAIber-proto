@@ -1,7 +1,6 @@
-import { TwilioClient } from '../clients/TwilioClient.js';
+import { TwilioClient, ElevenLabsConfigs, RedisClient } from '@naiber/shared';
 import { WebSocketServer, WebSocket } from 'ws';
 import http from 'http';
-import { ElevenLabsConfigs, RedisClient } from '@naiber/shared';
 import { WebSocketService } from '../services/WebSocketService.js';
 
 export class CallController {

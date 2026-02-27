@@ -1,13 +1,43 @@
 import { Router, Request, Response } from 'express';
 import { LLMController } from '../controllers/LLMController.js';
 import type { ChatCompletionRequest } from '@naiber/shared';
-import { RedisClient, OpenAIClient, VectorStoreClient, EmbeddingService, RedisEmbeddingStore } from '@naiber/shared';
+import { RedisClient, OpenAIClient, VectorStoreClient, EmbeddingService, RedisEmbeddingStore, TwilioClient } from '@naiber/shared';
 import { BaseCheckpointSaver } from '@langchain/langgraph-checkpoint';
 import { ConversationResolver } from '../services/ConversationResolver.js';
 import { TopicManager } from '../services/TopicManager.js';
 import { MemoryRetriever } from '../services/MemoryRetriever.js';
 import { SupervisorGraph } from '../graphs/SupervisorGraph.js';
 import { HumanMessage, AIMessage, SystemMessage } from "@langchain/core/messages";
+
+const END_CALL_DELAY_MS = 5000;
+
+async function scheduleCallEnd(conversationId: string): Promise<void> {
+    setTimeout(async () => {
+        try {
+            const session = await RedisClient.getInstance().getJSON<{ callSid?: string }>(`session:${conversationId}`);
+            const callSid = session?.callSid;
+
+            if (!callSid) {
+                console.warn('[LLM Route] No callSid found for conversation:', conversationId);
+                return;
+            }
+
+            const twilioClient = new TwilioClient({
+                accountSid: process.env.TWILIO_ACCOUNT_SID!,
+                authToken: process.env.TWILIO_AUTH_TOKEN!
+            });
+
+            const result = await twilioClient.endCall(callSid);
+            if (result.success) {
+                console.log('[LLM Route] Health check call ended via Twilio');
+            } else {
+                console.error('[LLM Route] Failed to end call:', result.error);
+            }
+        } catch (err) {
+            console.error('[LLM Route] Error ending call:', err);
+        }
+    }, END_CALL_DELAY_MS);
+}
 
 export function LLMRouter(checkpointer: BaseCheckpointSaver): Router {
     const router = Router();
@@ -157,6 +187,10 @@ export function LLMRouter(checkpointer: BaseCheckpointSaver): Router {
                 res.end();
 
                 console.log('[LLM Route] SSE stream completed');
+
+                if (result.isHealthCheckComplete) {
+                    scheduleCallEnd(conversation.conversationId);
+                }
             } else {
                 console.log('[LLM Route] Returning standard JSON format');
 
@@ -177,6 +211,10 @@ export function LLMRouter(checkpointer: BaseCheckpointSaver): Router {
 
                 res.setHeader('Content-Type', 'application/json');
                 res.status(200).json(completion);
+
+                if (result.isHealthCheckComplete) {
+                    scheduleCallEnd(conversation.conversationId);
+                }
             }
 
         } catch (error) {

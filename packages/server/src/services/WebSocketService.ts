@@ -1,9 +1,8 @@
-import { ElevenLabsClient, ElevenLabsConfigs, OpenAIClient, RedisClient } from "@naiber/shared";
+import { ElevenLabsClient, ElevenLabsConfigs, OpenAIClient, RedisClient, TwilioClient } from "@naiber/shared";
 import { UserProfile } from "@naiber/shared";
 import { WebSocket } from 'ws';
 import { buildGeneralFirstMessage, buildGeneralSystemPrompt } from './GeneralPrompt.js';
 import { buildHealthFirstMessage, buildHealthSystemPrompt } from './HealthPrompt.js';
-import { TwilioClient } from "../clients/TwilioClient.js";
 import { sessionManager } from "./SessionManager.js";
 import { PostCallQueue } from "../queues/PostCallQueue.js";
 

@@ -1,3 +1,4 @@
+export * from './TwilioClient.js';
 export * from './PrismaDBClient.js';
 export * from './OpenAIClient.js';
 export * from './ElevenlabsClient.js';

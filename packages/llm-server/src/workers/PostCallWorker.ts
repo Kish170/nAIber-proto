@@ -1,6 +1,6 @@
 import { Worker, Job } from 'bullmq';
-import { OpenAIClient, EmbeddingService, VectorStoreClient, ElevenLabsClient } from '@naiber/shared';
-import { RedisSaver } from '@langchain/langgraph-checkpoint-redis';
+import { OpenAIClient, EmbeddingService, VectorStoreClient, ElevenLabsClient, RedisClient } from '@naiber/shared';
+import { ShallowRedisSaver } from '@langchain/langgraph-checkpoint-redis/shallow';
 import { GeneralPostCallGraph } from '../graphs/GeneralPostCallGraph.js';
 import { HealthPostCallGraph } from '../graphs/HealthPostCallGraph.js';
 
@@ -16,9 +16,9 @@ export class PostCallWorker {
     private worker: Worker<PostCallJobData>;
     private generalPostCallGraph: any;
     private healthPostCallGraph: any;
-    private checkpointer: RedisSaver;
+    private checkpointer: ShallowRedisSaver;
 
-    constructor(checkpointer: RedisSaver) {
+    constructor(checkpointer: ShallowRedisSaver) {
         this.checkpointer = checkpointer;
 
         const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
@@ -93,12 +93,12 @@ export class PostCallWorker {
 
         console.log(`[PostCallWorker] Processing job ${job.id} for conversation ${conversationId}, callType: ${callType}`);
 
-        if (callType === 'health_check') {
-            return await this.processHealthCheckJob(userId, conversationId);
-        }
+        try {
+            if (callType === 'health_check') {
+                return await this.processHealthCheckJob(userId, conversationId);
+            }
 
-        if (callType === 'general') {
-            try {
+            if (callType === 'general') {
                 const result = await this.generalPostCallGraph.invoke({
                     conversationId,
                     userId,
@@ -120,10 +120,16 @@ export class PostCallWorker {
                     topicsCreated: result.topicsToCreate?.length || 0,
                     topicsUpdated: result.topicsToUpdate?.length || 0
                 };
-
-            } catch (error) {
-                console.error(`[PostCallWorker] Job ${job.id} failed:`, error);
-                throw error;
+            }
+        } catch (error) {
+            console.error(`[PostCallWorker] Job ${job.id} failed:`, error);
+            throw error;
+        } finally {
+            try {
+                await RedisClient.getInstance().deleteByPattern(`rag:topic:${conversationId}`);
+                console.log(`[PostCallWorker] Cleared topic state for: ${conversationId}`);
+            } catch (cleanupErr) {
+                console.warn('[PostCallWorker] Topic state cleanup failed (non-fatal):', cleanupErr);
             }
         }
     }
@@ -133,30 +139,35 @@ export class PostCallWorker {
 
         console.log(`[PostCallWorker] Processing health check for thread: ${threadId}`);
 
-        const tuple = await this.checkpointer.getTuple({ configurable: { thread_id: threadId } });
-        const rawAnswers: any[] = (tuple?.checkpoint?.channel_values?.healthCheckAnswers as any[]) ?? [];
+        try {
+            const tuple = await this.checkpointer.getTuple({ configurable: { thread_id: threadId } });
+            const rawAnswers: any[] = (tuple?.checkpoint?.channel_values?.healthCheckAnswers as any[]) ?? [];
 
-        console.log(`[PostCallWorker] Found ${rawAnswers.length} answers in thread state`);
+            console.log(`[PostCallWorker] Found ${rawAnswers.length} answers in thread state`);
 
-        const answers = rawAnswers.map((a: any) => ({
-            id: a.question?.id ?? '',
-            question: a.question?.question ?? '',
-            category: a.question?.category ?? '',
-            type: a.question?.type ?? '',
-            answer: a.isValid ? a.validatedAnswer : null,
-            isValid: a.isValid
-        }));
+            const answers = rawAnswers.map((a: any) => ({
+                id: a.question?.id ?? '',
+                question: a.question?.question ?? '',
+                category: a.question?.category ?? '',
+                type: a.question?.type ?? '',
+                answer: a.isValid ? a.validatedAnswer : null,
+                isValid: a.isValid
+            }));
 
-        const result = await this.healthPostCallGraph.invoke({ userId, conversationId, answers });
+            const result = await this.healthPostCallGraph.invoke({ userId, conversationId, answers });
 
-        if (result.error) {
-            throw new Error(result.error);
+            if (result.error) {
+                throw new Error(result.error);
+            }
+
+            await this.checkpointer.deleteThread(threadId);
+            console.log(`[PostCallWorker] Cleaned up thread: ${threadId}`);
+
+            return { success: true, conversationId, answersRecorded: answers.length };
+        } catch (error) {
+            console.error(`[PostCallWorker] Health check persistence failed for thread ${threadId}:`, error);
+            throw error;
         }
-
-        await this.checkpointer.deleteThread(threadId);
-        console.log(`[PostCallWorker] Cleaned up thread: ${threadId}`);
-
-        return { success: true, conversationId, answersRecorded: answers.length };
     }
 
     async close(): Promise<void> {

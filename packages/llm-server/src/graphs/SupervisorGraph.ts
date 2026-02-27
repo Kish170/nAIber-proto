@@ -116,12 +116,15 @@ export class SupervisorGraph {
             if (aiQuestion) messagesToAdd.push(new AIMessage(aiQuestion));
             messagesToAdd.push(new HumanMessage(userAnswer));
 
-            await this.healthCheckGraph.graph.updateState(config, { messages: messagesToAdd });
-
-            console.log("[SupervisorGraph] Updated state with", messagesToAdd.length, "messages");
-
             const result = await this.healthCheckGraph.graph.invoke(
-                new Command({ resume: userAnswer }),
+                new Command({
+                    resume: userAnswer,
+                    update: {
+                        messages: messagesToAdd,
+                        userId: state.userId,
+                        conversationId: state.conversationId
+                    }
+                }),
                 config
             );
 

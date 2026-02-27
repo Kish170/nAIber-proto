@@ -11,67 +11,38 @@ export interface HealthCheckAnswer {
     attemptCount: number;
 }
 
+const keep = <T>(fallback: T) => ({
+    reducer: (x: T, y: T | undefined | null) => (y !== undefined && y !== null) ? y : (x !== undefined && x !== null ? x : fallback),
+    default: () => fallback
+});
+
 export const HealthCheckState = Annotation.Root({
     messages: Annotation<BaseMessage[]>({
         reducer: (x, y) => x.concat(y),
         default: () => []
     }),
-    userId: Annotation<string>(),
-    conversationId: Annotation<string>(),
-
-    healthCheckQuestions: Annotation<QuestionData[]>({
-        value: (x, y) => y ?? x ?? [],
-        default: () => []
+    userId: Annotation<string>({
+        reducer: (x, y) => y || x || '',
+        default: () => ''
     }),
-    currentQuestionIndex: Annotation<number>({
-        value: (x, y) => y ?? x ?? 0,
-        default: () => 0
-    }),
-    questionAttempts: Annotation<number>({
-        value: (x, y) => y ?? x ?? 0,
-        default: () => 0
+    conversationId: Annotation<string>({
+        reducer: (x, y) => y || x || '',
+        default: () => ''
     }),
 
-    healthCheckAnswers: Annotation<HealthCheckAnswer[]>({
-        value: (x, y) => y ?? x ?? [],
-        default: () => []
-    }),
+    healthCheckQuestions: Annotation<QuestionData[]>(keep<QuestionData[]>([])),
+    currentQuestionIndex: Annotation<number>(keep<number>(0)),
+    questionAttempts: Annotation<number>(keep<number>(0)),
+    healthCheckAnswers: Annotation<HealthCheckAnswer[]>(keep<HealthCheckAnswer[]>([])),
 
-    rawAnswer: Annotation<string>({
-        value: (x, y) => y ?? x ?? "",
-        default: () => ""
-    }),
-    validatedAnswer: Annotation<string>({
-        value: (x, y) => y ?? x ?? "",
-        default: () => ""
-    }),
-    isValid: Annotation<boolean>({
-        value: (x, y) => y ?? x ?? false,
-        default: () => false
-    }),
-
-    isHealthCheckComplete: Annotation<boolean>({
-        value: (x, y) => y ?? x ?? false,
-        default: () => false
-    }),
-
-    lastValidationError: Annotation<string>({
-        value: (x, y) => y ?? x ?? "",
-        default: () => ""
-    }),
-    pendingClarification: Annotation<boolean>({
-        value: (x, y) => y ?? x ?? false,
-        default: () => false
-    }),
-    clarificationContext: Annotation<string>({
-        value: (x, y) => y ?? x ?? "",
-        default: () => ""
-    }),
-
-    response: Annotation<string>({
-        value: (x, y) => y ?? x ?? "",
-        default: () => ""
-    }),
+    rawAnswer: Annotation<string>(keep<string>("")),
+    validatedAnswer: Annotation<string>(keep<string>("")),
+    isValid: Annotation<boolean>(keep<boolean>(false)),
+    isHealthCheckComplete: Annotation<boolean>(keep<boolean>(false)),
+    lastValidationError: Annotation<string>(keep<string>("")),
+    pendingClarification: Annotation<boolean>(keep<boolean>(false)),
+    clarificationContext: Annotation<string>(keep<string>("")),
+    response: Annotation<string>(keep<string>("")),
 });
 
 export type HealthCheckStateType = typeof HealthCheckState.State;

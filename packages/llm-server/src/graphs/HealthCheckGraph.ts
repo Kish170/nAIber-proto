@@ -108,6 +108,11 @@ export class HealthCheckGraph {
     }
 
     private waitForAnswer(state: HealthCheckStateType) {
+        if (!state.healthCheckQuestions?.length || state.currentQuestionIndex == null) {
+            console.error('[HealthCheckGraph] waitForAnswer called with invalid state — completing early');
+            return { isHealthCheckComplete: true };
+        }
+
         const userAnswer = interrupt({
             question: state.healthCheckQuestions[state.currentQuestionIndex],
             questionIndex: state.currentQuestionIndex,
