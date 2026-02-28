@@ -22,6 +22,7 @@
         "@langchain/core": "^1.0.1",
         "@langchain/langgraph": "^1.0.1",
         "@langchain/openai": "^1.0.0",
+        "@naiber/shared-core": "*",
         "@naiber/shared-clients": "*",
         "@naiber/shared-services": "*",
         "@pinecone-database/pinecone": "^6.1.2",

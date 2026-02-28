@@ -13,6 +13,7 @@
   "dependencies": {
     "@bull-board/api": "^6.16.2",
     "@bull-board/express": "^6.16.2",
+    "@naiber/shared-core": "*",
     "@naiber/shared-clients": "*",
     "@naiber/shared-data": "*",
     "@naiber/shared-services": "*",

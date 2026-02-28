@@ -1,17 +1,10 @@
 import { Worker, Job } from 'bullmq';
+import { PostCallJobData, POST_CALL_QUEUE_NAME } from '@naiber/shared-core';
 import { OpenAIClient, VectorStoreClient, ElevenLabsClient, RedisClient } from '@naiber/shared-clients';
 import { EmbeddingService } from '@naiber/shared-services';
 import { ShallowRedisSaver } from '@langchain/langgraph-checkpoint-redis/shallow';
 import { GeneralPostCallGraph } from '../personas/general/post-call/GeneralPostCallGraph.js';
 import { HealthPostCallGraph } from '../personas/health/post-call/HealthPostCallGraph.js';
-
-export interface PostCallJobData {
-    conversationId: string;
-    userId: string;
-    isFirstCall: boolean;
-    callType: 'general' | 'health_check';
-    timestamp: number;
-}
 
 export class PostCallWorker {
     private worker: Worker<PostCallJobData>;
@@ -56,7 +49,7 @@ export class PostCallWorker {
         this.healthPostCallGraph = new HealthPostCallGraph().compile();
 
         this.worker = new Worker<PostCallJobData>(
-            'post-call-processing',
+            POST_CALL_QUEUE_NAME,
             async (job: Job<PostCallJobData>) => {
                 return await this.processJob(job);
             },

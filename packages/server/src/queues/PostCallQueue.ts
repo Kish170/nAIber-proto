@@ -1,12 +1,5 @@
 import { Queue } from 'bullmq';
-
-export interface PostCallJobData {
-    conversationId: string;
-    userId: string;
-    isFirstCall: boolean;
-    callType: 'general' | 'health_check';
-    timestamp: number;
-}
+import { PostCallJobData, POST_CALL_QUEUE_NAME } from '@naiber/shared-core';
 
 export class PostCallQueue {
     private static instance: PostCallQueue;
@@ -16,7 +9,7 @@ export class PostCallQueue {
     private constructor() {
         const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
 
-        this.queue = new Queue<PostCallJobData>('post-call-processing', {
+        this.queue = new Queue<PostCallJobData>(POST_CALL_QUEUE_NAME, {
             connection: {
                 host: new URL(redisUrl).hostname,
                 port: parseInt(new URL(redisUrl).port || '6379')
