@@ -1,5 +1,5 @@
 import { StateGraph, END } from "@langchain/langgraph";
-import { PostCallState, PostCallStateType } from "../states/PostCallState.js";
+import { PostCallState, PostCallStateType } from "./PostCallState.js";
 import {
     OpenAIClient,
     EmbeddingService,
@@ -15,7 +15,7 @@ import {
     updateConversationTopic,
     createConversationReferences,
     ReturnedTopic
-} from "../handlers/ConversationHandler.js";
+} from "../ConversationHandler.js";
 import { ConversationRepository } from "@naiber/shared";
 import cosine from 'compute-cosine-similarity';
 

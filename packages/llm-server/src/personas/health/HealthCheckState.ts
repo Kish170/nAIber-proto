@@ -1,6 +1,6 @@
 import { Annotation } from "@langchain/langgraph";
 import { BaseMessage } from "@langchain/core/messages";
-import { QuestionData } from "../handlers/questions/index.js";
+import { QuestionData } from "./questions/index.js";
 
 export interface HealthCheckAnswer {
     questionIndex: number;

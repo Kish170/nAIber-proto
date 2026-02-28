@@ -1,8 +1,8 @@
 import { BaseMessage, AIMessage, HumanMessage } from "@langchain/core/messages";
 import { StateGraph, END, Command } from "@langchain/langgraph";
 import { BaseCheckpointSaver } from "@langchain/langgraph-checkpoint";
-import { ConversationGraph } from "./ConversationGraph.js";
-import { HealthCheckGraph } from "./HealthCheckGraph.js";
+import { ConversationGraph } from "../personas/general/ConversationGraph.js";
+import { HealthCheckGraph } from "../personas/health/HealthCheckGraph.js";
 import { SupervisorState, SupervisorStateType } from "../states/SupervisorState.js";
 import { OpenAIClient, EmbeddingService, RedisClient } from "@naiber/shared";
 import { MemoryRetriever } from "../services/MemoryRetriever.js";

@@ -1,8 +1,8 @@
 import { Worker, Job } from 'bullmq';
 import { OpenAIClient, EmbeddingService, VectorStoreClient, ElevenLabsClient, RedisClient } from '@naiber/shared';
 import { ShallowRedisSaver } from '@langchain/langgraph-checkpoint-redis/shallow';
-import { GeneralPostCallGraph } from '../graphs/GeneralPostCallGraph.js';
-import { HealthPostCallGraph } from '../graphs/HealthPostCallGraph.js';
+import { GeneralPostCallGraph } from '../personas/general/post-call/GeneralPostCallGraph.js';
+import { HealthPostCallGraph } from '../personas/health/post-call/HealthPostCallGraph.js';
 
 export interface PostCallJobData {
     conversationId: string;

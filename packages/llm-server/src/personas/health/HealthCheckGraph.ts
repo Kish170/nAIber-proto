@@ -2,10 +2,10 @@ import { StateGraph, END, interrupt } from "@langchain/langgraph";
 import { BaseCheckpointSaver } from "@langchain/langgraph-checkpoint";
 import { ChatOpenAI } from "@langchain/openai";
 import { SystemMessage } from "@langchain/core/messages";
-import { HealthCheckState, HealthCheckStateType, HealthCheckAnswer } from "../states/HealthCheckState.js";
-import { HealthCheckHandler } from "../handlers/HealthCheckHandler.js";
-import { QuestionData } from "../handlers/questions/index.js";
-import { validateAnswer } from "../tools/health-tools/ValidationTools.js";
+import { HealthCheckState, HealthCheckStateType, HealthCheckAnswer } from "./HealthCheckState.js";
+import { HealthCheckHandler } from "./HealthCheckHandler.js";
+import { QuestionData } from "./questions/index.js";
+import { validateAnswer } from "./tools/ValidationTools.js";
 import { OpenAIClient } from "@naiber/shared";
 
 const MAX_RETRY_ATTEMPTS = 2;

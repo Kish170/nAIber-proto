@@ -1,4 +1,4 @@
-import type { QuestionData, ValidatedAnswer, BooleanQuestionData, ScaleQuestionData, TextQuestionData } from "../../handlers/questions/Question.js";
+import type { QuestionData, ValidatedAnswer, BooleanQuestionData, ScaleQuestionData, TextQuestionData } from "../questions/Question.js";
 
 const DEFAULT_ACCEPTED_TRUE = ['yes', 'y', 'yeah', 'yep', 'true', '1'];
 const DEFAULT_ACCEPTED_FALSE = ['no', 'n', 'nope', 'false', '0'];

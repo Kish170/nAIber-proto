@@ -1,5 +1,5 @@
 import { Annotation } from "@langchain/langgraph";
-import { ReturnedTopic } from "../handlers/ConversationHandler.js";
+import { ReturnedTopic } from "../ConversationHandler.js";
 
 export const PostCallState = Annotation.Root({
     conversationId: Annotation<string>(),
