@@ -1,5 +1,5 @@
-import { UserProfile } from "@naiber/shared";
-import { OpenAIClient } from "@naiber/shared";
+import { UserProfile } from "@naiber/shared-services";
+import { OpenAIClient } from "@naiber/shared-clients";
 
 export abstract class SystemPrompt {
     protected readonly tone = `

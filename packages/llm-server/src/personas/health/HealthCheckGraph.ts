@@ -6,7 +6,7 @@ import { HealthCheckState, HealthCheckStateType, HealthCheckAnswer } from "./Hea
 import { HealthCheckHandler } from "./HealthCheckHandler.js";
 import { QuestionData } from "./questions/index.js";
 import { validateAnswer } from "./tools/ValidationTools.js";
-import { OpenAIClient } from "@naiber/shared";
+import { OpenAIClient } from "@naiber/shared-clients";
 
 const MAX_RETRY_ATTEMPTS = 2;
 const MAX_FOLLOW_UP_QUESTIONS = 2;

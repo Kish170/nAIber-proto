@@ -1,4 +1,4 @@
-import { ElevenLabsClient, ElevenLabsConfigs, CallMessage } from '@naiber/shared';
+import { ElevenLabsClient, ElevenLabsConfigs, CallMessage } from '@naiber/shared-clients';
 import { sessionManager, SessionData } from '../services/SessionManager.js';
 
 export interface CallResult {

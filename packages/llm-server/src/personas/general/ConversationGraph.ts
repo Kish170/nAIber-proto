@@ -2,7 +2,7 @@ import { StateGraph, END } from "@langchain/langgraph";
 import { ChatOpenAI } from "@langchain/openai";
 import { SystemMessage } from "@langchain/core/messages";
 import { ConversationState, ConversationStateType } from "./ConversationState.js";
-import { EmbeddingService } from "@naiber/shared";
+import { EmbeddingService } from "@naiber/shared-services";
 import { IntentClassifier } from "../../services/IntentClassifier.js";
 import { MemoryRetriever } from "../../services/MemoryRetriever.js";
 import { TopicManager } from "../../services/TopicManager.js";

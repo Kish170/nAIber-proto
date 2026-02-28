@@ -5,7 +5,7 @@ import { LLMRouter } from './routes/LLMRoute.js'
 import { StatusRouter } from './routes/StatusRoute.js';
 import { BullBoardRouter } from './routes/BullBoardRoute.js';
 import { PostCallWorker } from './workers/PostCallWorker.js';
-import { RedisClient } from '@naiber/shared';
+import { RedisClient } from '@naiber/shared-clients';
 import { ShallowRedisSaver } from '@langchain/langgraph-checkpoint-redis/shallow';
 
 const app = express();

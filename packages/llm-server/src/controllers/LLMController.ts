@@ -1,4 +1,4 @@
-import { OpenAIClient, type ChatCompletionRequest } from "@naiber/shared";
+import { OpenAIClient, type ChatCompletionRequest } from "@naiber/shared-clients";
 import type { ChatCompletion } from 'openai/resources/index.mjs';
 import type { Stream } from 'openai/streaming.mjs';
 import OpenAI from 'openai';

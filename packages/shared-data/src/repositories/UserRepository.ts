@@ -1,5 +1,5 @@
-import { prismaClient } from '../clients/PrismaDBClient.js';
-import { userProfileInclude, UserProfileData } from '../types/database.js';
+import { prismaClient } from '@naiber/shared-clients';
+import { userProfileInclude, UserProfileData } from '@naiber/shared-core';
 
 export class UserRepository {
     static async findByPhone(phone: string): Promise<UserProfileData | null> {

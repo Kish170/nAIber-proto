@@ -1,4 +1,4 @@
-import { VectorStoreClient } from '@naiber/shared';
+import { VectorStoreClient } from '@naiber/shared-clients';
 
 export interface MemoryDocument {
     pageContent: string;

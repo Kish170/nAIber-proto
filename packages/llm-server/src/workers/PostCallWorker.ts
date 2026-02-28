@@ -1,5 +1,6 @@
 import { Worker, Job } from 'bullmq';
-import { OpenAIClient, EmbeddingService, VectorStoreClient, ElevenLabsClient, RedisClient } from '@naiber/shared';
+import { OpenAIClient, VectorStoreClient, ElevenLabsClient, RedisClient } from '@naiber/shared-clients';
+import { EmbeddingService } from '@naiber/shared-services';
 import { ShallowRedisSaver } from '@langchain/langgraph-checkpoint-redis/shallow';
 import { GeneralPostCallGraph } from '../personas/general/post-call/GeneralPostCallGraph.js';
 import { HealthPostCallGraph } from '../personas/health/post-call/HealthPostCallGraph.js';

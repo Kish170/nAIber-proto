@@ -1,5 +1,5 @@
 import { BaseStore } from '@langchain/core/stores';
-import { RedisClient } from '../clients/RedisClient.js';
+import { RedisClient } from '@naiber/shared-clients';
 
 const EMBEDDING_TTL_SECONDS = 86400;
 

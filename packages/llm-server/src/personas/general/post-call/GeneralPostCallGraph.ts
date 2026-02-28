@@ -2,12 +2,12 @@ import { StateGraph, END } from "@langchain/langgraph";
 import { PostCallState, PostCallStateType } from "./PostCallState.js";
 import {
     OpenAIClient,
-    EmbeddingService,
     VectorStoreClient,
     ElevenLabsClient,
     TranscriptMessage,
     Message
-} from "@naiber/shared";
+} from "@naiber/shared-clients";
+import { EmbeddingService } from "@naiber/shared-services";
 import {
     createSummary,
     getConversationTopics,
@@ -16,7 +16,7 @@ import {
     createConversationReferences,
     ReturnedTopic
 } from "../ConversationHandler.js";
-import { ConversationRepository } from "@naiber/shared";
+import { ConversationRepository } from "@naiber/shared-data";
 import cosine from 'compute-cosine-similarity';
 
 export class GeneralPostCallGraph {

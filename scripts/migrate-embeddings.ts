@@ -1,5 +1,6 @@
 import { PrismaClient } from '../generated/prisma/index.js';
-import { QdrantClient, OpenAIClient, RedisClient, EmbeddingService, TextPreprocessor } from '@naiber/shared';
+import { QdrantClient, OpenAIClient, RedisClient } from '@naiber/shared-clients';
+import { EmbeddingService, TextPreprocessor } from '@naiber/shared-services';
 import { randomUUID } from 'crypto';
 import 'dotenv/config';
 

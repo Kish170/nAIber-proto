@@ -10,7 +10,7 @@
   "scripts": {
     "dev": "npm run dev --workspace=@naiber/server",
     "dev:llm": "npm run dev --workspace=@naiber/llm-server",
-    "build": "npm run build --workspace=@naiber/shared && npm run build --workspace=@naiber/server && npm run build --workspace=@naiber/llm-server",
+    "build": "npm run build --workspace=@naiber/shared-core && npm run build --workspace=@naiber/shared-clients && npm run build --workspace=@naiber/shared-data && npm run build --workspace=@naiber/shared-services && npm run build --workspace=@naiber/server && npm run build --workspace=@naiber/llm-server",
     "start": "npm run start --workspace=@naiber/server",
     "clean": "npm run clean --workspaces --if-present && rm -rf node_modules",
     "lint": "npm run lint --workspaces --if-present",

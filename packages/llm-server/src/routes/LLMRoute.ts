@@ -1,7 +1,9 @@
 import { Router, Request, Response } from 'express';
 import { LLMController } from '../controllers/LLMController.js';
-import type { ChatCompletionRequest } from '@naiber/shared';
-import { RedisClient, OpenAIClient, VectorStoreClient, EmbeddingService, RedisEmbeddingStore, TwilioClient } from '@naiber/shared';
+import type { ChatCompletionRequest } from '@naiber/shared-clients';
+import { RedisClient, OpenAIClient, VectorStoreClient, TwilioClient } from '@naiber/shared-clients';
+import { EmbeddingService } from '@naiber/shared-services';
+import { RedisEmbeddingStore } from '@naiber/shared-data';
 import { BaseCheckpointSaver } from '@langchain/langgraph-checkpoint';
 import { ConversationResolver } from '../services/ConversationResolver.js';
 import { TopicManager } from '../services/TopicManager.js';

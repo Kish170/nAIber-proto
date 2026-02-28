@@ -1,4 +1,4 @@
-import { HealthRepository } from '@naiber/shared';
+import { HealthRepository } from '@naiber/shared-data';
 import { Question, QuestionData, ScaleQuestion, BooleanQuestion, TextQuestion, ValidatedAnswer } from './questions/index.js';
 
 export interface HealthCheckState {

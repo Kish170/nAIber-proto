@@ -4,7 +4,8 @@ import { BaseCheckpointSaver } from "@langchain/langgraph-checkpoint";
 import { ConversationGraph } from "../personas/general/ConversationGraph.js";
 import { HealthCheckGraph } from "../personas/health/HealthCheckGraph.js";
 import { SupervisorState, SupervisorStateType } from "../states/SupervisorState.js";
-import { OpenAIClient, EmbeddingService, RedisClient } from "@naiber/shared";
+import { OpenAIClient, RedisClient } from "@naiber/shared-clients";
+import { EmbeddingService } from "@naiber/shared-services";
 import { MemoryRetriever } from "../services/MemoryRetriever.js";
 import { TopicManager } from "../services/TopicManager.js";
 

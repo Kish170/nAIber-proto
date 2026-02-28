@@ -1,6 +1,6 @@
 import { CacheBackedEmbeddings } from "@langchain/classic/embeddings/cache_backed";
 import { InMemoryStore, BaseStore } from "@langchain/core/stores";
-import { OpenAIClient } from "../clients/OpenAIClient.js";
+import { OpenAIClient } from "@naiber/shared-clients";
 import { TextPreprocessor } from "./TextPreprocessor.js";
 
 

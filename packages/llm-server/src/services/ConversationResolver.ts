@@ -1,5 +1,5 @@
-import type { ChatCompletionRequest, Message } from '@naiber/shared';
-import { RedisClient } from '@naiber/shared';
+import type { ChatCompletionRequest, Message } from '@naiber/shared-clients';
+import { RedisClient } from '@naiber/shared-clients';
 
 export interface ResolvedConversation {
     conversationId: string;

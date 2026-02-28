@@ -1,5 +1,5 @@
 import cosine from 'compute-cosine-similarity';
-import { RedisClient } from '@naiber/shared';
+import { RedisClient } from '@naiber/shared-clients';
 import { IntentClassifier } from './IntentClassifier.js';
 
 export interface TopicState {

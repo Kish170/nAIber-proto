@@ -13,7 +13,9 @@
   "dependencies": {
     "@bull-board/api": "^6.16.2",
     "@bull-board/express": "^6.16.2",
-    "@naiber/shared": "*",
+    "@naiber/shared-clients": "*",
+    "@naiber/shared-data": "*",
+    "@naiber/shared-services": "*",
     "bullmq": "^5.66.5",
     "compromise": "^14.14.3",
     "compute-cosine-similarity": "^1.1.0",

@@ -1,4 +1,4 @@
-import { redisClient } from "@naiber/shared";
+import { redisClient } from "@naiber/shared-clients";
 
 export interface SessionData {
     callSid: string;

@@ -1,5 +1,5 @@
-import { UserProfile } from "@naiber/shared";
-import { OpenAIClient } from "@naiber/shared";
+import { UserProfile } from "@naiber/shared-services";
+import { OpenAIClient } from "@naiber/shared-clients";
 import { SystemPrompt } from "./PromptInterface.js";
 
 export class GeneralPrompt extends SystemPrompt {

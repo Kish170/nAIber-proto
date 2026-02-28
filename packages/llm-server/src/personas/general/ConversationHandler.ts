@@ -1,4 +1,4 @@
-import { ConversationRepository } from "@naiber/shared";
+import { ConversationRepository } from "@naiber/shared-data";
 
 export interface Summary {
     userId: string;

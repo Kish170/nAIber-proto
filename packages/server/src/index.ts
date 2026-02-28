@@ -4,7 +4,7 @@ import { CallController } from './controllers/CallController.js';
 import { CallController2 } from './controllers/CallController2.js';
 import { createCallRouter } from './routes/CallRoutes.js';
 import { sessionManager } from './services/SessionManager.js';
-import { prismaClient } from '@naiber/shared';
+import { prismaClient } from '@naiber/shared-clients';
 import { redisClient } from './clients/RedisClient.js';
 import { StatusRouter } from './routes/StatusRoute.js';
 import { getNgrokUrls } from './utils/ngrok.js';

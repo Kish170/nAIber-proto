@@ -1,4 +1,4 @@
-import { UserRepository } from '../repositories/UserRepository.js';
+import { UserRepository } from '@naiber/shared-data';
 import {
     UserProfileData,
     EmergencyContact,
@@ -7,7 +7,7 @@ import {
     ConversationTopic,
     ConversationSummary,
     BasicInfo
-} from '../types/database.js';
+} from '@naiber/shared-core';
 
 export class UserProfile {
     private readonly data: UserProfileData;

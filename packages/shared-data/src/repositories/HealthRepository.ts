@@ -1,4 +1,4 @@
-import { prismaClient } from '../clients/PrismaDBClient.js';
+import { prismaClient } from '@naiber/shared-clients';
 
 export interface HealthCheckLogData {
     userId: string;

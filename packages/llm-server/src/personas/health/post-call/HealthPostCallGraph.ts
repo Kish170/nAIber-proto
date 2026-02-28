@@ -1,5 +1,5 @@
 import { StateGraph, END } from '@langchain/langgraph';
-import { HealthRepository } from '@naiber/shared';
+import { HealthRepository } from '@naiber/shared-data';
 import { HealthPostCallState, HealthPostCallStateType } from './HealthPostCallState.js';
 
 export class HealthPostCallGraph {

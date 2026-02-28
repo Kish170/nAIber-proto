@@ -1,4 +1,4 @@
-import { TwilioClient, ElevenLabsConfigs, RedisClient } from '@naiber/shared';
+import { TwilioClient, ElevenLabsConfigs, RedisClient } from '@naiber/shared-clients';
 import { WebSocketServer, WebSocket } from 'ws';
 import http from 'http';
 import { WebSocketService } from '../services/WebSocketService.js';
