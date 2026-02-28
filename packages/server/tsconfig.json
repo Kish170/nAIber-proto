@@ -9,6 +9,7 @@
     "references": [
         { "path": "../shared-core" },
         { "path": "../shared-clients" },
+        { "path": "../shared-data" },
         { "path": "../shared-services" }
     ]
 }

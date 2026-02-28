@@ -92,7 +92,6 @@ export class CallController {
             const result = await this.twilioClient.createCall(this.userNumber);
 
             if (result.success && result.callSid) {
-                // Store callType temporarily for WebSocket lookup
                 const redisClient = RedisClient.getInstance();
                 await redisClient.set(`call_type:${result.callSid}`, callType, { EX: 60 });
                 console.log('[CallController] Stored callType for callSid:', result.callSid, callType);

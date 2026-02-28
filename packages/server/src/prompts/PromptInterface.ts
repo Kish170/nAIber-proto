@@ -1,4 +1,4 @@
-import { UserProfile } from "@naiber/shared-services";
+import { UserProfile } from "../handlers/UserHandler.js";
 import { OpenAIClient } from "@naiber/shared-clients";
 
 export abstract class SystemPrompt {

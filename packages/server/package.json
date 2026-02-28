@@ -24,6 +24,7 @@
         "@langchain/openai": "^1.0.0",
         "@naiber/shared-core": "*",
         "@naiber/shared-clients": "*",
+        "@naiber/shared-data": "*",
         "@naiber/shared-services": "*",
         "@pinecone-database/pinecone": "^6.1.2",
         "@prisma/client": "^6.18.0",

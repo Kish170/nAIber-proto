@@ -1,7 +1,6 @@
 import express from 'express';
 import http from 'http';
 import { CallController } from './controllers/CallController.js';
-import { CallController2 } from './controllers/CallController2.js';
 import { createCallRouter } from './routes/CallRoutes.js';
 import { sessionManager } from './services/SessionManager.js';
 import { prismaClient } from '@naiber/shared-clients';
@@ -20,11 +19,10 @@ if (ngrokUrls.baseUrl) {
 
 const app = express();
 const callController = new CallController();
-const callController2 = new CallController2();
 
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
-app.use(createCallRouter(callController, callController2));
+app.use(createCallRouter(callController));
 app.use(StatusRouter());
 const server = http.createServer(app);
 await callController.initializeWSServer(server);

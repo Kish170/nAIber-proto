@@ -1,8 +1,7 @@
 import { Router } from 'express';
 import { CallController } from '../controllers/CallController.js';
-import { CallController2 } from '../controllers/CallController2.js';
 
-export function createCallRouter(callController: CallController, callController2: CallController2): Router {
+export function createCallRouter(callController: CallController): Router {
     const router = Router();
 
     router.post('/call', async (req, res) => {
@@ -54,19 +53,6 @@ export function createCallRouter(callController: CallController, callController2
         } catch (error) {
             console.error('[CallRoutes] Error fetching sessions:', error);
             res.status(500).json({ error: 'Failed to fetch sessions' });
-        }
-    });
-
-    router.post('/call2', async (req, res) => {
-        try {
-            const result = await callController2.createCall()
-            res.json(result);
-        } catch (error) {
-            console.error('[CallRoutes] Error creating call:', error);
-            res.status(500).json({
-                success: false,
-                error: 'Failed to create call'
-            });
         }
     });
 

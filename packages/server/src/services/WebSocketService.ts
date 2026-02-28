@@ -1,5 +1,5 @@
 import { ElevenLabsClient, ElevenLabsConfigs, OpenAIClient, RedisClient, TwilioClient } from "@naiber/shared-clients";
-import { UserProfile } from "@naiber/shared-services";
+import { UserProfile } from "../handlers/UserHandler.js";
 import { WebSocket } from 'ws';
 import { buildGeneralFirstMessage, buildGeneralSystemPrompt } from '../prompts/GeneralPrompt.js';
 import { buildHealthFirstMessage, buildHealthSystemPrompt } from '../prompts/HealthPrompt.js';
