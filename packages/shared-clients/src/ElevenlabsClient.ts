@@ -26,7 +26,6 @@ export interface TranscriptData {
     }>;
 }
 
-
 export class ElevenLabsClient {
     private client: AxiosInstance;
     private configs: ElevenLabsConfigs;
