@@ -62,3 +62,15 @@ Before starting work, check if any of these are relevant:
 - `docs/decisions/adr-004-bullmq-postcall.md` — why BullMQ for post-call processing
 
 Each package has its own `CLAUDE.md` with module-specific context, gotchas, and dependency rules.
+
+## Workflow Prompts
+Reusable prompt templates for common task types. Reference these to structure your approach before starting:
+
+| Prompt | When to use |
+|---|---|
+| `.claude/prompts/planning.md` | Before implementing any feature — explore first, challenge the approach, get approval before writing code |
+| `.claude/prompts/debugging.md` | When diagnosing an issue — trace before fixing, check common nAIber gotchas (ESM, Docker, Redis, checkpoint version) |
+| `.claude/prompts/testing.md` | When writing or verifying tests — follow existing patterns, cover unhappy paths, verify with build |
+| `.claude/prompts/understanding.md` | When explaining or navigating the codebase — orient by layer, explain purpose before implementation |
+| `.claude/prompts/arch-review.md` | When reviewing code for architectural quality — check coupling, cohesion, contracts, and persona boundaries |
+| `.claude/prompts/stuck.md` | After 2+ failed attempts — stop, summarize what failed, propose 3 different approaches, wait for approval |

@@ -1,4 +1,3 @@
-# Node.js
 node_modules/
 .env
 .env.bak
@@ -6,24 +5,20 @@ node_modules/
 dist/
 build/
 
-# Logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# OS files
-.DS_Store
-
 /generated/prisma
 
-# Redis
 /dump.rdb
 *.rdb
 
-# ngrok (contains auth token - don't commit!)
 /ngrok-local.yml
 /ngrok.yml
 
 *.tsbuildinfo
 
-.claude
+.DS_Store
+*.swp
+*.swo

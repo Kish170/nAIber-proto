@@ -1,0 +1,37 @@
+# Dependencies
+node_modules/
+packages/*/node_modules/
+
+# Build output
+packages/*/dist/
+packages/*/build/
+
+# Generated files
+generated/
+packages/*/.tsbuildinfo
+*.tsbuildinfo
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+logs/
+
+# Test coverage
+coverage/
+packages/*/coverage/
+
+# OS / editor artifacts
+.DS_Store
+*.swp
+*.swo
+
+# Prisma migrations (schema is enough for context)
+prisma/migrations/
+
+# Lock files (package.json is enough for dependency context)
+package-lock.json
+packages/*/package-lock.json
