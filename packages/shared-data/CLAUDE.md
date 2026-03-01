@@ -19,3 +19,7 @@ Repositories (Prisma data access) and stores (Redis caching).
 ## Dependents
 - `@naiber/server` (system prompts for personas use UserRepository)
 - `@naiber/llm-server` (persona graphs use ConversationRepository, HealthRepository; LLMRoute uses RedisEmbeddingStore)
+
+## Reference Docs
+- `docs/arch/shared.md` — shared packages architecture: what this layer owns, dependency direction, gotchas
+- `docs/decisions/adr-003-shared-split.md` — why shared code is split into 4 layered packages

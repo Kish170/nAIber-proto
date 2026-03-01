@@ -34,3 +34,7 @@ External service connections. Each client is a standalone wrapper around a third
 - `RedisClient` and `PrismaDBClient` are singletons — do not instantiate multiple times.
 - Interface types (`ChatCompletionRequest`, `ElevenLabsConfigs`, etc.) are exported from the client files, not from shared-core.
 - `QdrantClient.ts` is technically not needed but keep for now; `VectorStoreClient.ts` is the Vector Store client with Langchain support.
+
+## Reference Docs
+- `docs/arch/shared.md` — shared packages architecture: what this layer owns, singleton rules, dependency direction
+- `docs/decisions/adr-003-shared-split.md` — why shared code is split into 4 layered packages

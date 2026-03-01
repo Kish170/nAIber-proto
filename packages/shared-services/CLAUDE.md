@@ -18,3 +18,7 @@ Business logic utilities shared across server packages.
 
 ## Dependents
 - `@naiber/llm-server` (uses `EmbeddingService` in graphs, workers, and LLMRoute)
+
+## Reference Docs
+- `docs/arch/shared.md` — shared packages architecture: what this layer owns, dependency direction, gotchas
+- `docs/decisions/adr-003-shared-split.md` — why shared code is split into 4 layered packages

@@ -16,7 +16,7 @@ Twilio → server:3000 (WSS) → ElevenLabs ↔ llm-server:3001
 | `@naiber/shared-core` | — | Types only: Prisma types, BullMQ contracts |
 | `@naiber/shared-clients` | — | External clients (OpenAI, Twilio, Redis, Qdrant, etc.) |
 | `@naiber/shared-data` | — | Repositories (Prisma) + stores (Redis) |
-| `@naiber/shared-services` | — | Utilities (embeddings, text preprocessing, user handler) |
+| `@naiber/shared-services` | — | Utilities (embeddings, text preprocessing) |
 
 ## Build Order
 ```
@@ -42,7 +42,23 @@ Run `npm run build`. Each package uses `tsc --build` with project references.
 
 ## Reference Docs
 Before starting work, check if any of these are relevant:
-- `docs/arch.md` — system architecture and persona design
-- `docs/prd.md` — product requirements
-- Each package has its own `CLAUDE.md` with module-specific context,
-  gotchas, and dependency rules
+
+**Architecture**
+- `docs/glossary.md` — terminology and concept disambiguation (read first if unsure about a term)
+- `docs/arch/overview.md` — full system map: call flow, package roles, Redis keys, design rationale
+- `docs/arch/server.md` — telephony layer deep dive (call lifecycle, prompts, session management)
+- `docs/arch/llm-server.md` — AI orchestration deep dive (SupervisorGraph, persona graphs, RAG, post-call)
+- `docs/arch/shared.md` — shared packages deep dive (dependency direction, what each layer owns)
+
+**Personas / Product**
+- `docs/prds/personas/general.md` — general conversation persona requirements and memory behaviour
+- `docs/prds/personas/health.md` — health check persona requirements, Q&A flow, validation rules
+- `docs/prds/personas/cognitive.md` — cognitive assessment design (placeholder — read before implementing)
+
+**Decisions**
+- `docs/decisions/adr-001-langgraph.md` — why LangGraph for AI orchestration
+- `docs/decisions/adr-002-elevenlabs-routing.md` — why ElevenLabs calls llm-server directly
+- `docs/decisions/adr-003-shared-split.md` — why shared code is split into 4 packages
+- `docs/decisions/adr-004-bullmq-postcall.md` — why BullMQ for post-call processing
+
+Each package has its own `CLAUDE.md` with module-specific context, gotchas, and dependency rules.

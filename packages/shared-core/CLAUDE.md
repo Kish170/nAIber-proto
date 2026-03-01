@@ -15,3 +15,7 @@ Zero-dependency types package. The foundation layer — every other shared packa
 ## Gotchas
 - `database.ts` imports from `../../../../generated/prisma/index.js` — this relative path is sensitive to directory depth. If you move the file, update the path.
 - Any new queue or job type should be added to `queue-contracts.ts`, not defined locally in producer/consumer packages.
+
+## Reference Docs
+- `docs/arch/shared.md` — shared packages architecture: dependency direction, what each layer owns, import conventions
+- `docs/decisions/adr-003-shared-split.md` — why shared code is split into 4 layered packages

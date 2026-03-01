@@ -55,3 +55,13 @@ LangGraph AI orchestration — SupervisorGraph routes incoming messages to perso
 - Bull Board dashboard at `/admin/queues` for queue monitoring.
 - PostCallWorker concurrency is 1, rate limited to 3 jobs per 60s.
 - Health check call-end has a 5s delay via `scheduleCallEnd()` in LLMRoute.
+
+## Reference Docs
+- `docs/arch/llm-server.md` — deep dive on this package: SupervisorGraph, ConversationGraph RAG pipeline, HealthCheckGraph durable execution, PostCallWorker
+- `docs/arch/overview.md` — full system context and how llm-server fits into the end-to-end flow
+- `docs/personas/general.md` — general conversation persona requirements (RAG behaviour, memory intent, edge cases)
+- `docs/personas/health.md` — health check persona requirements (question flow, validation rules, post-call expectations)
+- `docs/personas/cognitive.md` — cognitive assessment design spec (read before implementing CognitiveGraph)
+- `docs/decisions/adr-001-langgraph.md` — why LangGraph and the graph: any + setEntryPoint() convention
+- `docs/decisions/adr-002-elevenlabs-routing.md` — why ElevenLabs calls this server directly
+- `docs/decisions/adr-004-bullmq-postcall.md` — why BullMQ and PostCallWorker design constraints

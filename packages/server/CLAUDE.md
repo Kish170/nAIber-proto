@@ -57,3 +57,10 @@ Telephony layer — handles Twilio webhooks, ElevenLabs WebSocket sessions, and 
 - PostCallQueue deduplicates by conversationId with a 5-minute TTL.
 - Post-call job fires with a 3s delay to allow transcript readiness.
 - WebSocket keepalive to ElevenLabs runs every 30s.
+
+## Reference Docs
+- `docs/arch/server.md` — deep dive on this package: call lifecycle, prompt architecture, session management, Redis keys
+- `docs/arch/overview.md` — full system context and how server fits into the end-to-end flow
+- `docs/personas/general.md` — general conversation persona requirements (prompts, memory, edge cases)
+- `docs/personas/health.md` — health check persona requirements (prompt expectations, first message)
+- `docs/decisions/adr-002-elevenlabs-routing.md` — why ElevenLabs calls llm-server directly instead of server proxying
