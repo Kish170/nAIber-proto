@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { LLMController } from '../controllers/LLMController.js';
 import type { ChatCompletionRequest } from '@naiber/shared-clients';
-import { RedisClient, OpenAIClient, VectorStoreClient, TwilioClient } from '@naiber/shared-clients';
+import { RedisClient, OpenAIClient, TwilioClient } from '@naiber/shared-clients';
 import { EmbeddingService } from '@naiber/shared-services';
 import { RedisEmbeddingStore } from '@naiber/shared-data';
 import { BaseCheckpointSaver } from '@langchain/langgraph-checkpoint';
@@ -9,6 +9,7 @@ import { ConversationResolver } from '../services/ConversationResolver.js';
 import { TopicManager } from '../services/TopicManager.js';
 import { MemoryRetriever } from '../services/MemoryRetriever.js';
 import { SupervisorGraph } from '../graphs/SupervisorGraph.js';
+import { VectorStoreClient } from '../clients/VectorStoreClient.js';
 import { HumanMessage, AIMessage, SystemMessage } from "@langchain/core/messages";
 
 const END_CALL_DELAY_MS = 5000;

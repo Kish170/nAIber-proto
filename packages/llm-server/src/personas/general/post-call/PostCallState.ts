@@ -62,6 +62,31 @@ export const PostCallState = Annotation.Root({
         default: () => []
     }),
 
+    callType: Annotation<'general' | 'health_check'>({
+        value: (x, y) => y ?? x ?? 'general',
+        default: () => 'general'
+    }),
+
+    highlightEntries: Annotation<Array<{
+        text: string;
+        qdrantPointId: string;
+        embedding: number[];
+    }>>({
+        value: (x, y) => y ?? x ?? [],
+        default: () => []
+    }),
+
+    extractedPersons: Annotation<Array<{
+        id: string;
+        name: string;
+        role?: string;
+        context: string;
+        highlightIndices: number[];
+    }>>({
+        value: (x, y) => y ?? x ?? [],
+        default: () => []
+    }),
+
     errors: Annotation<string[]>({
         reducer: (x, y) => x.concat(y),
         default: () => []

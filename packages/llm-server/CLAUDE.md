@@ -4,7 +4,7 @@ LangGraph AI orchestration — SupervisorGraph routes incoming messages to perso
 ## Communication
 - **Receives:** `POST /v1/chat/completions` from ElevenLabs (OpenAI-compatible format). ElevenLabs calls this endpoint directly — server does NOT proxy.
 - **Consumes:** BullMQ `post-call-processing` jobs dispatched by server's PostCallQueue.
-- **Calls out to:** OpenAI API (chat + embeddings), Qdrant (vector search), Twilio (end-call scheduling).
+- **Calls out to:** OpenAI API (chat + embeddings), Qdrant (vector search), Neo4j (knowledge graph), Twilio (end-call scheduling).
 - **Exposes:** `GET /admin/queues` (Bull Board dashboard), `GET /status` (health check).
 
 ## Request Lifecycle
@@ -13,7 +13,7 @@ LangGraph AI orchestration — SupervisorGraph routes incoming messages to perso
 3. **Routing** — `SupervisorGraph` determines call type, dispatches to `ConversationGraph` (general) or `HealthCheckGraph` (health).
 4. **Response** — Graph returns response, LLMRoute sends it back to ElevenLabs as SSE stream.
 5. **Health check completion** — When health check finishes, `scheduleCallEnd()` tells Twilio to hang up after 5s delay.
-6. **Post-call** — `PostCallWorker` picks up BullMQ job. General: runs topic extraction + RAG embedding. Health: reads checkpoint answers, persists to DB, deletes thread.
+6. **Post-call** — `PostCallWorker` picks up BullMQ job. General: runs topic extraction + RAG embedding + KG population (nodes then relationships). Health: reads checkpoint answers, persists to DB, deletes thread.
 
 ## Environment
 - `LLM_PORT` — Server port (default 3001)
@@ -24,11 +24,17 @@ LangGraph AI orchestration — SupervisorGraph routes incoming messages to perso
 - `ELEVENLABS_API_KEY`, `ELEVENLABS_AGENT_ID`, `ELEVENLABS_BASE_URL`, `ELEVENLABS_NUMBER_ID` — For PostCallWorker's ElevenLabs client
 - `RAG_ENABLED` — Toggle RAG feature (default true, set `'false'` to disable)
 - `RAG_MEMORY_SIMILARITY_THRESHOLD` — Cosine similarity threshold (default 0.45)
+- `NEO4J_URI` — Neo4j bolt URI (default `bolt://neo4j:7687`)
+- `NEO4J_USERNAME` — Neo4j username (default `neo4j`)
+- `NEO4J_PASSWORD` — Neo4j password
 
 ## What It Owns
 - `graphs/SupervisorGraph.ts` — Top-level router. Decides which persona graph handles a message.
 - `personas/` — Persona-specific graphs, states, handlers (see subdirectory CLAUDE.md files).
 - `services/` — LLM-specific services (IntentClassifier, ConversationResolver, MemoryRetriever, TopicManager, HealthDataService).
+- `services/graph/` — KG-specific services: `NERService` (person extraction from transcript), `KGPopulationService` (node + relationship creation via GraphRepository).
+- `clients/` — Server-local clients: `VectorStoreClient` (Qdrant via LangChain), `Neo4jClient` (singleton Neo4j driver).
+- `repositories/GraphRepository.ts` — Neo4j Cypher operations for all KG node merges and relationship upserts.
 - `workers/PostCallWorker.ts` — BullMQ consumer. Processes post-call jobs dispatched by server.
 - `routes/LLMRoute.ts` — `POST /v1/chat/completions` (OpenAI-compatible). ElevenLabs sends messages here.
 
@@ -43,7 +49,7 @@ LangGraph AI orchestration — SupervisorGraph routes incoming messages to perso
 - `@naiber/shared-data` (ConversationRepository, HealthRepository, RedisEmbeddingStore)
 - `@naiber/shared-services` (EmbeddingService)
 - `@langchain/langgraph`, `@langchain/langgraph-checkpoint`, `@langchain/langgraph-checkpoint-redis`
-- `bullmq`, `express`, `compromise`, `compute-cosine-similarity`
+- `bullmq`, `express`, `compromise`, `compute-cosine-similarity`, `neo4j-driver`
 
 ## Key Patterns
 - LangGraph `StateGraph` uses `graph: any` + `setEntryPoint()` to avoid TS strict type issues.

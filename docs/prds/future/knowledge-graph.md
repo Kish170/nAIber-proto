@@ -1,6 +1,6 @@
 # Knowledge Graph Integration
 
-> **Status:** Design — not yet implemented
+> **Status:** In Progress — core implementation complete, RAG retrieval layer pending
 > **Target DB:** Neo4j
 > **Purpose:** Hybrid RAG (vector + graph) for General Conversation persona
 > **Last updated:** 2026-03-01
@@ -193,10 +193,82 @@ Computing "how well a summary covers a highlight" requires embedding similarity 
 
 ---
 
+## Post-Call Integration Plan
+
+### Updated GeneralPostCallGraph Flow
+
+```
+fetch_transcript → generate_summary → match_topics → update_topics → store_embeddings
+    → extract_persons → populate_kg_nodes → populate_kg_relationships → END
+```
+
+### Prerequisite: Qdrant Point IDs
+
+`VectorStoreClient.addMemories` must be refactored to support pre-generated UUIDs. The current implementation uses LangChain's `addDocuments` which auto-generates IDs internally. The KG requires `qdrantPointId` on every Highlight node.
+
+Approach: generate UUIDs + embeddings before Qdrant insertion, pass explicit IDs to Qdrant, store `highlightEntries[]` in PostCallState for downstream KG nodes.
+
+### New PostCallState Fields
+
+```typescript
+// From refactored store_embeddings
+highlightEntries: Array<{
+    text: string;
+    qdrantPointId: string;
+    embedding: number[];
+}>
+
+// From extract_persons (NER)
+extractedPersons: Array<{
+    id: string;
+    name: string;
+    role?: string;
+    context: string;
+    highlightIndices: number[];
+}>
+
+// From PostCallWorker job data
+callType: 'general' | 'health_check'
+```
+
+### New Services
+
+```
+src/services/graph/
+    NERService.ts              — LLM-based person extraction from transcript
+    KGPopulationService.ts     — orchestrates node + relationship creation via GraphRepository
+```
+
+### New Graph Nodes
+
+| Node | Responsibility |
+|------|---------------|
+| `extract_persons` | NER on transcript → extract person names, roles, context via NERService |
+| `populate_kg_nodes` | Merge all KG nodes in order: User → Conversation → Summary → Highlights → Topics → Persons |
+| `populate_kg_relationships` | Create all edges with computed weights (see Edge Weighting below) |
+
+### Edge Weighting Strategy (per post-call)
+
+| Edge | Weight | Computation |
+|------|--------|-------------|
+| `User-MENTIONS->Topic` | `count` + `lastSeen`/`firstSeen` | Increment count, update lastSeen on each post-call |
+| `Highlight-MENTIONS->Topic` | `similarityScore` | Cosine similarity: highlight embedding (from `highlightEntries`) vs topic embedding (from Postgres) |
+| `Summary-MENTIONS->Topic` | `similarityScore` | Reuse similarity from `match_topics` node (`topicMatchResults[].similarity`) |
+| `Topic-RELATED_TO->Topic` | `coOccurrenceCount`, `strength` | Increment coOccurrenceCount for all topic pairs in same conversation |
+| `User-INTERESTED_IN->Topic` | `strength`, `count` | Derived from MENTIONS (v1.5 — not per post-call, periodic computation) |
+
+**Deferred:** PageRank, degree centrality, betweenness centrality on Topic nodes — future periodic batch job via Neo4j GDS library.
+
+### v1 Defaults
+
+- `Highlight.importanceScore` = 1.0 (computed scoring deferred)
+- `Highlight.mood` = undefined (sentiment extraction deferred)
+
+---
+
 ## Open Questions
 
 - **importanceScore computation:** How should highlight importance be scored? Options: LLM-based scoring during post-call, embedding distinctiveness, or manual heuristic (e.g., length + sentiment).
 - **INTERESTED_IN threshold:** What count and recency window defines "interest" vs "mention"? Needs tuning with real data.
-- **Topic-RELATED_TO computation:** Co-occurrence within conversations vs embedding similarity vs both? Co-occurrence is cheaper but sparser.
-- **NER model selection (v2):** Which NER approach for Person extraction — LLM-based (more accurate, slower) or spaCy/dedicated model (faster, less context-aware)?
 - **Backfill strategy:** How to populate the KG from existing Postgres + Qdrant data for users with conversation history.
+- **NER prompt tuning:** Conversational elderly speech has indirect references ("my daughter", "the doctor"). NER prompt needs domain-specific tuning to avoid false positives and extract roles correctly.

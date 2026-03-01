@@ -2,7 +2,6 @@ import { StateGraph, END } from "@langchain/langgraph";
 import { PostCallState, PostCallStateType } from "./PostCallState.js";
 import {
     OpenAIClient,
-    VectorStoreClient,
     ElevenLabsClient,
     TranscriptMessage,
     Message
@@ -18,6 +17,9 @@ import {
 } from "../ConversationHandler.js";
 import { ConversationRepository } from "@naiber/shared-data";
 import cosine from 'compute-cosine-similarity';
+import { VectorStoreClient } from "../../../clients/VectorStoreClient.js";
+import { NERService } from "../../../services/graph/NERService.js";
+import { KGPopulationService } from "../../../services/graph/KGPopulationService.js";
 
 export class GeneralPostCallGraph {
     private graph: any;
@@ -25,6 +27,8 @@ export class GeneralPostCallGraph {
     private embeddingService: EmbeddingService;
     private vectorStore: VectorStoreClient;
     private elevenLabsClient: ElevenLabsClient;
+    private nerService: NERService;
+    private kgPopulationService: KGPopulationService;
     private similarityThreshold: number = 0.78;
 
     constructor(openAIClient: OpenAIClient, embeddingService: EmbeddingService, vectorStore: VectorStoreClient, elevenLabsClient: ElevenLabsClient) {
@@ -32,6 +36,8 @@ export class GeneralPostCallGraph {
         this.embeddingService = embeddingService;
         this.vectorStore = vectorStore;
         this.elevenLabsClient = elevenLabsClient;
+        this.nerService = new NERService(openAIClient);
+        this.kgPopulationService = new KGPopulationService();
 
         this.graph = new StateGraph(PostCallState);
 
@@ -40,12 +46,18 @@ export class GeneralPostCallGraph {
         this.graph.addNode("match_topics", this.matchTopics.bind(this));
         this.graph.addNode("update_topics", this.updateTopics.bind(this));
         this.graph.addNode("store_embeddings", this.storeEmbeddings.bind(this));
+        this.graph.addNode("extract_persons", this.extractPersons.bind(this));
+        this.graph.addNode("populate_kg_nodes", this.populateKGNodes.bind(this));
+        this.graph.addNode("populate_kg_relationships", this.populateKGRelationships.bind(this));
 
         this.graph.addEdge("fetch_transcript", "generate_summary");
         this.graph.addEdge("generate_summary", "match_topics");
         this.graph.addEdge("match_topics", "update_topics");
         this.graph.addEdge("update_topics", "store_embeddings");
-        this.graph.addEdge("store_embeddings", END);
+        this.graph.addEdge("store_embeddings", "extract_persons");
+        this.graph.addEdge("extract_persons", "populate_kg_nodes");
+        this.graph.addEdge("populate_kg_nodes", "populate_kg_relationships");
+        this.graph.addEdge("populate_kg_relationships", END);
 
         this.graph.setEntryPoint("fetch_transcript");
     }
@@ -327,22 +339,99 @@ export class GeneralPostCallGraph {
                 return {};
             }
 
-            const highlights = state.summary.keyHighlights;
+            const metadata = {
+                userId: state.userId,
+                conversationId: state.conversationId,
+                createdAt: new Date().toISOString(),
+                summaryId: state.summaryId ?? undefined
+            };
 
-            if (highlights.length > 0) {
-                await this.vectorStore.addMemories(highlights, {
-                    userId: state.userId,
-                    conversationId: state.conversationId,
-                    createdAt: new Date().toISOString(),
-                    summaryId: state.summaryId ?? undefined
-                });
-                console.log(`[PostCallGraph] Stored ${highlights.length} highlights in vector database`);
+            const highlightEntries = await Promise.all(
+                state.summary.keyHighlights.map(async (text) => {
+                    const { embedding } = await this.embeddingService.generateEmbedding(text);
+                    return {
+                        text,
+                        embedding,
+                        id: crypto.randomUUID()
+                    };
+                })
+            );
+
+            await this.vectorStore.addMemoriesWithIds(highlightEntries, metadata);
+            console.log(`[PostCallGraph] Stored ${highlightEntries.length} highlights in vector database`);
+
+            return { highlightEntries };
+
+        } catch (error) {
+            const errorMsg = `Failed to store embeddings: ${error instanceof Error ? error.message : 'Unknown error'}`;
+            console.error('[PostCallGraph]', errorMsg);
+            return { errors: [errorMsg] };
+        }
+    }
+
+    private async populateKGRelationships(state: PostCallStateType) {
+        try {
+            console.log('[PostCallGraph] Populating KG relationships');
+
+            if (state.errors.length > 0) {
+                console.log('[PostCallGraph] Skipping KG relationship population due to previous errors');
+                return {};
             }
+
+            await this.kgPopulationService.populateRelationships(state);
+            console.log('[PostCallGraph] KG relationships populated successfully');
 
             return { completed: true };
 
         } catch (error) {
-            const errorMsg = `Failed to store embeddings: ${error instanceof Error ? error.message : 'Unknown error'}`;
+            const errorMsg = `Failed to populate KG relationships: ${error instanceof Error ? error.message : 'Unknown error'}`;
+            console.error('[PostCallGraph]', errorMsg);
+            return { errors: [errorMsg] };
+        }
+    }
+
+    private async populateKGNodes(state: PostCallStateType) {
+        try {
+            console.log('[PostCallGraph] Populating KG nodes');
+
+            if (state.errors.length > 0) {
+                console.log('[PostCallGraph] Skipping KG node population due to previous errors');
+                return {};
+            }
+
+            await this.kgPopulationService.populateNodes(state);
+            console.log('[PostCallGraph] KG nodes populated successfully');
+
+            return {};
+
+        } catch (error) {
+            const errorMsg = `Failed to populate KG nodes: ${error instanceof Error ? error.message : 'Unknown error'}`;
+            console.error('[PostCallGraph]', errorMsg);
+            return { errors: [errorMsg] };
+        }
+    }
+
+    private async extractPersons(state: PostCallStateType) {
+        try {
+            console.log('[PostCallGraph] Extracting persons via NER');
+
+            if (state.errors.length > 0) {
+                console.log('[PostCallGraph] Skipping NER due to previous errors');
+                return {};
+            }
+
+            if (!state.transcript) {
+                console.log('[PostCallGraph] No transcript available for NER');
+                return {};
+            }
+
+            const extractedPersons = await this.nerService.extractPersons(state.transcript);
+            console.log(`[PostCallGraph] Extracted ${extractedPersons.length} person(s) from transcript`);
+
+            return { extractedPersons };
+
+        } catch (error) {
+            const errorMsg = `Failed to extract persons: ${error instanceof Error ? error.message : 'Unknown error'}`;
             console.error('[PostCallGraph]', errorMsg);
             return { errors: [errorMsg] };
         }

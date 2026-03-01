@@ -7,6 +7,12 @@ export interface VectorStoreConfigs {
     collectionName: string;
 }
 
+export interface HighlightEntry {
+    text: string;
+    embedding: number[];
+    id: string;
+}
+
 export class VectorStoreClient {
     private vectorStore: QdrantVectorStore;
 
@@ -35,6 +41,17 @@ export class VectorStoreClient {
         }));
 
         await this.vectorStore.addDocuments(documents);
+    }
+    
+    async addMemoriesWithIds(
+        entries: HighlightEntry[],
+        metadata: { userId: string; conversationId: string; createdAt?: string; summaryId?: string }
+    ): Promise<void> {
+        await this.vectorStore.addVectors(
+            entries.map(e => e.embedding),
+            entries.map(e => ({ pageContent: e.text, metadata })),
+            { ids: entries.map(e => e.id) }
+        );
     }
 
     async searchByEmbedding(embedding: number[], userId: string, k: number = 5) {

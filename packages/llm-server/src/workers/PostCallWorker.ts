@@ -1,10 +1,11 @@
 import { Worker, Job } from 'bullmq';
 import { PostCallJobData, POST_CALL_QUEUE_NAME } from '@naiber/shared-core';
-import { OpenAIClient, VectorStoreClient, ElevenLabsClient, RedisClient } from '@naiber/shared-clients';
+import { OpenAIClient, ElevenLabsClient, RedisClient } from '@naiber/shared-clients';
 import { EmbeddingService } from '@naiber/shared-services';
 import { ShallowRedisSaver } from '@langchain/langgraph-checkpoint-redis/shallow';
 import { GeneralPostCallGraph } from '../personas/general/post-call/GeneralPostCallGraph.js';
 import { HealthPostCallGraph } from '../personas/health/post-call/HealthPostCallGraph.js';
+import { VectorStoreClient } from '../clients/VectorStoreClient.js';
 
 export class PostCallWorker {
     private worker: Worker<PostCallJobData>;
@@ -97,6 +98,7 @@ export class PostCallWorker {
                     conversationId,
                     userId,
                     isFirstCall,
+                    callType,
                     transcript: '',
                 });
 
