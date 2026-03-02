@@ -23,7 +23,7 @@ export class Neo4jClient {
             { disableLosslessIntegers: true }
         );
 
-        this.database = configs.database ?? 'naiber-kg';
+        this.database = configs.database ?? 'nAIber-KG';
     }
 
     static getInstance(configs?: Neo4jClientConfigs): Neo4jClient {

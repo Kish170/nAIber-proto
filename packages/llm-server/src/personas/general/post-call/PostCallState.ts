@@ -87,6 +87,16 @@ export const PostCallState = Annotation.Root({
         default: () => []
     }),
 
+    callDurationMinutes: Annotation<number | null>({
+        value: (x, y) => y ?? x ?? null,
+        default: () => null
+    }),
+
+    callDate: Annotation<string>({
+        value: (x, y) => y ?? x ?? '',
+        default: () => ''
+    }),
+
     errors: Annotation<string[]>({
         reducer: (x, y) => x.concat(y),
         default: () => []

@@ -7,6 +7,7 @@ import { BullBoardRouter } from './routes/BullBoardRoute.js';
 import { PostCallWorker } from './workers/PostCallWorker.js';
 import { RedisClient } from '@naiber/shared-clients';
 import { ShallowRedisSaver } from '@langchain/langgraph-checkpoint-redis/shallow';
+import { Neo4jClient } from './clients/Neo4jClient.js';
 
 const app = express();
 
@@ -21,11 +22,20 @@ const PORT = process.env.LLM_PORT || 3001;
 const redisClient = RedisClient.getInstance();
 const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
 
+const neo4jClient = Neo4jClient.getInstance({
+  uri: process.env.NEO4J_URI || 'bolt://neo4j:7687',
+  username: process.env.NEO4J_USERNAME || 'neo4j',
+  password: process.env.NEO4J_PASSWORD || '',
+  database: process.env.NEO4J_DATABASE,
+});
+
 let postCallWorker: PostCallWorker | null = null;
 let checkpointer: ShallowRedisSaver | null = null;
 
 redisClient.connect().then(async () => {
   console.log('[LLM Server] Redis connected');
+
+  await neo4jClient.verifyConnectivity();
 
   checkpointer = await ShallowRedisSaver.fromUrl(REDIS_URL);
   console.log('[LLM Server] ShallowRedisSaver checkpointer initialized');
@@ -74,6 +84,13 @@ async function gracefulShutdown(signal: string): Promise<void> {
       }
     } catch (error) {
       console.error('Error closing RedisSaver:', error);
+    }
+
+    try {
+      await neo4jClient.closeDriver();
+      console.log('Neo4j driver closed');
+    } catch (error) {
+      console.error('Error closing Neo4j driver:', error);
     }
 
     try {

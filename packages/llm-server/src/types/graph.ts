@@ -6,7 +6,6 @@ export interface UserNode {
 export interface TopicNode {
     topicId: string;
     label: string;
-    category?: string;
     variations: string[];
     createdAt: string;
     lastUpdated: string;
@@ -16,7 +15,6 @@ export interface HighlightNode {
     id: string;
     qdrantPointId: string;
     text: string;
-    mood?: string;
     importanceScore: number;
     createdAt: string;
 }
@@ -29,10 +27,10 @@ export interface SummaryNode {
 
 export interface ConversationNode {
     conversationId: string;
-    startedAt: string;
-    endedAt?: string;
+    date: string;
+    durationMinutes: number | null;
     callType: 'general' | 'health_check';
-    outcome?: string;
+    outcome: string;
 }
 
 export interface PersonNode {

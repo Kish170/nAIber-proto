@@ -17,8 +17,10 @@ export class KGPopulationService {
 
             await repo.mergeConversation({
                 conversationId: state.conversationId,
-                startedAt: now,
+                date: state.callDate || now.split('T')[0],
+                durationMinutes: state.callDurationMinutes,
                 callType: state.callType,
+                outcome: 'completed',
             });
 
             if (state.summaryId && state.summary) {
@@ -95,8 +97,6 @@ export class KGPopulationService {
                     highlightQdrantPointId: entry.qdrantPointId,
                 });
             }
-
-            //check after here
 
             for (const match of state.topicMatchResults) {
                 const topic = topics.find(t =>

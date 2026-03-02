@@ -76,7 +76,13 @@ export class GeneralPostCallGraph {
 
             console.log('[PostCallGraph] Transcript retrieved successfully');
 
-            return { transcript: JSON.stringify(transcript) };
+            const lastMsg = transcript[transcript.length - 1];
+            const callDurationMinutes = lastMsg?.time_in_call_secs != null
+                ? Math.round(lastMsg.time_in_call_secs / 60)
+                : null;
+            const callDate = new Date().toISOString().split('T')[0];
+
+            return { transcript: JSON.stringify(transcript), callDurationMinutes, callDate };
 
         } catch (error) {
             const errorMsg = `Failed to fetch transcript: ${error instanceof Error ? error.message : 'Unknown error'}`;
@@ -360,7 +366,13 @@ export class GeneralPostCallGraph {
             await this.vectorStore.addMemoriesWithIds(highlightEntries, metadata);
             console.log(`[PostCallGraph] Stored ${highlightEntries.length} highlights in vector database`);
 
-            return { highlightEntries };
+            return {
+                highlightEntries: highlightEntries.map(e => ({
+                    text: e.text,
+                    embedding: e.embedding,
+                    qdrantPointId: e.id,
+                }))
+            };
 
         } catch (error) {
             const errorMsg = `Failed to store embeddings: ${error instanceof Error ? error.message : 'Unknown error'}`;

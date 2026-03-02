@@ -17,13 +17,18 @@ export interface ElevenLabsConfigs {
 export interface TranscriptMessage {
     message: string;
     role: string;
+    time_in_call_secs?: number;
 }
 
 export interface TranscriptData {
     transcript?: Array<{
         message: any;
         role: string;
+        time_in_call_secs?: number;
     }>;
+    metadata?: {
+        start_time_unix_secs?: number;
+    };
 }
 
 export class ElevenLabsClient {
@@ -97,7 +102,8 @@ export class ElevenLabsClient {
                     .filter((turn) => turn.message)
                     .map((turn) => ({
                         message: turn.message,
-                        role: turn.role
+                        role: turn.role,
+                        time_in_call_secs: turn.time_in_call_secs,
                     }));
             }
             await new Promise(resolve => setTimeout(resolve, delayMs));

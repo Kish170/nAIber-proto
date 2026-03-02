@@ -34,7 +34,7 @@ export class GraphRepository {
         try {
             await this.session.run(
                 `MERGE (u:User {userId: $userId})
-                 SET u.name = $name`,
+                 ON CREATE SET u.name = $name`,
                 params
             );
         } catch (error) {
@@ -48,7 +48,6 @@ export class GraphRepository {
             await this.session.run(
                 `MERGE (t:Topic {topicId: $topicId})
                  SET t.label       = $label,
-                     t.category    = $category,
                      t.variations  = $variations,
                      t.createdAt   = $createdAt,
                      t.lastUpdated = $lastUpdated`,
@@ -66,7 +65,6 @@ export class GraphRepository {
                 `MERGE (h:Highlight {qdrantPointId: $qdrantPointId})
                  SET h.id              = $id,
                      h.text            = $text,
-                     h.mood            = $mood,
                      h.importanceScore = $importanceScore,
                      h.createdAt       = $createdAt`,
                 params
@@ -95,10 +93,10 @@ export class GraphRepository {
         try {
             await this.session.run(
                 `MERGE (c:Conversation {conversationId: $conversationId})
-                 SET c.startedAt = $startedAt,
-                     c.endedAt   = $endedAt,
-                     c.callType  = $callType,
-                     c.outcome   = $outcome`,
+                 SET c.date            = $date,
+                     c.durationMinutes = $durationMinutes,
+                     c.callType        = $callType,
+                     c.outcome         = $outcome`,
                 params
             );
         } catch (error) {
@@ -234,8 +232,9 @@ export class GraphRepository {
                 `MATCH (a:Topic {topicId: $fromTopicId})
                  MATCH (b:Topic {topicId: $toTopicId})
                  MERGE (a)-[r:RELATED_TO]->(b)
-                 SET r.strength          = $strength,
-                     r.coOccurrenceCount = $coOccurrenceCount`,
+                 ON CREATE SET r.strength          = $strength,
+                               r.coOccurrenceCount = 1
+                 ON MATCH  SET r.coOccurrenceCount = r.coOccurrenceCount + 1`,
                 params
             );
         } catch (error) {
