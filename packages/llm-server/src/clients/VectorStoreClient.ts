@@ -42,14 +42,14 @@ export class VectorStoreClient {
 
         await this.vectorStore.addDocuments(documents);
     }
-    
+
     async addMemoriesWithIds(
         entries: HighlightEntry[],
         metadata: { userId: string; conversationId: string; createdAt?: string; summaryId?: string }
     ): Promise<void> {
         await this.vectorStore.addVectors(
             entries.map(e => e.embedding),
-            entries.map(e => ({ pageContent: e.text, metadata })),
+            entries.map(e => ({ pageContent: e.text, metadata: { ...metadata, qdrantPointId: e.id } })),
             { ids: entries.map(e => e.id) }
         );
     }

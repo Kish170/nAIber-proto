@@ -47,9 +47,5 @@ export class Neo4jClient {
         await this.driver.close();
         Neo4jClient.instance = null;
     }
-
-    async closeSession(session: Session): Promise<void> {
-        await session.close();
-    }
 }
 

@@ -1,11 +1,18 @@
 import cosine from 'compute-cosine-similarity';
 import { RedisClient } from '@naiber/shared-clients';
 import { IntentClassifier } from './IntentClassifier.js';
+import type { EnrichedMemory, KGPersonResult } from '../types/graph.js';
+
+export interface CachedKGContext {
+    enrichedMemories: EnrichedMemory[];
+    personsContext: KGPersonResult[];
+}
 
 export interface TopicState {
     currentTopicVector: number[];
     topicCentroidVector: number[];
     cachedHighlights: string[];
+    cachedKGContext?: CachedKGContext;
     messageLength: number;
     messageCount: number;
     topicStartedAt?: number;
@@ -134,6 +141,25 @@ export class TopicManager {
     async getCachedHighlights(conversationId: string): Promise<string[]> {
         const currentTopic = await this.getCurrentTopic(conversationId);
         return currentTopic?.cachedHighlights || [];
+    }
+
+    async updateCachedKGContext(conversationId: string, highlights: string[], kgContext: CachedKGContext): Promise<void> {
+        const currentTopic = await this.getCurrentTopic(conversationId);
+        if (currentTopic) {
+            currentTopic.cachedHighlights = highlights;
+            currentTopic.cachedKGContext = kgContext;
+            currentTopic.cacheAnchorCentroid = [...currentTopic.topicCentroidVector];
+            await this.redisClient.setJSON(
+                `rag:topic:${conversationId}`,
+                currentTopic,
+                3600
+            );
+        }
+    }
+
+    async getCachedKGContext(conversationId: string): Promise<CachedKGContext | null> {
+        const currentTopic = await this.getCurrentTopic(conversationId);
+        return currentTopic?.cachedKGContext ?? null;
     }
 
     async getCurrentTopic(conversationId: string): Promise<TopicState | null> {

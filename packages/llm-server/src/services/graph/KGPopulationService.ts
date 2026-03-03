@@ -45,7 +45,7 @@ export class KGPopulationService {
                 await repo.mergeTopic({
                     topicId: topic.id,
                     label: topic.topicName,
-                    variations: [],
+                    variations: topic.variations ?? [],
                     createdAt: now,
                     lastUpdated: now,
                 });

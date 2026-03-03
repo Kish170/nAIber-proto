@@ -1,5 +1,6 @@
 import { Annotation } from "@langchain/langgraph";
 import { BaseMessage } from "@langchain/core/messages";
+import type { EnrichedMemory, KGPersonResult } from "../../types/graph.js";
 
 export const ConversationState = Annotation.Root({
     messages: Annotation<BaseMessage[]>({
@@ -43,6 +44,16 @@ export const ConversationState = Annotation.Root({
     }),
 
     retrievedMemories: Annotation<string[]>({
+        value: (x, y) => y ?? x ?? [],
+        default: () => []
+    }),
+
+    enrichedMemories: Annotation<EnrichedMemory[]>({
+        value: (x, y) => y ?? x ?? [],
+        default: () => []
+    }),
+
+    personsContext: Annotation<KGPersonResult[]>({
         value: (x, y) => y ?? x ?? [],
         default: () => []
     }),

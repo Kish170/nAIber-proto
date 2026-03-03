@@ -6,6 +6,8 @@ import { EmbeddingService } from "@naiber/shared-services";
 import { IntentClassifier } from "../../services/IntentClassifier.js";
 import { MemoryRetriever } from "../../services/MemoryRetriever.js";
 import { TopicManager } from "../../services/TopicManager.js";
+import { KGRetrievalService } from "../../services/KGRetrievalService.js";
+import type { EnrichedMemory, KGPersonResult } from "../../types/graph.js";
 
 export class ConversationGraph {
     private graph: any;
@@ -14,7 +16,8 @@ export class ConversationGraph {
     private memoryRetriever: MemoryRetriever;
     private intentClassifier: IntentClassifier;
     private topicManager: TopicManager;
-    constructor(openAIKey: string, embeddingService: EmbeddingService, memoryRetriever: MemoryRetriever, topicManager: TopicManager) {
+    private kgRetrievalService: KGRetrievalService;
+    constructor(openAIKey: string, embeddingService: EmbeddingService, memoryRetriever: MemoryRetriever, topicManager: TopicManager, kgRetrievalService: KGRetrievalService) {
         this.llm = new ChatOpenAI({ // use llm from openaicleint
             apiKey: openAIKey,
             model: "gpt-4o",
@@ -23,6 +26,7 @@ export class ConversationGraph {
         this.embeddingService = embeddingService;
         this.memoryRetriever = memoryRetriever;
         this.topicManager = topicManager;
+        this.kgRetrievalService = kgRetrievalService;
         this.intentClassifier = new IntentClassifier();
 
         this.graph = new StateGraph(ConversationState);
@@ -104,6 +108,8 @@ export class ConversationGraph {
     private async retrieveMemories(state: ConversationStateType) {
         try {
             let memories: string[] = [];
+            let enrichedMemories: EnrichedMemory[] = [];
+            let personsContext: KGPersonResult[] = [];
 
             const hasVector = state.currentTopicVector && state.currentTopicVector.length > 0;
             const needsRefresh = state.topicChanged ||
@@ -115,25 +121,44 @@ export class ConversationGraph {
                     state.currentTopicVector!,
                     5
                 );
-                memories = retrievedMemories.highlights;
 
-                await this.topicManager.updateCachedHighlights(
-                    state.conversationId,
-                    memories
+                const kgResult = await this.kgRetrievalService.retrieve(
+                    state.userId,
+                    state.currentTopicVector!,
+                    retrievedMemories.documents
                 );
 
-                console.log('[ConversationGraph] Cache refreshed:', {
+                enrichedMemories = kgResult.enrichedMemories;
+                personsContext = kgResult.personsContext;
+                memories = kgResult.highlights.length > 0
+                    ? kgResult.highlights
+                    : retrievedMemories.highlights;
+
+                await this.topicManager.updateCachedKGContext(
+                    state.conversationId,
+                    memories,
+                    { enrichedMemories, personsContext }
+                );
+
+                console.log('[ConversationGraph] Cache refreshed with KG:', {
                     reason: state.topicChanged ? 'topic_changed' : 'centroid_drift',
-                    memoryCount: memories.length
+                    qdrantCount: retrievedMemories.documents.length,
+                    kgEnrichedCount: enrichedMemories.length,
+                    personsCount: personsContext.length,
                 });
             } else {
                 memories = await this.topicManager.getCachedHighlights(state.conversationId);
+                const cachedKG = await this.topicManager.getCachedKGContext(state.conversationId);
+                if (cachedKG) {
+                    enrichedMemories = cachedKG.enrichedMemories;
+                    personsContext = cachedKG.personsContext;
+                }
             }
 
-            return { retrievedMemories: memories };
+            return { retrievedMemories: memories, enrichedMemories, personsContext };
         } catch (error) {
             console.error('[ConversationGraph] retrieveMemories failed, continuing without memories:', error);
-            return { retrievedMemories: [] };
+            return { retrievedMemories: [], enrichedMemories: [], personsContext: [] };
         }
     }
 
@@ -161,17 +186,16 @@ export class ConversationGraph {
 
     private async generateResponse(state: ConversationStateType) {
         let contextSection = "";
-        if (state.retrievedMemories.length > 0) {
+
+        if (state.enrichedMemories && state.enrichedMemories.length > 0) {
+            contextSection = this.formatEnrichedContext(state.enrichedMemories, state.personsContext);
+        } else if (state.retrievedMemories.length > 0) {
             contextSection = `# RELEVANT MEMORIES FROM PAST CONVERSATIONS
 ${state.retrievedMemories.map((m, i) => `${i + 1}. ${m}`).join('\n')}
 
 Use these memories to provide continuity and personalization.
 `;
         }
-
-        // if (state.fatigueGuidance) {
-        //     contextSection += `\n\n${state.fatigueGuidance}`;
-        // }
 
         const recentMessages = state.messages.slice(-10);
 
@@ -209,6 +233,47 @@ Use these memories to provide continuity and personalization.
         return {
             response: content
         };
+    }
+
+    private formatEnrichedContext(memories: EnrichedMemory[], persons: KGPersonResult[]): string {
+        const sections: string[] = [];
+
+        const memoryLines = memories.map((m, i) => {
+            let line = `${i + 1}. ${m.text}`;
+            if (m.topicLabels.length > 0) {
+                line += ` [Topics: ${m.topicLabels.join(', ')}]`;
+            }
+            if (m.conversationDate) {
+                line += ` [From: ${m.conversationDate}]`;
+            }
+            if (m.persons.length > 0) {
+                line += ` [People: ${m.persons.map(p => p.role ? `${p.name} (${p.role})` : p.name).join(', ')}]`;
+            }
+            return line;
+        });
+
+        sections.push(`# RELEVANT MEMORIES FROM PAST CONVERSATIONS
+${memoryLines.join('\n')}`);
+
+        const allRelated = [...new Set(memories.flatMap(m => m.relatedTopics))];
+        if (allRelated.length > 0) {
+            sections.push(`# RELATED TOPICS THE USER HAS DISCUSSED
+${allRelated.join(', ')}
+These topics are connected to the current conversation. You may reference them naturally if relevant.`);
+        }
+
+        if (persons.length > 0) {
+            const personLines = persons.slice(0, 5).map(p =>
+                `- ${p.name}${p.role ? ` (${p.role})` : ''}: mentioned ${p.mentionCount} times`
+            );
+            sections.push(`# PEOPLE IN THE USER'S LIFE
+${personLines.join('\n')}
+Reference these people naturally when they relate to the topic.`);
+        }
+
+        sections.push('Use these memories to provide continuity and personalization. Reference them naturally, not robotically.');
+
+        return sections.join('\n\n');
     }
 
     private async skipRAG(state: ConversationStateType) {

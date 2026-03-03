@@ -10,6 +10,8 @@ import { TopicManager } from '../services/TopicManager.js';
 import { MemoryRetriever } from '../services/MemoryRetriever.js';
 import { SupervisorGraph } from '../graphs/SupervisorGraph.js';
 import { VectorStoreClient } from '../clients/VectorStoreClient.js';
+import { GraphQueryRepository } from '../repositories/GraphQueryRepository.js';
+import { KGRetrievalService } from '../services/KGRetrievalService.js';
 import { HumanMessage, AIMessage, SystemMessage } from "@langchain/core/messages";
 
 const END_CALL_DELAY_MS = 5000;
@@ -64,6 +66,8 @@ export function LLMRouter(checkpointer: BaseCheckpointSaver): Router {
     const memoryRetriever = new MemoryRetriever(vectorStore);
     const topicManager = new TopicManager(redisClient);
     const conversationResolver = new ConversationResolver(redisClient);
+    const graphQueryRepository = new GraphQueryRepository();
+    const kgRetrievalService = new KGRetrievalService(graphQueryRepository);
 
     const supervisorGraph = new SupervisorGraph(
         openAIClient,
@@ -72,7 +76,8 @@ export function LLMRouter(checkpointer: BaseCheckpointSaver): Router {
         topicManager,
         redisClient,
         process.env.OPENAI_API_KEY!,
-        checkpointer
+        checkpointer,
+        kgRetrievalService
     );
 
     const conversationGraphHandler = async (req: Request, res: Response) => {

@@ -249,7 +249,8 @@ export class ConversationRepository {
                 select: {
                     id: true,
                     topicName: true,
-                    topicEmbedding: true
+                    topicEmbedding: true,
+                    variations: true
                 }
             });
         } catch (error) {

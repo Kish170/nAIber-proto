@@ -1,9 +1,9 @@
 # Knowledge Graph Integration
 
-> **Status:** In Progress — core implementation complete, RAG retrieval layer pending
+> **Status:** In Progress — Phase 2 RAG retrieval layer implemented
 > **Target DB:** Neo4j
 > **Purpose:** Hybrid RAG (vector + graph) for General Conversation persona
-> **Last updated:** 2026-03-01
+> **Last updated:** 2026-03-02
 
 ---
 
@@ -33,6 +33,26 @@ The current RAG pipeline retrieves memories from Qdrant via cosine similarity, b
 ```
 
 The most performance-critical KG query starts from Highlight nodes (by `qdrantPointId`), so `Highlight.qdrantPointId` must be indexed in Neo4j.
+
+### Phase 2: Two-Stream Retrieval Architecture
+
+The live RAG pipeline runs two parallel retrieval streams, sharing the existing cache/refresh gate (only fires on topic change or centroid drift):
+
+**Stream 1 — Qdrant → KG Enrichment:**
+Qdrant vector search returns top-K highlights with `qdrantPointId`s. These IDs are passed to Neo4j via `GraphQueryRepository` to traverse `Highlight→Topic`, `Highlight→Summary→Conversation`, and `Person→Topic`, enriching each result with structural metadata.
+
+**Stream 2 — Postgres Bridge → KG Discovery:**
+The user message embedding (already computed in `manage_topic_state`) is cosine-ranked against all user topics in Postgres (via `getConversationTopics`). Top topic IDs are passed to Neo4j to discover additional highlights linked to those topics that Qdrant may have missed, plus related topics and associated persons.
+
+**Merge & Rerank:**
+Both streams are merged by `qdrantPointId`, deduplicated, and reranked using weighted linear combination: `finalScore = alpha * qdrantScore + (1 - alpha) * kgScore` (alpha defaults to 0.7). Context expansion (related topics, persons, summaries) happens after top-K selection.
+
+**Key services:**
+- `GraphQueryRepository` — read-side Neo4j queries (per-method sessions)
+- `KGRetrievalService` — orchestrates both streams, deduplication, reranking, context assembly
+- `TopicManager.cachedKGContext` — caches enriched results alongside plain highlights in Redis
+
+**Graceful degradation:** If Neo4j is unavailable, `KGRetrievalService` returns empty and the pipeline falls back to Qdrant-only highlights.
 
 ---
 

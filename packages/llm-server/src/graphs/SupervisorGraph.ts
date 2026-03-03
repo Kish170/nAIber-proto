@@ -8,6 +8,7 @@ import { OpenAIClient, RedisClient } from "@naiber/shared-clients";
 import { EmbeddingService } from "@naiber/shared-services";
 import { MemoryRetriever } from "../services/MemoryRetriever.js";
 import { TopicManager } from "../services/TopicManager.js";
+import { KGRetrievalService } from "../services/KGRetrievalService.js";
 
 export class SupervisorGraph {
     private compiledGraph: any;
@@ -22,7 +23,8 @@ export class SupervisorGraph {
         topicManager: TopicManager,
         redisClient: RedisClient,
         openAIKey: string,
-        checkpointer: BaseCheckpointSaver
+        checkpointer: BaseCheckpointSaver,
+        kgRetrievalService: KGRetrievalService
     ) {
         this.redisClient = redisClient;
 
@@ -30,7 +32,8 @@ export class SupervisorGraph {
             openAIKey,
             embeddingService,
             memoryRetriever,
-            topicManager
+            topicManager,
+            kgRetrievalService
         ).compile();
 
         this.healthCheckGraph = new HealthCheckGraph(openAIClient, checkpointer);
