@@ -3,6 +3,7 @@ import { UserProfile } from "../handlers/UserHandler.js";
 import { WebSocket } from 'ws';
 import { buildGeneralFirstMessage, buildGeneralSystemPrompt } from '../prompts/GeneralPrompt.js';
 import { buildHealthFirstMessage, buildHealthSystemPrompt } from '../prompts/HealthPrompt.js';
+import { buildCognitiveFirstMessage, buildCognitiveSystemPrompt } from '../prompts/CognitivePrompt.js';
 import { sessionManager } from "./SessionManager.js";
 import { PostCallQueue } from "../queues/PostCallQueue.js";
 
@@ -25,7 +26,7 @@ export class WebSocketService {
     private startedAt: Date = new Date();
     private userProfile: UserProfile | null = null;
     private postCallWorkflowCompleted: boolean = false;
-    private callType: 'general' | 'health_check' = 'general';
+    private callType: 'general' | 'health_check' | 'cognitive' = 'general';
 
     constructor(twilioWs: WebSocket, elevenLabsConfig: ElevenLabsConfigs, callType: string, twilioClient?: TwilioClient) {
         this.twilioWs = twilioWs;
@@ -35,7 +36,7 @@ export class WebSocketService {
             apiKey: process.env.OPENAI_API_KEY!,
             baseUrl: process.env.OPENAI_BASE_URL!
         });
-        this.callType = callType === 'health_check' ? 'health_check' : 'general';
+        this.callType = (callType === 'health_check' || callType === 'cognitive') ? callType as 'health_check' | 'cognitive' : 'general';
     }
 
     async twilioEventProcessor(message: Buffer): Promise<void> {
@@ -121,7 +122,7 @@ export class WebSocketService {
 
         const redisClient = RedisClient.getInstance();
         const storedCallType = await redisClient.get(`call_type:${this.callSid}`);
-        this.callType = (storedCallType as 'general' | 'health_check') || 'general';
+        this.callType = (storedCallType as 'general' | 'health_check' | 'cognitive') || 'general';
 
         console.log('[WebSocketService] Retrieved callType for callSid:', this.callSid, this.callType);
 
@@ -192,6 +193,11 @@ export class WebSocketService {
                 case 'health_check':
                     systemPrompt = buildHealthSystemPrompt(userProfile);
                     firstMessage = await buildHealthFirstMessage(userProfile, this.openAIClient);
+                    break;
+
+                case 'cognitive':
+                    systemPrompt = buildCognitiveSystemPrompt(userProfile);
+                    firstMessage = await buildCognitiveFirstMessage(userProfile, this.openAIClient);
                     break;
 
                 case 'general':

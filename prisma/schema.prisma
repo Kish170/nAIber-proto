@@ -15,6 +15,7 @@ model User {
   age                 Int?
   phone               String    @unique
   gender              Gender?
+  educationLevel      EducationLevel?
 
   interests           String[]
   dislikes            String[]
@@ -36,6 +37,9 @@ model User {
   conversationSummaries ConversationSummary[]
   conversationTopics    ConversationTopic[]
   healthCheckLogs       HealthCheckLog[]
+  cognitiveTestResults  CognitiveTestResult[]
+  cognitiveBaselines    CognitiveBaseline[]
+  trustedContacts       TrustedContact[]
 
   @@map("users")
 }
@@ -133,6 +137,7 @@ model CallLog {
   user                     User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   conversationSummary      ConversationSummary?
   healthCheckLogs          HealthCheckLog[]
+  cognitiveTestResult      CognitiveTestResult?
 
   @@index([userId, scheduledTime])
   @@index([status])
@@ -288,8 +293,132 @@ enum NotificationType {
 }
 
 enum NotificationStatus {
-  PENDING    
-  SENT       
-  DELIVERED  
-  FAILED     
+  PENDING
+  SENT
+  DELIVERED
+  FAILED
+}
+
+model CognitiveTestResult {
+  id                      String   @id @default(uuid())
+  userId                  String
+  conversationId          String   @unique
+  callLogId               String?  @unique
+
+  source                  String   @default("voice") // 'voice' | 'web'
+  modality                String   @default("phone_call")
+  sessionIndex            Int
+  wordListUsed            String
+  digitSetUsed            Int
+  letterUsed              String
+  abstractionSetUsed      Int
+  vigilanceSetUsed        Int
+
+  domainScores            Json     // { raw: {}, normalized: {} } per domain
+  taskResponses           Json     // Per-task: response, latency, accuracy, retrieval level, signals
+
+  stabilityIndex          Float?
+  isPartial               Boolean  @default(false)
+
+  wellbeingCheckResponses Json?
+  distressDetected        Boolean  @default(false)
+  deferralReason          String?
+
+  completedAt             DateTime @default(now())
+
+  user                    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  callLog                 CallLog? @relation(fields: [callLogId], references: [id], onDelete: Cascade)
+
+  @@index([userId, completedAt])
+  @@index([userId, sessionIndex])
+  @@map("cognitive_test_results")
+}
+
+model CognitiveBaseline {
+  id              String   @id @default(uuid())
+  userId          String
+
+  featureVector   Json     // Normalized baseline values per signal
+  rawValues       Json     // Un-normalized metric values
+  domainBaselines Json     // Per-domain baseline scores
+
+  version         Int
+  createdAt       DateTime @default(now())
+
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, version])
+  @@map("cognitive_baselines")
+}
+
+model TrustedContact {
+  id                    String           @id @default(uuid())
+  userId                String
+
+  name                  String
+  relationship          String
+  knownDurationYears    Int
+  contactFrequency      ContactFrequency
+  reliabilityTier       ReliabilityTier
+
+  informantConcernIndex  Float?
+  weightedInformantIndex Float?
+
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+
+  user                  User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  submissions           TrustedContactSubmission[]
+
+  @@index([userId])
+  @@map("trusted_contacts")
+}
+
+model TrustedContactSubmission {
+  id                    String         @id @default(uuid())
+  trustedContactId      String
+
+  submissionType        SubmissionType
+  structuredResponses   Json           // Per-question response values
+  openTextResponses     Json?          // Free-text fields
+  referencePointNote    String?        // "When did you first notice changes?"
+
+  rawScore              Int
+  informantConcernIndex Float
+
+  createdAt             DateTime       @default(now())
+
+  trustedContact        TrustedContact @relation(fields: [trustedContactId], references: [id], onDelete: Cascade)
+
+  @@index([trustedContactId, createdAt])
+  @@map("trusted_contact_submissions")
+}
+
+enum EducationLevel {
+  NO_FORMAL_EDUCATION
+  PRIMARY_OR_ELEMENTARY
+  SECONDARY_OR_HIGH_SCHOOL
+  COLLEGE_OR_TRADE
+  BACHELORS_OR_EQUIVALENT
+  GRADUATE_OR_POSTGRADUATE
+}
+
+enum ReliabilityTier {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum ContactFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+  OCCASIONAL
+}
+
+enum SubmissionType {
+  ONBOARDING
+  DRIFT_TRIGGERED
+  SCHEDULED_REFRESH
+  MANUAL
 }

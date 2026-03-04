@@ -196,7 +196,7 @@ export function LLMRouter(checkpointer: BaseCheckpointSaver): Router {
 
                 console.log('[LLM Route] SSE stream completed');
 
-                if (result.isHealthCheckComplete) {
+                if (result.isHealthCheckComplete || result.isCognitiveComplete) {
                     scheduleCallEnd(conversation.conversationId);
                 }
             } else {
@@ -220,7 +220,7 @@ export function LLMRouter(checkpointer: BaseCheckpointSaver): Router {
                 res.setHeader('Content-Type', 'application/json');
                 res.status(200).json(completion);
 
-                if (result.isHealthCheckComplete) {
+                if (result.isHealthCheckComplete || result.isCognitiveComplete) {
                     scheduleCallEnd(conversation.conversationId);
                 }
             }

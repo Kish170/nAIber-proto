@@ -8,7 +8,7 @@ export interface SessionData {
     streamSid?: string;
     startedAt: string;
     lastMessageAt: string;
-    callType: 'general' | 'health_check';
+    callType: 'general' | 'health_check' | 'cognitive';
 }
 
 export class SessionManager {

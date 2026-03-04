@@ -17,6 +17,19 @@ export function createCallRouter(callController: CallController): Router {
         }
     });
 
+    router.post('/call/cognitive', async (req, res) => {
+        try {
+            const result = await callController.createCall('cognitive');
+            res.json(result);
+        } catch (error) {
+            console.error('[CallRoutes] Error creating cognitive assessment call:', error);
+            res.status(500).json({
+                success: false,
+                error: 'Failed to create cognitive assessment call'
+            });
+        }
+    });
+
     router.post('/call/health-check', async (req, res) => {
         try {
             const result = await callController.createCall('health_check');

@@ -5,12 +5,14 @@ import { EmbeddingService } from '@naiber/shared-services';
 import { ShallowRedisSaver } from '@langchain/langgraph-checkpoint-redis/shallow';
 import { GeneralPostCallGraph } from '../personas/general/post-call/GeneralPostCallGraph.js';
 import { HealthPostCallGraph } from '../personas/health/post-call/HealthPostCallGraph.js';
+import { CognitivePostCallGraph } from '../personas/cognitive/post-call/CognitivePostCallGraph.js';
 import { VectorStoreClient } from '../clients/VectorStoreClient.js';
 
 export class PostCallWorker {
     private worker: Worker<PostCallJobData>;
     private generalPostCallGraph: any;
     private healthPostCallGraph: any;
+    private cognitivePostCallGraph: any;
     private checkpointer: ShallowRedisSaver;
 
     constructor(checkpointer: ShallowRedisSaver) {
@@ -48,6 +50,7 @@ export class PostCallWorker {
         ).compile();
 
         this.healthPostCallGraph = new HealthPostCallGraph().compile();
+        this.cognitivePostCallGraph = new CognitivePostCallGraph().compile();
 
         this.worker = new Worker<PostCallJobData>(
             POST_CALL_QUEUE_NAME,
@@ -91,6 +94,10 @@ export class PostCallWorker {
         try {
             if (callType === 'health_check') {
                 return await this.processHealthCheckJob(userId, conversationId);
+            }
+
+            if (callType === 'cognitive') {
+                return await this.processCognitiveJob(userId, conversationId);
             }
 
             if (callType === 'general') {
@@ -162,6 +169,61 @@ export class PostCallWorker {
             return { success: true, conversationId, answersRecorded: answers.length };
         } catch (error) {
             console.error(`[PostCallWorker] Health check persistence failed for thread ${threadId}:`, error);
+            throw error;
+        }
+    }
+
+    private async processCognitiveJob(userId: string, conversationId: string): Promise<any> {
+        const threadId = `cognitive:${userId}:${conversationId}`;
+
+        console.log(`[PostCallWorker] Processing cognitive assessment for thread: ${threadId}`);
+
+        try {
+            const tuple = await this.checkpointer.getTuple({ configurable: { thread_id: threadId } });
+            const values = tuple?.checkpoint?.channel_values as any;
+
+            if (!values) {
+                console.warn(`[PostCallWorker] No checkpoint state found for cognitive thread: ${threadId}`);
+                return { success: false, error: 'No checkpoint state found' };
+            }
+
+            const isDeferred = values.isDeferred ?? false;
+            const isPartial = values.isPartial ?? false;
+
+            const result = await this.cognitivePostCallGraph.invoke({
+                userId,
+                conversationId,
+                taskResponses: values.taskResponses ?? [],
+                wellbeingResponses: values.wellbeingResponses ?? [],
+                sessionIndex: values.sessionIndex ?? 0,
+                selectedWordList: values.selectedWordList ?? '',
+                selectedDigitSet: values.selectedDigitSet ?? 0,
+                selectedLetter: values.selectedLetter ?? '',
+                selectedAbstractionSet: values.selectedAbstractionSet ?? 0,
+                selectedVigilanceSet: values.selectedVigilanceSet ?? 0,
+                registrationQuality: values.registrationQuality ?? '',
+                distressDetected: values.distressDetected ?? false,
+                isPartial,
+                isDeferred,
+                deferralReason: values.deferralReason ?? '',
+            });
+
+            if (result.error) {
+                throw new Error(result.error);
+            }
+
+            await this.checkpointer.deleteThread(threadId);
+            console.log(`[PostCallWorker] Cleaned up cognitive thread: ${threadId}`);
+
+            return {
+                success: true,
+                conversationId,
+                isDeferred,
+                isPartial,
+                taskResponseCount: (values.taskResponses ?? []).length,
+            };
+        } catch (error) {
+            console.error(`[PostCallWorker] Cognitive post-call failed for thread ${threadId}:`, error);
             throw error;
         }
     }

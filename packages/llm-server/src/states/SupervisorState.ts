@@ -8,6 +8,7 @@ export const SupervisorState = Annotation.Root({
     callType:              Annotation<string>({ reducer: (_, b) => b, default: () => 'general' }),
     response:              Annotation<string>({ reducer: (_, b) => b, default: () => '' }),
     isHealthCheckComplete: Annotation<boolean>({ reducer: (_, b) => b, default: () => false }),
+    isCognitiveComplete:   Annotation<boolean>({ reducer: (_, b) => b, default: () => false }),
 });
 
 export type SupervisorStateType = typeof SupervisorState.State;

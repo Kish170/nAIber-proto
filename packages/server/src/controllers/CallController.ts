@@ -7,7 +7,7 @@ export class CallController {
     private elevenLabsConfigs: ElevenLabsConfigs;
     private twilioClient: TwilioClient;
     private userNumber: string;
-    private callType: 'general' | 'health_check' = 'general';
+    private callType: 'general' | 'health_check' | 'cognitive' = 'general';
 
     constructor() {
         const elevenLabsApiKey = process.env.ELEVENLABS_API_KEY;
@@ -85,7 +85,7 @@ export class CallController {
         }
     }
 
-    async createCall(callType: 'general' | 'health_check' = 'general'): Promise<{ success: boolean; callSid?: string; error?: string }> {
+    async createCall(callType: 'general' | 'health_check' | 'cognitive' = 'general'): Promise<{ success: boolean; callSid?: string; error?: string }> {
         try {
             console.log('[CallController] Creating outbound call to:', this.userNumber, 'with callType:', callType);
 
