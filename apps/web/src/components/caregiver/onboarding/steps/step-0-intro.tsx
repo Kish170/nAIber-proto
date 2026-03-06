@@ -11,12 +11,8 @@ import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 
 const schema = z.object({
-  consentData: z.literal(true, {
-    errorMap: () => ({ message: "You must accept this to continue" }),
-  }),
-  consentTerms: z.literal(true, {
-    errorMap: () => ({ message: "You must agree to continue" }),
-  }),
+  consentData: z.literal(true, { message: "You must accept this to continue" }),
+  consentTerms: z.literal(true, { message: "You must agree to continue" }),
 })
 
 type FormData = z.infer<typeof schema>
@@ -45,7 +41,7 @@ export function Step0Intro() {
   }
 
   return (
-    <div className="min-h-full bg-ivory p-8">
+    <div className="min-h-screen bg-ivory p-8">
       <div className="max-w-lg mx-auto">
 
         <div className="flex justify-center mb-8">

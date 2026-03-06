@@ -27,7 +27,7 @@ export function StepLayout({
   children,
 }: StepLayoutProps) {
   return (
-    <div className="min-h-full bg-ivory p-8">
+    <div className="min-h-screen bg-ivory p-8">
       <div className="max-w-lg mx-auto">
 
         <div className="flex justify-center mb-8">

@@ -14,12 +14,10 @@ import { StepLayout } from "../step-layout"
 
 const schema = z.object({
   grantDashboardAccess: z.enum(["yes", "no"], {
-    errorMap: () => ({ message: "Please select an option" }),
+    message: "Please select an option",
   }),
   elderlyEmail: z.string().optional(),
-  acknowledged: z.literal(true, {
-    errorMap: () => ({ message: "Please confirm before completing setup" }),
-  }),
+  acknowledged: z.literal(true, { message: "Please confirm before completing setup" }),
 }).superRefine((data, ctx) => {
   if (
     data.grantDashboardAccess === "yes" &&

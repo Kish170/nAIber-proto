@@ -23,11 +23,10 @@ const STEP_MAP = {
   7: Step7Activation,
 } as const
 
-export default function OnboardingStepPage({
-  params,
-}: {
-  params: { step: string }
+export default async function OnboardingStepPage(props: {
+  params: Promise<{ step: string }>
 }) {
+  const params = await props.params
   const stepNum = parseInt(params.step, 10)
 
   if (isNaN(stepNum) || stepNum < 0 || stepNum > 7) {
