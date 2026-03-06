@@ -5,7 +5,6 @@
 @plugin 'tailwindcss-animate';
 @custom-variant dark (&:is(.dark *));
 
-/* v4 @theme — generates utility classes for brand tokens */
 @theme {
   --color-ivory:              #FAF7F2;
   --color-ivory-deep:         #F2EDE4;

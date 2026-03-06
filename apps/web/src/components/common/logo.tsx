@@ -1,4 +1,5 @@
 import * as React from "react"
+import Link from "next/link"
 import { Heart } from "lucide-react"
 import { cva, type VariantProps } from "class-variance-authority"
 
@@ -23,19 +24,20 @@ const logoVariants = cva("inline-flex items-center", {
 })
 
 export interface LogoProps
-  extends React.HTMLAttributes<HTMLDivElement>,
+  extends React.AnchorHTMLAttributes<HTMLAnchorElement>,
     VariantProps<typeof logoVariants> {
   size?: keyof typeof sizeMap
   light?: boolean
 }
 
-const Logo = React.forwardRef<HTMLDivElement, LogoProps>(
+const Logo = React.forwardRef<HTMLAnchorElement, LogoProps>(
   ({ className, variant, size = "default", light = false, ...props }, ref) => {
     const { circle, iconPx, text } = sizeMap[size]
 
     return (
-      <div
+      <Link
         ref={ref}
+        href="/"
         className={cn(logoVariants({ variant }), className)}
         {...props}
       >
@@ -64,7 +66,7 @@ const Logo = React.forwardRef<HTMLDivElement, LogoProps>(
             ber
           </span>
         )}
-      </div>
+      </Link>
     )
   }
 )

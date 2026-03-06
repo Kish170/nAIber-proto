@@ -4,12 +4,6 @@ import { Button } from "@/components/ui/button"
 const HERO_PHOTO =
   "https://images.unsplash.com/photo-1518895949257-7621c3c786d7?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixlib=rb-4.1.0&q=80&w=1080"
 
-const STATS = [
-  { value: "2,400+", label: "Families using nAIber" },
-  { value: "180k",   label: "Check-ins completed" },
-  { value: "4.9 ★",  label: "Average rating" },
-]
-
 export function Hero() {
   return (
     <section className="max-w-[1100px] mx-auto px-8 pt-20 pb-28">
@@ -46,19 +40,6 @@ export function Hero() {
             <Button variant="outline" size="lg" asChild>
               <Link href="#how-it-works">See a demo</Link>
             </Button>
-          </div>
-
-          <div className="pt-8 border-t border-border flex gap-10 flex-wrap">
-            {STATS.map(({ value, label }) => (
-              <div key={label}>
-                <div className="font-display font-medium text-warm-900 text-2xl">
-                  {value}
-                </div>
-                <div className="text-xs text-warm-500 leading-snug mt-0.5">
-                  {label}
-                </div>
-              </div>
-            ))}
           </div>
         </div>
 
