@@ -1,12 +1,12 @@
 import { prismaClient } from '@naiber/shared-clients';
-import { userProfileInclude, UserProfileData } from '@naiber/shared-core';
+import { elderlyProfileInclude, ElderlyProfileData } from '@naiber/shared-core';
 
 export class UserRepository {
-    static async findByPhone(phone: string): Promise<UserProfileData | null> {
+    static async findByPhone(phone: string): Promise<ElderlyProfileData | null> {
         try {
-            return await prismaClient.user.findUnique({
+            return await prismaClient.elderlyProfile.findUnique({
                 where: { phone },
-                include: userProfileInclude
+                include: elderlyProfileInclude
             });
         } catch (error) {
             console.error('[UserRepository] Error finding user by phone:', error);
@@ -14,11 +14,11 @@ export class UserRepository {
         }
     }
 
-    static async findById(id: string): Promise<UserProfileData | null> {
+    static async findById(id: string): Promise<ElderlyProfileData | null> {
         try {
-            return await prismaClient.user.findUnique({
+            return await prismaClient.elderlyProfile.findUnique({
                 where: { id },
-                include: userProfileInclude
+                include: elderlyProfileInclude
             });
         } catch (error) {
             console.error('[UserRepository] Error finding user by ID:', error);
@@ -26,10 +26,10 @@ export class UserRepository {
         }
     }
 
-    static async updateLastCallAt(userId: string, timestamp: Date): Promise<void> {
+    static async updateLastCallAt(elderlyProfileId: string, timestamp: Date): Promise<void> {
         try {
-            await prismaClient.user.update({
-                where: { id: userId },
+            await prismaClient.elderlyProfile.update({
+                where: { id: elderlyProfileId },
                 data: {
                     lastCallAt: timestamp,
                     isFirstCall: false

@@ -2,7 +2,9 @@
 Zero-dependency types package. The foundation layer — every other shared package depends on this.
 
 ## What It Owns
-- `types/database.ts` — Prisma-derived types (`UserProfileData`, `EmergencyContact`, `HealthCondition`, `Medication`, `ConversationTopic`, `ConversationSummary`, `BasicInfo`) and the `userProfileInclude` validator.
+- `types/user-profile.ts` — Prisma-derived types (`ElderlyProfileData`, `EmergencyContact`, `HealthCondition`, `Medication`, `ConversationTopic`, `ConversationSummary`, `BasicInfo`) and the `elderlyProfileInclude` validator.
+- `types/caregiver.ts` — `CaregiverProfileData`, `ManagedElderlyUser`, `ElderlyWithCaregivers` types and include validators.
+- `types/cognitive.ts` — `CognitiveSessionData`, `CognitiveBaselineData` types.
 - `types/queue-contracts.ts` — `PostCallJobData` interface and `POST_CALL_QUEUE_NAME` constant. Single source of truth for BullMQ message shapes.
 
 ## What It Does NOT Own
@@ -13,7 +15,7 @@ Zero-dependency types package. The foundation layer — every other shared packa
 - `@prisma/client` (for Prisma type generation only)
 
 ## Gotchas
-- `database.ts` imports from `../../../../generated/prisma/index.js` — this relative path is sensitive to directory depth. If you move the file, update the path.
+- Type files import from `../../../../generated/prisma/index.js` — this relative path is sensitive to directory depth. If you move the files, update the path.
 - Any new queue or job type should be added to `queue-contracts.ts`, not defined locally in producer/consumer packages.
 
 ## Reference Docs

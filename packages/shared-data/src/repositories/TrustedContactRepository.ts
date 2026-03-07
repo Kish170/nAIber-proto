@@ -2,7 +2,7 @@ import { prismaClient } from '@naiber/shared-clients';
 import type { ContactFrequency, ReliabilityTier, SubmissionType } from '../../../../generated/prisma/index.js';
 
 export interface TrustedContactData {
-    userId: string;
+    elderlyProfileId: string;
     name: string;
     relationship: string;
     knownDurationYears: number;
@@ -30,10 +30,10 @@ export class TrustedContactRepository {
         }
     }
 
-    static async findByUserId(userId: string) {
+    static async findByElderlyProfileId(elderlyProfileId: string) {
         try {
             return await prismaClient.trustedContact.findMany({
-                where: { userId },
+                where: { elderlyProfileId },
                 include: { submissions: { orderBy: { createdAt: 'desc' }, take: 1 } },
             });
         } catch (error) {

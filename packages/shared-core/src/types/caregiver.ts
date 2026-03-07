@@ -1,11 +1,11 @@
 import { Prisma } from '../../../../generated/prisma/index.js';
-import { userProfileInclude } from './user-profile.js';
+import { elderlyProfileInclude } from './user-profile.js';
 
-export const caregiverProfileInclude = Prisma.validator<Prisma.CaregiverAccountInclude>()({
+export const caregiverProfileInclude = Prisma.validator<Prisma.CaregiverProfileInclude>()({
     managedUsers: {
         where: { status: 'ACTIVE' },
         include: {
-            user: {
+            elderlyProfile: {
                 select: {
                     id: true,
                     name: true,
@@ -20,22 +20,21 @@ export const caregiverProfileInclude = Prisma.validator<Prisma.CaregiverAccountI
     }
 });
 
-export type CaregiverProfileData = Prisma.CaregiverAccountGetPayload<{
+export type CaregiverProfileData = Prisma.CaregiverProfileGetPayload<{
     include: typeof caregiverProfileInclude
 }>;
 
-export type ManagedUserSummary = CaregiverProfileData['managedUsers'][number]['user'];
+export type ManagedElderlyUser = CaregiverProfileData['managedUsers'][number]['elderlyProfile'];
 
-export const userWithCaregiversInclude = Prisma.validator<Prisma.UserInclude>()({
-    ...userProfileInclude,
+export const elderlyWithCaregiversInclude = Prisma.validator<Prisma.ElderlyProfileInclude>()({
+    ...elderlyProfileInclude,
     caregiverLinks: {
         where: { status: 'ACTIVE' },
         include: {
-            caregiver: {
+            caregiverProfile: {
                 select: {
                     id: true,
                     name: true,
-                    email: true,
                     relationship: true,
                 }
             }
@@ -43,6 +42,6 @@ export const userWithCaregiversInclude = Prisma.validator<Prisma.UserInclude>()(
     }
 });
 
-export type UserWithCaregivers = Prisma.UserGetPayload<{
-    include: typeof userWithCaregiversInclude
+export type ElderlyWithCaregivers = Prisma.ElderlyProfileGetPayload<{
+    include: typeof elderlyWithCaregiversInclude
 }>;

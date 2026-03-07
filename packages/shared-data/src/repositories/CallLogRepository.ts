@@ -2,11 +2,11 @@ import { prismaClient } from '@naiber/shared-clients';
 import type { CallType } from '../../../../generated/prisma/index.js';
 
 export class CallLogRepository {
-    static async findByUserId(userId: string, options?: { limit?: number; offset?: number; callType?: CallType }) {
+    static async findByElderlyProfileId(elderlyProfileId: string, options?: { limit?: number; offset?: number; callType?: CallType }) {
         try {
             return await prismaClient.callLog.findMany({
                 where: {
-                    userId,
+                    elderlyProfileId,
                     ...(options?.callType ? { callType: options.callType } : {}),
                 },
                 orderBy: { scheduledTime: 'desc' },
@@ -40,13 +40,13 @@ export class CallLogRepository {
         }
     }
 
-    static async getCallStats(userId: string) {
+    static async getCallStats(elderlyProfileId: string) {
         try {
             const [total, completed, lastCall] = await Promise.all([
-                prismaClient.callLog.count({ where: { userId } }),
-                prismaClient.callLog.count({ where: { userId, status: 'COMPLETED' } }),
+                prismaClient.callLog.count({ where: { elderlyProfileId } }),
+                prismaClient.callLog.count({ where: { elderlyProfileId, status: 'COMPLETED' } }),
                 prismaClient.callLog.findFirst({
-                    where: { userId, status: 'COMPLETED' },
+                    where: { elderlyProfileId, status: 'COMPLETED' },
                     orderBy: { scheduledTime: 'desc' },
                     select: { scheduledTime: true, endTime: true, callType: true },
                 }),

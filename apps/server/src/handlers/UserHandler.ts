@@ -1,6 +1,6 @@
 import { UserRepository } from '@naiber/shared-data';
 import {
-    UserProfileData,
+    ElderlyProfileData,
     EmergencyContact,
     HealthCondition,
     Medication,
@@ -10,9 +10,9 @@ import {
 } from '@naiber/shared-core';
 
 export class UserProfile {
-    private readonly data: UserProfileData;
+    private readonly data: ElderlyProfileData;
 
-    private constructor(data: UserProfileData) {
+    private constructor(data: ElderlyProfileData) {
         this.data = data;
     }
 
@@ -110,7 +110,7 @@ export class UserProfile {
         return this.data.conversationSummaries[0];
     }
 
-    getData(): UserProfileData {
+    getData(): ElderlyProfileData {
         return this.data;
     }
 }

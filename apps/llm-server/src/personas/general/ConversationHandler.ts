@@ -1,7 +1,7 @@
 import { ConversationRepository } from "@naiber/shared-data";
 
 export interface Summary {
-    userId: string;
+    elderlyProfileId: string;
     conversationId: string;
     summaryText: string;
     topicsDiscussed: string[];
@@ -9,7 +9,7 @@ export interface Summary {
 }
 
 export interface CallLogData {
-    userId: string;
+    elderlyProfileId: string;
     scheduledTime: Date;
     endTime?: Date;
     status?: 'PENDING' | 'QUEUED' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED';
@@ -20,7 +20,7 @@ export interface CallLogData {
 }
 
 export interface ConversationTopicData {
-    userId: string;
+    elderlyProfileId: string;
     topicName: string;
     category?: string;
     topicEmbedding: number[];
@@ -53,15 +53,15 @@ export async function createConversationReferences(data: ConversationReferenceDa
     return await ConversationRepository.upsertTopicReference(data);
 }
 
-export async function updateConversationTopic(userId: string, oldTopicName: string, newTopicName: string): Promise<ReturnedTopic> {
-    const existingNewTopic = await ConversationRepository.findTopicByName(userId, newTopicName);
+export async function updateConversationTopic(elderlyProfileId: string, oldTopicName: string, newTopicName: string): Promise<ReturnedTopic> {
+    const existingNewTopic = await ConversationRepository.findTopicByName(elderlyProfileId, newTopicName);
 
     if (existingNewTopic) {
         console.log(`[ConversationHandler] Topic "${newTopicName}" already exists, adding "${oldTopicName}" as variation`);
-        return await ConversationRepository.addVariationToTopic(userId, newTopicName, oldTopicName);
+        return await ConversationRepository.addVariationToTopic(elderlyProfileId, newTopicName, oldTopicName);
     }
 
-    return await ConversationRepository.renameTopic(userId, oldTopicName, newTopicName);
+    return await ConversationRepository.renameTopic(elderlyProfileId, oldTopicName, newTopicName);
 }
 
 export async function updateConversationReference(conversationSummaryId: string, conversationTopicId: string) {
@@ -74,12 +74,12 @@ export async function updateConversationReference(conversationSummaryId: string,
     return await ConversationRepository.updateTopicReferenceById(reference.id, conversationTopicId);
 }
 
-export async function getConversationTopics(userId: string) {
-    return await ConversationRepository.findTopicsByUserId(userId);
+export async function getConversationTopics(elderlyProfileId: string) {
+    return await ConversationRepository.findTopicsByElderlyProfileId(elderlyProfileId);
 }
 
-export async function getConversationTopic(userId: string, topicId: string) {
-    return await ConversationRepository.findTopicById(userId, topicId);
+export async function getConversationTopic(elderlyProfileId: string, topicId: string) {
+    return await ConversationRepository.findTopicById(elderlyProfileId, topicId);
 }
 
 export async function getTopicReference(topicId: string) {

@@ -1,6 +1,6 @@
 import { Prisma } from '../../../../generated/prisma/index.js';
 
-export const userProfileInclude = Prisma.validator<Prisma.UserInclude>()({
+export const elderlyProfileInclude = Prisma.validator<Prisma.ElderlyProfileInclude>()({
     emergencyContact: {
         select: {
             id: true,
@@ -64,17 +64,15 @@ export const userProfileInclude = Prisma.validator<Prisma.UserInclude>()({
     },
 });
 
-export type UserProfileData = Prisma.UserGetPayload<{
-    include: typeof userProfileInclude
+export type ElderlyProfileData = Prisma.ElderlyProfileGetPayload<{
+    include: typeof elderlyProfileInclude
 }>;
 
-
-export type EmergencyContact = NonNullable<UserProfileData['emergencyContact']>;
-export type HealthCondition = UserProfileData['healthConditions'][number];
-export type Medication = UserProfileData['medications'][number];
-export type ConversationTopic = UserProfileData['conversationTopics'][number];
-export type ConversationSummary = UserProfileData['conversationSummaries'][number];
+export type EmergencyContact = NonNullable<ElderlyProfileData['emergencyContact']>;
+export type HealthCondition = ElderlyProfileData['healthConditions'][number];
+export type Medication = ElderlyProfileData['medications'][number];
+export type ConversationTopic = ElderlyProfileData['conversationTopics'][number];
+export type ConversationSummary = ElderlyProfileData['conversationSummaries'][number];
 export type ConversationSummaryReferenceForTopic = ConversationTopic['conversationReferences'][number];
 
-
-export type BasicInfo = Pick<UserProfileData, 'name' | 'age' | 'gender' | 'interests' | 'dislikes'>;
+export type BasicInfo = Pick<ElderlyProfileData, 'name' | 'age' | 'gender' | 'interests' | 'dislikes'>;

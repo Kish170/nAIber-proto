@@ -146,7 +146,7 @@ export class GeneralPostCallGraph {
             console.log('[PostCallGraph] Conversation summary generated successfully');
 
             const conversationSummary = await createSummary({
-                userId: state.userId,
+                elderlyProfileId: state.userId,
                 conversationId: state.conversationId,
                 summaryText: summary.summaryText,
                 topicsDiscussed: summary.topicsDiscussed,
@@ -278,7 +278,7 @@ export class GeneralPostCallGraph {
                     const embedding = result.embedding;
 
                     const newTopic = await createConversationTopic({
-                        userId: state.userId,
+                        elderlyProfileId: state.userId,
                         topicName,
                         topicEmbedding: embedding
                     });
@@ -302,7 +302,7 @@ export class GeneralPostCallGraph {
 
                     const avgEmbedding = existingEmbedding.map((v, i) => (v + newEmbedding[i]) / 2);
                     await ConversationRepository.upsertTopic({
-                        userId: state.userId,
+                        elderlyProfileId: state.userId,
                         topicName: newName,
                         topicEmbedding: avgEmbedding
                     });

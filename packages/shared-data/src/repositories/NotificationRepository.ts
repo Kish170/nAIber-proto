@@ -2,7 +2,7 @@ import { prismaClient } from '@naiber/shared-clients';
 import type { NotificationType } from '../../../../generated/prisma/index.js';
 
 export interface NotificationCreateData {
-    userId: string;
+    elderlyProfileId: string;
     type: NotificationType;
     title: string;
     body: string;
@@ -19,11 +19,11 @@ export class NotificationRepository {
         }
     }
 
-    static async findByUserId(userId: string, options?: { limit?: number; offset?: number; unreadOnly?: boolean }) {
+    static async findByElderlyProfileId(elderlyProfileId: string, options?: { limit?: number; offset?: number; unreadOnly?: boolean }) {
         try {
             return await prismaClient.notification.findMany({
                 where: {
-                    userId,
+                    elderlyProfileId,
                     ...(options?.unreadOnly ? { readAt: null } : {}),
                 },
                 orderBy: { createdAt: 'desc' },
@@ -48,10 +48,10 @@ export class NotificationRepository {
         }
     }
 
-    static async getUnreadCount(userId: string): Promise<number> {
+    static async getUnreadCount(elderlyProfileId: string): Promise<number> {
         try {
             return await prismaClient.notification.count({
-                where: { userId, readAt: null },
+                where: { elderlyProfileId, readAt: null },
             });
         } catch (error) {
             console.error('[NotificationRepository] Error getting unread count:', error);

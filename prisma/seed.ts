@@ -12,14 +12,21 @@ async function main() {
   console.log(`Creating test user with phone number: ${phoneNumber}`);
 
   await prisma.caregiverUserLink.deleteMany({});
-  await prisma.caregiverAccount.deleteMany({
-    where: { email: 'sarah.thompson@email.com' }
-  });
-  await prisma.user.deleteMany({
+  await prisma.caregiverProfile.deleteMany({});
+  await prisma.elderlyProfile.deleteMany({
     where: { phone: phoneNumber }
   });
+  await prisma.user.deleteMany({});
 
-  const user = await prisma.user.create({
+  // Create Auth.js user for the caregiver
+  const authUser = await prisma.user.create({
+    data: {
+      name: 'Sarah Thompson',
+      email: 'sarah.thompson@email.com',
+    }
+  });
+
+  const elderlyProfile = await prisma.elderlyProfile.create({
     data: {
       name: 'Margaret Thompson',
       age: 72,
@@ -40,9 +47,9 @@ async function main() {
         'Spicy food'
       ],
       callFrequency: 'DAILY',
-      preferredCallTime: new Date('1970-01-01T14:00:00Z'), 
+      preferredCallTime: new Date('1970-01-01T14:00:00Z'),
       isFirstCall: false,
-      lastCallAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), 
+      lastCallAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
 
       emergencyContact: {
         create: {
@@ -141,7 +148,7 @@ async function main() {
               'Taking all medications as prescribed',
               'Reading a new Agatha Christie novel'
             ],
-            createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000) 
+            createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000)
           }
         ]
       },
@@ -152,19 +159,19 @@ async function main() {
             topicName: 'Gardening',
             variations: ['gardening', 'garden work', 'planting flowers', 'roses'],
             category: 'Hobby',
-            topicEmbedding: Array(1536).fill(0).map(() => Math.random() - 0.5), 
+            topicEmbedding: Array(1536).fill(0).map(() => Math.random() - 0.5),
           },
           {
             topicName: 'Family time',
             variations: ['family', 'grandchildren', 'daughter', 'video calls with family'],
             category: 'Relationships',
-            topicEmbedding: Array(1536).fill(0).map(() => Math.random() - 0.5), 
+            topicEmbedding: Array(1536).fill(0).map(() => Math.random() - 0.5),
           },
           {
             topicName: 'Arthritis pain',
             variations: ['arthritis', 'joint pain', 'knee pain', 'hand pain'],
             category: 'Health',
-            topicEmbedding: Array(1536).fill(0).map(() => Math.random() - 0.5), 
+            topicEmbedding: Array(1536).fill(0).map(() => Math.random() - 0.5),
           },
           {
             topicName: 'Baking',
@@ -183,18 +190,16 @@ async function main() {
     }
   });
 
-  // Create test caregiver (Sarah, Margaret's daughter)
-  const caregiver = await prisma.caregiverAccount.create({
+  // Create caregiver profile linked to auth user
+  const caregiver = await prisma.caregiverProfile.create({
     data: {
-      email: 'sarah.thompson@email.com',
+      authUserId: authUser.id,
       name: 'Sarah Thompson',
       phone: '+1234567890',
-      passwordHash: null,
-      authProvider: 'email',
       relationship: 'DAUGHTER',
       managedUsers: {
         create: {
-          userId: user.id,
+          elderlyProfileId: elderlyProfile.id,
           isPrimary: true,
           status: 'ACTIVE',
         }
@@ -203,11 +208,11 @@ async function main() {
   });
 
   const summaries = await prisma.conversationSummary.findMany({
-    where: { userId: user.id }
+    where: { elderlyProfileId: elderlyProfile.id }
   });
 
   const topics = await prisma.conversationTopic.findMany({
-    where: { userId: user.id }
+    where: { elderlyProfileId: elderlyProfile.id }
   });
 
   const firstSummary = summaries.find(s => s.conversationId === 'conv_sample_001');
@@ -255,20 +260,20 @@ async function main() {
     }
   }
 
-  console.log('✅ Test user created successfully!');
-  console.log(`User ID: ${user.id}`);
-  console.log(`Name: ${user.name}`);
-  console.log(`Phone: ${user.phone}`);
-  console.log(`Is First Call: ${user.isFirstCall}`);
-  console.log('\nUser profile includes:');
+  console.log('✅ Test data created successfully!');
+  console.log(`\nElderly Profile ID: ${elderlyProfile.id}`);
+  console.log(`Name: ${elderlyProfile.name}`);
+  console.log(`Phone: ${elderlyProfile.phone}`);
+  console.log(`Is First Call: ${elderlyProfile.isFirstCall}`);
+  console.log('\nProfile includes:');
   console.log('- Emergency contact (daughter Sarah)');
   console.log('- 3 health conditions');
   console.log('- 4 medications');
   console.log('- 2 conversation summaries (no CallLog entries)');
   console.log('- 5 conversation topics with embeddings');
   console.log('- Topic references linking conversations to topics');
-  console.log(`\nCaregiver: ${caregiver.name} (${caregiver.email})`);
-  console.log(`Caregiver ID: ${caregiver.id}`);
+  console.log(`\nCaregiver: ${caregiver.name} (Auth User: ${authUser.email})`);
+  console.log(`Caregiver Profile ID: ${caregiver.id}`);
   console.log('- Linked to Margaret as primary caregiver');
   console.log('\nReady for testing!');
 }

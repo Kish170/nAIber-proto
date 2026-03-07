@@ -67,7 +67,7 @@ export class CognitivePostCallGraph {
             const stabilityIndex = (this as any)._stabilityIndex;
 
             await CognitiveRepository.createTestResult({
-                userId: state.userId,
+                elderlyProfileId: state.userId,
                 conversationId: state.conversationId,
                 source: 'voice',
                 modality: 'phone',
@@ -111,7 +111,7 @@ export class CognitivePostCallGraph {
             const newVector = computeBaselineUpdate(currentVector, domainScores);
 
             await CognitiveRepository.createBaseline({
-                userId: state.userId,
+                elderlyProfileId: state.userId,
                 featureVector: newVector,
                 rawValues: domainScores,
                 domainBaselines: newVector,

@@ -18,7 +18,7 @@ export class HealthPostCallGraph {
     private async persistLog(state: HealthPostCallStateType) {
         try {
             await HealthRepository.createHealthCheckLog({
-                userId: state.userId,
+                elderlyProfileId: state.userId,
                 conversationId: state.conversationId,
                 answers: state.answers
             });

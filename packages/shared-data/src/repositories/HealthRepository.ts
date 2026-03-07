@@ -1,22 +1,22 @@
 import { prismaClient } from '@naiber/shared-clients';
 
 export interface HealthCheckLogData {
-    userId: string;
+    elderlyProfileId: string;
     conversationId: string;
     callLogId?: string;
     answers: object[];
 }
 
 export class HealthRepository {
-    static async findHealthConditionsByUserId(userId: string) {
+    static async findHealthConditionsByElderlyProfileId(elderlyProfileId: string) {
         try {
             return await prismaClient.userHealthCondition.findMany({
                 where: {
-                    userId: userId
+                    elderlyProfileId
                 },
                 select: {
                     id: true,
-                    userId: true,
+                    elderlyProfileId: true,
                     condition: true,
                     severity: true,
                     diagnosedAt: true,
@@ -30,16 +30,16 @@ export class HealthRepository {
         }
     }
 
-    static async findMedicationsByUserId(userId: string) {
+    static async findMedicationsByElderlyProfileId(elderlyProfileId: string) {
         try {
             return await prismaClient.userMedication.findMany({
                 where: {
-                    userId: userId,
+                    elderlyProfileId,
                     isActive: true
                 },
                 select: {
                     id: true,
-                    userId: true,
+                    elderlyProfileId: true,
                     name: true,
                     dosage: true,
                     frequency: true,

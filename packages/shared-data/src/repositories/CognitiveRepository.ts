@@ -1,7 +1,7 @@
 import { prismaClient } from '@naiber/shared-clients';
 
 export interface CognitiveTestResultData {
-    userId: string;
+    elderlyProfileId: string;
     conversationId: string;
     callLogId?: string;
     source?: string;
@@ -21,8 +21,8 @@ export interface CognitiveTestResultData {
     deferralReason?: string;
 }
 
-export interface CognitiveBaselineData {
-    userId: string;
+export interface CognitiveBaselineCreateData {
+    elderlyProfileId: string;
     featureVector: object;
     rawValues: object;
     domainBaselines: object;
@@ -39,10 +39,10 @@ export class CognitiveRepository {
         }
     }
 
-    static async findTestResultsByUserId(userId: string, limit?: number) {
+    static async findTestResultsByElderlyProfileId(elderlyProfileId: string, limit?: number) {
         try {
             return await prismaClient.cognitiveTestResult.findMany({
-                where: { userId },
+                where: { elderlyProfileId },
                 orderBy: { completedAt: 'desc' },
                 ...(limit ? { take: limit } : {}),
             });
@@ -52,11 +52,11 @@ export class CognitiveRepository {
         }
     }
 
-    static async getSessionCount(userId: string): Promise<number> {
+    static async getSessionCount(elderlyProfileId: string): Promise<number> {
         try {
             return await prismaClient.cognitiveTestResult.count({
                 where: {
-                    userId,
+                    elderlyProfileId,
                     deferralReason: null,
                     isPartial: false,
                 },
@@ -67,10 +67,10 @@ export class CognitiveRepository {
         }
     }
 
-    static async getLatestBaseline(userId: string) {
+    static async getLatestBaseline(elderlyProfileId: string) {
         try {
             return await prismaClient.cognitiveBaseline.findFirst({
-                where: { userId },
+                where: { elderlyProfileId },
                 orderBy: { version: 'desc' },
             });
         } catch (error) {
@@ -79,7 +79,7 @@ export class CognitiveRepository {
         }
     }
 
-    static async createBaseline(data: CognitiveBaselineData) {
+    static async createBaseline(data: CognitiveBaselineCreateData) {
         try {
             return await prismaClient.cognitiveBaseline.create({ data });
         } catch (error) {
@@ -88,11 +88,11 @@ export class CognitiveRepository {
         }
     }
 
-    static async findRecentCompletedResults(userId: string, count: number) {
+    static async findRecentCompletedResults(elderlyProfileId: string, count: number) {
         try {
             return await prismaClient.cognitiveTestResult.findMany({
                 where: {
-                    userId,
+                    elderlyProfileId,
                     isPartial: false,
                     deferralReason: null,
                 },

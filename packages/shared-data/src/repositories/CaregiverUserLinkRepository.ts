@@ -1,10 +1,10 @@
 import { prismaClient } from '@naiber/shared-clients';
 
 export class CaregiverUserLinkRepository {
-    static async createLink(caregiverId: string, userId: string, isPrimary: boolean = false) {
+    static async createLink(caregiverProfileId: string, elderlyProfileId: string, isPrimary: boolean = false) {
         try {
             return await prismaClient.caregiverUserLink.create({
-                data: { caregiverId, userId, isPrimary, status: 'ACTIVE' },
+                data: { caregiverProfileId, elderlyProfileId, isPrimary, status: 'ACTIVE' },
             });
         } catch (error) {
             console.error('[CaregiverUserLinkRepository] Error creating link:', error);
@@ -36,10 +36,10 @@ export class CaregiverUserLinkRepository {
         }
     }
 
-    static async findByCaregiverAndUser(caregiverId: string, userId: string) {
+    static async findByCaregiverAndUser(caregiverProfileId: string, elderlyProfileId: string) {
         try {
             return await prismaClient.caregiverUserLink.findUnique({
-                where: { caregiverId_userId: { caregiverId, userId } },
+                where: { caregiverProfileId_elderlyProfileId: { caregiverProfileId, elderlyProfileId } },
             });
         } catch (error) {
             console.error('[CaregiverUserLinkRepository] Error finding link:', error);
@@ -47,22 +47,21 @@ export class CaregiverUserLinkRepository {
         }
     }
 
-    static async findCaregiversByUser(userId: string) {
+    static async findCaregiversByUser(elderlyProfileId: string) {
         try {
             const links = await prismaClient.caregiverUserLink.findMany({
-                where: { userId, status: 'ACTIVE' },
+                where: { elderlyProfileId, status: 'ACTIVE' },
                 include: {
-                    caregiver: {
+                    caregiverProfile: {
                         select: {
                             id: true,
                             name: true,
-                            email: true,
                             relationship: true,
                         }
                     }
                 }
             });
-            return links.map(link => ({ ...link.caregiver, isPrimary: link.isPrimary, linkId: link.id }));
+            return links.map(link => ({ ...link.caregiverProfile, isPrimary: link.isPrimary, linkId: link.id }));
         } catch (error) {
             console.error('[CaregiverUserLinkRepository] Error finding caregivers by user:', error);
             throw error;

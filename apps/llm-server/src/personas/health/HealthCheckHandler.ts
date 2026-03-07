@@ -73,10 +73,10 @@ export class HealthCheckHandler {
             )
         );
 
-        const conditions = await HealthRepository.findHealthConditionsByUserId(userId);
+        const conditions = await HealthRepository.findHealthConditionsByElderlyProfileId(userId);
         const activeConditions = conditions.filter(c => c.isActive);
-        
-        const medications = await HealthRepository.findMedicationsByUserId(userId);
+
+        const medications = await HealthRepository.findMedicationsByElderlyProfileId(userId);
         const activeMedications = medications.filter(m => m.isActive);
 
         if (activeConditions.length > 0) {

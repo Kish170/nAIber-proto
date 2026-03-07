@@ -3,7 +3,7 @@ import { prismaClient } from '@naiber/shared-clients';
 const MAX_TOPIC_VARIATIONS = 10;
 
 export interface Summary {
-    userId: string;
+    elderlyProfileId: string;
     conversationId: string;
     summaryText: string;
     topicsDiscussed: string[];
@@ -11,7 +11,7 @@ export interface Summary {
 }
 
 export interface CallLogData {
-    userId: string;
+    elderlyProfileId: string;
     scheduledTime: Date;
     endTime?: Date;
     status?: 'PENDING' | 'QUEUED' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED';
@@ -22,7 +22,7 @@ export interface CallLogData {
 }
 
 export interface ConversationTopicData {
-    userId: string;
+    elderlyProfileId: string;
     topicName: string;
     category?: string;
     topicEmbedding: number[];
@@ -47,7 +47,7 @@ export class ConversationRepository {
                     keyHighlights: [...data.keyHighlights]
                 },
                 create: {
-                    userId: data.userId,
+                    elderlyProfileId: data.elderlyProfileId,
                     conversationId: data.conversationId,
                     summaryText: data.summaryText,
                     topicsDiscussed: [...data.topicsDiscussed],
@@ -64,7 +64,7 @@ export class ConversationRepository {
         try {
             return await prismaClient.callLog.create({
                 data: {
-                    userId: data.userId,
+                    elderlyProfileId: data.elderlyProfileId,
                     scheduledTime: data.scheduledTime,
                     endTime: data.endTime,
                     status: data.status || 'PENDING',
@@ -84,8 +84,8 @@ export class ConversationRepository {
         try {
             return await prismaClient.conversationTopic.upsert({
                 where: {
-                    userId_topicName: {
-                        userId: data.userId,
+                    elderlyProfileId_topicName: {
+                        elderlyProfileId: data.elderlyProfileId,
                         topicName: data.topicName
                     }
                 },
@@ -94,7 +94,7 @@ export class ConversationRepository {
                     category: data.category,
                 },
                 create: {
-                    userId: data.userId,
+                    elderlyProfileId: data.elderlyProfileId,
                     topicName: data.topicName,
                     category: data.category,
                     topicEmbedding: data.topicEmbedding,
@@ -136,12 +136,12 @@ export class ConversationRepository {
         }
     }
 
-    static async findTopicByName(userId: string, topicName: string) {
+    static async findTopicByName(elderlyProfileId: string, topicName: string) {
         try {
             return await prismaClient.conversationTopic.findUnique({
                 where: {
-                    userId_topicName: {
-                        userId,
+                    elderlyProfileId_topicName: {
+                        elderlyProfileId,
                         topicName
                     }
                 },
@@ -158,17 +158,17 @@ export class ConversationRepository {
         }
     }
 
-    static async addVariationToTopic(userId: string, topicName: string, variation: string) {
+    static async addVariationToTopic(elderlyProfileId: string, topicName: string, variation: string) {
         try {
             const current = await prismaClient.conversationTopic.findUnique({
-                where: { userId_topicName: { userId, topicName } },
+                where: { elderlyProfileId_topicName: { elderlyProfileId, topicName } },
                 select: { variations: true }
             });
             const updatedVariations = [variation, ...(current?.variations ?? [])].slice(0, MAX_TOPIC_VARIATIONS);
 
             return await prismaClient.conversationTopic.update({
                 where: {
-                    userId_topicName: { userId, topicName }
+                    elderlyProfileId_topicName: { elderlyProfileId, topicName }
                 },
                 data: { variations: updatedVariations },
                 select: {
@@ -183,17 +183,17 @@ export class ConversationRepository {
         }
     }
 
-    static async renameTopic(userId: string, oldTopicName: string, newTopicName: string) {
+    static async renameTopic(elderlyProfileId: string, oldTopicName: string, newTopicName: string) {
         try {
             const current = await prismaClient.conversationTopic.findUnique({
-                where: { userId_topicName: { userId, topicName: oldTopicName } },
+                where: { elderlyProfileId_topicName: { elderlyProfileId, topicName: oldTopicName } },
                 select: { variations: true }
             });
             const updatedVariations = [oldTopicName, ...(current?.variations ?? [])].slice(0, MAX_TOPIC_VARIATIONS);
 
             return await prismaClient.conversationTopic.update({
                 where: {
-                    userId_topicName: { userId, topicName: oldTopicName }
+                    elderlyProfileId_topicName: { elderlyProfileId, topicName: oldTopicName }
                 },
                 data: {
                     topicName: newTopicName,
@@ -240,11 +240,11 @@ export class ConversationRepository {
         }
     }
 
-    static async findTopicsByUserId(userId: string) {
+    static async findTopicsByElderlyProfileId(elderlyProfileId: string) {
         try {
             return await prismaClient.conversationTopic.findMany({
                 where: {
-                    userId
+                    elderlyProfileId
                 },
                 select: {
                     id: true,
@@ -259,11 +259,11 @@ export class ConversationRepository {
         }
     }
 
-    static async findTopicById(userId: string, topicId: string) {
+    static async findTopicById(elderlyProfileId: string, topicId: string) {
         try {
             return await prismaClient.conversationTopic.findUnique({
                 where: {
-                    userId,
+                    elderlyProfileId,
                     id: topicId
                 },
             });
