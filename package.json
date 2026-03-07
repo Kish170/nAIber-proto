@@ -5,7 +5,8 @@
   "type": "module",
   "description": "nAIber monorepo - AI companion service",
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "apps/*"
   ],
   "scripts": {
     "dev": "npm run dev --workspace=@naiber/server",

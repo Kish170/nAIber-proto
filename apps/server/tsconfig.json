@@ -7,6 +7,9 @@
     },
     "include": ["src/**/*"],
     "references": [
-        { "path": "../shared" }
+        { "path": "../../packages/shared-core" },
+        { "path": "../../packages/shared-clients" },
+        { "path": "../../packages/shared-data" },
+        { "path": "../../packages/shared-services" }
     ]
 }
