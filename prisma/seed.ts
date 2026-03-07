@@ -11,6 +11,10 @@ async function main() {
 
   console.log(`Creating test user with phone number: ${phoneNumber}`);
 
+  await prisma.caregiverUserLink.deleteMany({});
+  await prisma.caregiverAccount.deleteMany({
+    where: { email: 'sarah.thompson@email.com' }
+  });
   await prisma.user.deleteMany({
     where: { phone: phoneNumber }
   });
@@ -179,6 +183,25 @@ async function main() {
     }
   });
 
+  // Create test caregiver (Sarah, Margaret's daughter)
+  const caregiver = await prisma.caregiverAccount.create({
+    data: {
+      email: 'sarah.thompson@email.com',
+      name: 'Sarah Thompson',
+      phone: '+1234567890',
+      passwordHash: null,
+      authProvider: 'email',
+      relationship: 'DAUGHTER',
+      managedUsers: {
+        create: {
+          userId: user.id,
+          isPrimary: true,
+          status: 'ACTIVE',
+        }
+      }
+    }
+  });
+
   const summaries = await prisma.conversationSummary.findMany({
     where: { userId: user.id }
   });
@@ -244,7 +267,10 @@ async function main() {
   console.log('- 2 conversation summaries (no CallLog entries)');
   console.log('- 5 conversation topics with embeddings');
   console.log('- Topic references linking conversations to topics');
-  console.log('\nReady for testing PostCallController!');
+  console.log(`\nCaregiver: ${caregiver.name} (${caregiver.email})`);
+  console.log(`Caregiver ID: ${caregiver.id}`);
+  console.log('- Linked to Margaret as primary caregiver');
+  console.log('\nReady for testing!');
 }
 
 main()

@@ -1,4 +1,4 @@
-import { CognitiveRepository } from "./repositories/CognitiveRepository.js";
+import { CognitiveRepository } from '@naiber/shared-data';
 import {
     getWordList,
     getDigitSet,

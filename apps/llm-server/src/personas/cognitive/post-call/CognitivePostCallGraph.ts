@@ -1,6 +1,6 @@
 import { StateGraph, END } from '@langchain/langgraph';
 import { CognitivePostCallState, CognitivePostCallStateType } from './CognitivePostCallState.js';
-import { CognitiveRepository } from '../repositories/CognitiveRepository.js';
+import { CognitiveRepository } from '@naiber/shared-data';
 import {
     computeDomainScores,
     computeStabilityIndex,
