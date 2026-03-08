@@ -1,0 +1,28 @@
+{
+  "name": "@naiber/api",
+  "version": "1.0.0",
+  "description": "nAIber web API server — Express + tRPC + Auth.js",
+  "license": "ISC",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc --build",
+    "start": "node dist/index.js",
+    "dev": "node --watch dist/index.js"
+  },
+  "dependencies": {
+    "@naiber/shared-core": "*",
+    "@naiber/shared-clients": "*",
+    "@naiber/shared-data": "*",
+    "express": "^4.21.0",
+    "cors": "^2.8.5",
+    "@trpc/server": "^11.1.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.23",
+    "@types/cors": "^2.8.17",
+    "@types/node": "^18.19.118",
+    "typescript": "^5.9.3"
+  }
+}
