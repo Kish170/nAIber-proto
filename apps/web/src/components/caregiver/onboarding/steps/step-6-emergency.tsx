@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation"
 import { useForm, Controller } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { z } from "zod"
+import { z } from "zod/v3"
 
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -16,6 +16,8 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { StepLayout } from "../step-layout"
+import { useOnboardingStore } from "@/stores/onboarding.store"
+import { EMERGENCY_RELATIONSHIPS } from "@/types/onboarding"
 
 const schema = z.object({
   name: z.string().min(2, "Name is required"),
@@ -27,13 +29,10 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>
 
-const RELATIONSHIPS = [
-  "Spouse / Partner", "Son", "Daughter", "Sibling",
-  "Friend", "Neighbour", "Other family member", "Professional carer",
-]
-
 export function Step6Emergency() {
   const router = useRouter()
+
+  const store = useOnboardingStore()
 
   const {
     register,
@@ -42,10 +41,17 @@ export function Step6Emergency() {
     formState: { errors },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { notifyOnMissedCall: true },
+    defaultValues: {
+      name: store.data.emergencyContact?.name ?? "",
+      phone: store.data.emergencyContact?.phone ?? "",
+      email: store.data.emergencyContact?.email ?? "",
+      relationship: store.data.emergencyContact?.relationship ?? undefined,
+      notifyOnMissedCall: store.data.emergencyContact?.notifyOnMissedCall ?? true,
+    },
   })
 
-  function onSuccess() {
+  function onSuccess(data: FormData) {
+    store.updateStep(6, { emergencyContact: data })
     router.push("/onboarding/7")
   }
 
@@ -110,7 +116,7 @@ export function Step6Emergency() {
                 <SelectValue placeholder="Select relationship" />
               </SelectTrigger>
               <SelectContent>
-                {RELATIONSHIPS.map((r) => (
+                {EMERGENCY_RELATIONSHIPS.map((r) => (
                   <SelectItem key={r} value={r}>
                     {r}
                   </SelectItem>

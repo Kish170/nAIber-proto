@@ -58,14 +58,14 @@ export interface OnboardingData {
     // Step 1: Profile
     fullName?: string;
     dateOfBirth?: string;
-    gender?: Gender;
+    gender?: string;
     phone?: string;
     language?: string;
     email?: string;
 
     // Step 2: Preferences
-    callTime?: CallTime;
-    callFrequency?: CallFrequency;
+    callTime?: string;
+    callFrequency?: string;
     interests?: string;
     dislikes?: string;
 
@@ -74,8 +74,8 @@ export interface OnboardingData {
     medications?: Medication[];
 
     // Step 4: Cognitive
-    educationLevel?: EducationLevel;
-    memoryConcerns?: MemoryConcern;
+    educationLevel?: string;
+    memoryConcerns?: string;
     cognitiveChecksEnabled?: boolean;
     communicationStyle?: string;
 
@@ -91,13 +91,13 @@ export interface OnboardingData {
 }
 
 export interface ObservationAnswers {
-    q1?: ChangeLevel;
-    q2?: ChangeLevel;
-    q3?: ChangeLevel;
-    q4?: ChangeLevel;
-    q5?: ChangeLevel;
-    q6?: ChangeLevel;
-    q7?: ChangeLevel;
+    q1?: string;
+    q2?: string;
+    q3?: string;
+    q4?: string;
+    q5?: string;
+    q6?: string;
+    q7?: string;
     otherNotes?: string;
     changeOnset?: string;
 }

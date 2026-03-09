@@ -4,11 +4,12 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useForm, Controller } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { z } from "zod"
+import { z } from "zod/v3"
 
 import { Logo } from "@/components/common/logo"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
+import { useOnboardingStore } from "@/stores/onboarding.store"
 
 const schema = z.object({
   consentData: z.literal(true, { message: "You must accept this to continue" }),
@@ -37,6 +38,7 @@ export function Step0Intro() {
   } = useForm<FormData>({ resolver: zodResolver(schema) })
 
   function onSubmit() {
+    useOnboardingStore.getState().setCurrentStep(0)
     router.push("/onboarding/1")
   }
 

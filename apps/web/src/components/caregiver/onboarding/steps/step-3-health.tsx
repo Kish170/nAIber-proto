@@ -4,7 +4,7 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { useForm, Controller } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { z } from "zod"
+import { z } from "zod/v3"
 import { X, Plus } from "lucide-react"
 
 import { Input } from "@/components/ui/input"
@@ -18,6 +18,12 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { StepLayout } from "../step-layout"
+import { useOnboardingStore } from "@/stores/onboarding.store"
+import {
+  SUGGESTED_CONDITIONS,
+  MedicationFrequency,
+  type Medication,
+} from "@/types/onboarding"
 
 const medicationSchema = z.object({
   name: z.string(),
@@ -30,21 +36,16 @@ const schema = z.object({
   medications: z.array(medicationSchema).optional(),
 })
 
-type Medication = z.infer<typeof medicationSchema>
 type FormData = z.infer<typeof schema>
 
-const SUGGESTED_CONDITIONS = [
-  "Diabetes", "Hypertension", "Arthritis", "Heart disease",
-  "Dementia", "Depression", "Osteoporosis", "COPD",
-]
-
-const FREQUENCIES = ["Once daily", "Twice daily", "Three times daily", "As needed", "Weekly"]
+const FREQUENCIES = Object.values(MedicationFrequency)
 
 export function Step3Health() {
   const router = useRouter()
+  const store = useOnboardingStore()
   const [tagInput, setTagInput] = useState("")
-  const [tags, setTags] = useState<string[]>([])
-  const [medications, setMedications] = useState<Medication[]>([])
+  const [tags, setTags] = useState<string[]>(store.data.conditions ?? [])
+  const [medications, setMedications] = useState<Medication[]>(store.data.medications ?? [])
 
   const { handleSubmit } = useForm<FormData>({ resolver: zodResolver(schema) })
 
@@ -75,6 +76,7 @@ export function Step3Health() {
   }
 
   function onSuccess() {
+    store.updateStep(3, { conditions: tags, medications })
     router.push("/onboarding/4")
   }
 

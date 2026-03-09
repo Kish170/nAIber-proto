@@ -4,7 +4,7 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { useForm, Controller } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { z } from "zod"
+import { z } from "zod/v3"
 
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -18,6 +18,8 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { StepLayout } from "../step-layout"
+import { useOnboardingStore } from "@/stores/onboarding.store"
+import { EducationLevel } from "@/types/onboarding"
 
 const schema = z.object({
   educationLevel: z.string().optional(),
@@ -28,28 +30,28 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>
 
-const EDUCATION_LEVELS = [
-  "No formal education",
-  "Primary school",
-  "Some high school",
-  "High school diploma",
-  "Some college / trade school",
-  "Bachelor's degree",
-  "Graduate degree",
-]
+const EDUCATION_LEVELS = Object.values(EducationLevel)
 
 export function Step4Cognitive() {
   const router = useRouter()
+
+  const store = useOnboardingStore()
 
   const {
     control,
     handleSubmit,
   } = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { cognitiveChecksEnabled: true },
+    defaultValues: {
+      educationLevel: store.data.educationLevel ?? undefined,
+      memoryConcerns: store.data.memoryConcerns as FormData['memoryConcerns'] ?? undefined,
+      cognitiveChecksEnabled: store.data.cognitiveChecksEnabled ?? true,
+      communicationStyle: store.data.communicationStyle ?? "",
+    },
   })
 
-  function onSuccess() {
+  function onSuccess(data: FormData) {
+    store.updateStep(4, data)
     router.push("/onboarding/5")
   }
 

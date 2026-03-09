@@ -3,12 +3,14 @@
 import { useRouter } from "next/navigation"
 import { useForm, Controller } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { z } from "zod"
+import { z } from "zod/v3"
 
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { StepLayout } from "../step-layout"
+import { useOnboardingStore } from "@/stores/onboarding.store"
+import { CallTime, CallFrequency, CALL_TIME_OPTIONS, INTEREST_SUGGESTIONS } from "@/types/onboarding"
 
 const schema = z.object({
   callTime: z.enum(["morning", "afternoon", "evening"], {
@@ -23,19 +25,10 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>
 
-const INTEREST_SUGGESTIONS = [
-  "Family", "Gardening", "Music", "Sports", "Cooking", "Travel",
-  "Books", "History", "Nature", "Faith",
-]
-
-const CALL_TIMES = [
-  { value: "morning", label: "Morning", sub: "8 am – 12 pm" },
-  { value: "afternoon", label: "Afternoon", sub: "12 pm – 5 pm" },
-  { value: "evening", label: "Evening", sub: "5 pm – 8 pm" },
-]
-
 export function Step2Preferences() {
   const router = useRouter()
+
+  const store = useOnboardingStore()
 
   const {
     control,
@@ -43,7 +36,15 @@ export function Step2Preferences() {
     setValue,
     watch,
     formState: { errors },
-  } = useForm<FormData>({ resolver: zodResolver(schema) })
+  } = useForm<FormData>({
+    resolver: zodResolver(schema),
+    defaultValues: {
+      callTime: store.data.callTime as FormData['callTime'] ?? undefined,
+      callFrequency: store.data.callFrequency as FormData['callFrequency'] ?? undefined,
+      interests: store.data.interests ?? "",
+      dislikes: store.data.dislikes ?? "",
+    },
+  })
 
   const currentInterests = watch("interests") ?? ""
 
@@ -55,7 +56,8 @@ export function Step2Preferences() {
     }
   }
 
-  function onSuccess() {
+  function onSuccess(data: FormData) {
+    store.updateStep(2, data)
     router.push("/onboarding/3")
   }
 
@@ -79,7 +81,7 @@ export function Step2Preferences() {
               onValueChange={field.onChange}
               className="grid grid-cols-3 gap-3"
             >
-              {CALL_TIMES.map(({ value, label, sub }) => (
+              {CALL_TIME_OPTIONS.map(({ value, label, sub }) => (
                 <label
                   key={value}
                   htmlFor={`callTime-${value}`}

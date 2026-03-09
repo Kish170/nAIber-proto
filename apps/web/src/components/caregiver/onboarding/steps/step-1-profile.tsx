@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation"
 import { useForm, Controller } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { z } from "zod"
+import { z } from "zod/v3"
 
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -15,6 +15,8 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { StepLayout } from "../step-layout"
+import { useOnboardingStore } from "@/stores/onboarding.store"
+import { Gender } from "@/types/onboarding"
 
 const schema = z.object({
   fullName: z.string().min(2, "Full name is required"),
@@ -30,14 +32,27 @@ type FormData = z.infer<typeof schema>
 export function Step1Profile() {
   const router = useRouter()
 
+  const store = useOnboardingStore()
+
   const {
     register,
     control,
     handleSubmit,
     formState: { errors },
-  } = useForm<FormData>({ resolver: zodResolver(schema) })
+  } = useForm<FormData>({
+    resolver: zodResolver(schema),
+    defaultValues: {
+      fullName: store.data.fullName ?? "",
+      dateOfBirth: store.data.dateOfBirth ?? "",
+      gender: store.data.gender ?? undefined,
+      phone: store.data.phone ?? "",
+      language: store.data.language ?? undefined,
+      email: store.data.email ?? "",
+    },
+  })
 
-  function onSuccess() {
+  function onSuccess(data: FormData) {
+    store.updateStep(1, data)
     router.push("/onboarding/2")
   }
 
@@ -85,10 +100,10 @@ export function Step1Profile() {
                 <SelectValue placeholder="Select gender" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="female">Female</SelectItem>
-                <SelectItem value="male">Male</SelectItem>
-                <SelectItem value="nonbinary">Non-binary</SelectItem>
-                <SelectItem value="prefer_not">Prefer not to say</SelectItem>
+                <SelectItem value={Gender.FEMALE}>Female</SelectItem>
+                <SelectItem value={Gender.MALE}>Male</SelectItem>
+                <SelectItem value={Gender.NON_BINARY}>Non-binary</SelectItem>
+                <SelectItem value={Gender.PREFER_NOT_TO_SAY}>Prefer not to say</SelectItem>
               </SelectContent>
             </Select>
           )}

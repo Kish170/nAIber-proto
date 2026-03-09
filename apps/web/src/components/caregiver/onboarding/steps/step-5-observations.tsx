@@ -3,32 +3,22 @@
 import { useRouter } from "next/navigation"
 import { useForm, Controller } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { z } from "zod"
+import { z } from "zod/v3"
 
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { StepLayout } from "../step-layout"
+import { useOnboardingStore } from "@/stores/onboarding.store"
+import {
+  ChangeLevel,
+  CHANGE_LEVEL_LABELS,
+  OBSERVATION_QUESTIONS,
+} from "@/types/onboarding"
 
-const changeOptions = ["no_change", "slight_change", "noticeable_change", "big_change"] as const
-const changeLabels: Record<typeof changeOptions[number], string> = {
-  no_change: "No change",
-  slight_change: "Slight",
-  noticeable_change: "Noticeable",
-  big_change: "Big change",
-}
+const changeOptions = Object.values(ChangeLevel)
 
-const QUESTIONS = [
-  { key: "q1", label: "Remembering things about family and friends" },
-  { key: "q2", label: "Remembering things that happened recently" },
-  { key: "q3", label: "Recalling conversations a few days later" },
-  { key: "q4", label: "Knowing what day and month it is" },
-  { key: "q5", label: "Finding their way around familiar places" },
-  { key: "q6", label: "Using familiar everyday items (phone, appliances)" },
-  { key: "q7", label: "Managing everyday tasks independently" },
-] as const
-
-const questionSchema = z.enum(changeOptions).optional()
+const questionSchema = z.enum(changeOptions as [string, ...string[]]).optional()
 
 const schema = z.object({
   q1: questionSchema,
@@ -47,9 +37,25 @@ type FormData = z.infer<typeof schema>
 export function Step5Observations() {
   const router = useRouter()
 
-  const { control, handleSubmit } = useForm<FormData>({ resolver: zodResolver(schema) })
+  const store = useOnboardingStore()
 
-  function onSuccess() {
+  const { control, handleSubmit } = useForm<FormData>({
+    resolver: zodResolver(schema),
+    defaultValues: {
+      q1: store.data.observations?.q1 ?? undefined,
+      q2: store.data.observations?.q2 ?? undefined,
+      q3: store.data.observations?.q3 ?? undefined,
+      q4: store.data.observations?.q4 ?? undefined,
+      q5: store.data.observations?.q5 ?? undefined,
+      q6: store.data.observations?.q6 ?? undefined,
+      q7: store.data.observations?.q7 ?? undefined,
+      otherNotes: store.data.observations?.otherNotes ?? "",
+      changeOnset: store.data.observations?.changeOnset ?? "",
+    },
+  })
+
+  function onSuccess(data: FormData) {
+    store.updateStep(5, { observations: data })
     router.push("/onboarding/6")
   }
 
@@ -71,7 +77,7 @@ export function Step5Observations() {
 
       {/* 7 observation questions */}
       <div className="flex flex-col gap-6">
-        {QUESTIONS.map(({ key, label }) => (
+        {OBSERVATION_QUESTIONS.map(({ key, label }) => (
           <div key={key} className="flex flex-col gap-2">
             <p className="text-sm font-medium text-warm-700">{label}</p>
             <Controller
@@ -99,7 +105,7 @@ export function Step5Observations() {
                         className="sr-only"
                       />
                       <span className="text-xs font-medium text-warm-700 leading-tight">
-                        {changeLabels[opt]}
+                        {CHANGE_LEVEL_LABELS[opt as ChangeLevel]}
                       </span>
                     </label>
                   ))}

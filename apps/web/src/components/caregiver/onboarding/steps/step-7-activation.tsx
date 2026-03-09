@@ -1,9 +1,10 @@
 "use client"
 
+import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { useForm, Controller, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { z } from "zod"
+import { z } from "zod/v3"
 import { Phone, Bell, Brain, Shield } from "lucide-react"
 
 import { Input } from "@/components/ui/input"
@@ -11,6 +12,8 @@ import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Checkbox } from "@/components/ui/checkbox"
 import { StepLayout } from "../step-layout"
+import { useOnboardingStore } from "@/stores/onboarding.store"
+import { trpc } from "@/lib/trpc"
 
 const schema = z.object({
   grantDashboardAccess: z.enum(["yes", "no"], {
@@ -58,17 +61,66 @@ const SUMMARY_ITEMS = [
 
 export function Step7Activation() {
   const router = useRouter()
+  const store = useOnboardingStore()
+  const [submitError, setSubmitError] = useState<string | null>(null)
+
+  const submitMutation = trpc.onboarding.submit.useMutation({
+    onSuccess: () => {
+      store.reset()
+      router.push("/dashboard")
+    },
+    onError: (error) => {
+      setSubmitError(error.message)
+    },
+  })
 
   const {
     control,
     handleSubmit,
     formState: { errors },
-  } = useForm<FormData>({ resolver: zodResolver(schema) })
+  } = useForm<FormData>({
+    resolver: zodResolver(schema),
+    defaultValues: {
+      grantDashboardAccess: store.data.grantDashboardAccess as "yes" | "no" | undefined,
+      elderlyEmail: store.data.elderlyEmail ?? "",
+    },
+  })
 
   const grantAccess = useWatch({ control, name: "grantDashboardAccess" })
 
-  function onSuccess() {
-    router.push("/dashboard")
+  function onSuccess(data: FormData) {
+    store.updateStep(7, data)
+    const allData = { ...store.data, ...data }
+    submitMutation.mutate({
+      fullName: allData.fullName!,
+      dateOfBirth: allData.dateOfBirth,
+      gender: allData.gender as any,
+      phone: allData.phone!,
+      language: allData.language,
+      email: allData.email,
+      callTime: allData.callTime as "morning" | "afternoon" | "evening",
+      callFrequency: allData.callFrequency as "daily" | "weekly",
+      interests: allData.interests,
+      dislikes: allData.dislikes,
+      conditions: allData.conditions,
+      medications: allData.medications,
+      educationLevel: allData.educationLevel,
+      memoryConcerns: allData.memoryConcerns as any,
+      cognitiveChecksEnabled: allData.cognitiveChecksEnabled,
+      communicationStyle: allData.communicationStyle,
+      observations: allData.observations as any,
+      emergencyContact: allData.emergencyContact
+        ? {
+            name: allData.emergencyContact.name,
+            phone: allData.emergencyContact.phone,
+            email: allData.emergencyContact.email,
+            relationship: allData.emergencyContact.relationship ?? 'Other',
+            notifyOnMissedCalls: allData.emergencyContact.notifyOnMissedCall,
+          }
+        : undefined,
+      grantDashboardAccess: data.grantDashboardAccess,
+      elderlyEmail: data.elderlyEmail,
+    })
   }
 
   return (
@@ -81,7 +133,6 @@ export function Step7Activation() {
       onContinue={handleSubmit(onSuccess)}
     >
 
-      {/* Part A: Dashboard access */}
       <div className="flex flex-col gap-2">
         <Label>Would they like access to their own simplified nAIber dashboard?</Label>
         <Controller
@@ -144,7 +195,6 @@ export function Step7Activation() {
         )}
       </div>
 
-      {/* Part B: Summary */}
       <div className="flex flex-col gap-3">
         <p className="text-sm font-medium text-warm-700">Here's what nAIber will do</p>
         <div className="grid grid-cols-1 gap-2">
@@ -165,7 +215,6 @@ export function Step7Activation() {
         </div>
       </div>
 
-      {/* Acknowledgment */}
       <Controller
         name="acknowledged"
         control={control}
@@ -193,6 +242,10 @@ export function Step7Activation() {
           </div>
         )}
       />
+
+      {submitError && (
+        <p className="text-xs text-destructive text-center">{submitError}</p>
+      )}
 
     </StepLayout>
   )
