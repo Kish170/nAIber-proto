@@ -1,7 +1,6 @@
 import { z } from 'zod';
 import { caregiverProcedure, router } from '../trpc/init.js';
 import { HealthRepository } from '@naiber/shared-data';
-import { prismaClient } from '@naiber/shared-clients';
 
 export const healthRouter = router({
     getHealthCheckLogs: caregiverProcedure
@@ -10,11 +9,7 @@ export const healthRouter = router({
             limit: z.number().min(1).max(50).default(10),
         }))
         .query(async ({ input }) => {
-            return await prismaClient.healthCheckLog.findMany({
-                where: { elderlyProfileId: input.elderlyProfileId },
-                orderBy: { createdAt: 'desc' },
-                take: input.limit,
-            });
+            return await HealthRepository.findHealthCheckLogsByElderlyProfileId(input.elderlyProfileId, input.limit);
         }),
 
     getConditions: caregiverProcedure

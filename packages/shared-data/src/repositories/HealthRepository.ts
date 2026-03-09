@@ -76,6 +76,19 @@ export class HealthRepository {
         }
     }
 
+    static async findHealthCheckLogsByElderlyProfileId(elderlyProfileId: string, limit: number = 10) {
+        try {
+            return await prismaClient.healthCheckLog.findMany({
+                where: { elderlyProfileId },
+                orderBy: { createdAt: 'desc' },
+                take: limit,
+            });
+        } catch (error) {
+            console.error('[HealthRepository] Unable to find health check logs:', error);
+            throw error;
+        }
+    }
+
     static async createHealthCheckLog(data: HealthCheckLogData) {
         try {
             return await prismaClient.healthCheckLog.create({ data });

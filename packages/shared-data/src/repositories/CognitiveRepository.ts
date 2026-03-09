@@ -1,4 +1,5 @@
 import { prismaClient } from '@naiber/shared-clients';
+import { cognitiveSessionInclude } from '@naiber/shared-core';
 
 export interface CognitiveTestResultData {
     elderlyProfileId: string;
@@ -84,6 +85,32 @@ export class CognitiveRepository {
             return await prismaClient.cognitiveBaseline.create({ data });
         } catch (error) {
             console.error('[CognitiveRepository] Unable to create baseline:', error);
+            throw error;
+        }
+    }
+
+    static async findSessionsWithCallLog(elderlyProfileId: string, limit: number = 10) {
+        try {
+            return await prismaClient.cognitiveTestResult.findMany({
+                where: { elderlyProfileId },
+                include: cognitiveSessionInclude,
+                orderBy: { completedAt: 'desc' },
+                take: limit,
+            });
+        } catch (error) {
+            console.error('[CognitiveRepository] Unable to find sessions with call log:', error);
+            throw error;
+        }
+    }
+
+    static async findSessionDetailById(id: string) {
+        try {
+            return await prismaClient.cognitiveTestResult.findUnique({
+                where: { id },
+                include: cognitiveSessionInclude,
+            });
+        } catch (error) {
+            console.error('[CognitiveRepository] Unable to find session detail:', error);
             throw error;
         }
     }
