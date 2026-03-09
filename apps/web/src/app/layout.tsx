@@ -5,6 +5,7 @@ import "../styles/globals.css"
 import "../styles/elderly.css"
 import { Toaster } from "@/components/ui/sonner"
 import { SessionProvider } from "@/components/providers/session-provider"
+import { TRPCProvider } from "@/components/providers/trpc-provider"
 
 export const metadata: Metadata = {
   title: {
@@ -22,14 +23,16 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className="min-h-screen antialiased">
         <SessionProvider>
-          <ThemeProvider
-            attribute="class"
-            defaultTheme="light"
-            disableTransitionOnChange
-          >
-            {children}
-            <Toaster position="bottom-right" />
-          </ThemeProvider>
+          <TRPCProvider>
+            <ThemeProvider
+              attribute="class"
+              defaultTheme="light"
+              disableTransitionOnChange
+            >
+              {children}
+              <Toaster position="bottom-right" />
+            </ThemeProvider>
+          </TRPCProvider>
         </SessionProvider>
       </body>
     </html>
