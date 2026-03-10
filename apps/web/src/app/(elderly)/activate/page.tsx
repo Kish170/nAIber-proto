@@ -1,12 +1,15 @@
-import type { Metadata } from "next"
+"use client"
+
 import Link from "next/link"
 
 import { Logo } from "@/components/common/logo"
 import { Button } from "@/components/ui/button"
-
-export const metadata: Metadata = { title: "Welcome to nAIber" }
+import { trpc } from "@/lib/trpc"
 
 export default function ActivatePage() {
+  const { data: profile } = trpc.user.getOwnProfile.useQuery()
+  const name = (profile as any)?.name?.split(" ")[0] ?? "there"
+
   return (
     <div className="flex items-center justify-center min-h-[calc(100vh-80px)] p-6">
       <div className="bg-white rounded-2xl shadow-elevated px-8 py-10 max-w-md w-full">
@@ -16,7 +19,7 @@ export default function ActivatePage() {
         </div>
 
         <h1 className="font-display font-medium text-warm-900 text-2xl leading-snug mb-3">
-          Hi Dorothy, nAIber is here for you.
+          Hi {name}, nAIber is here for you.
         </h1>
         <p className="text-warm-500 leading-relaxed mb-8">
           Your caregiver has set up regular friendly calls for you. nAIber will check in, have a chat,

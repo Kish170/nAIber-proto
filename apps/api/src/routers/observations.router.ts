@@ -34,4 +34,10 @@ export const observationsRouter = router({
         .query(async ({ input }) => {
             return await TrustedContactRepository.getLatestSubmission(input.trustedContactId);
         }),
+
+    getSubmissionHistory: caregiverProcedure
+        .input(z.object({ trustedContactId: z.string().uuid() }))
+        .query(async ({ input }) => {
+            return await TrustedContactRepository.getSubmissionHistory(input.trustedContactId);
+        }),
 });

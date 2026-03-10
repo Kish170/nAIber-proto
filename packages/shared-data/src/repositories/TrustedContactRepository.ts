@@ -63,6 +63,18 @@ export class TrustedContactRepository {
         }
     }
 
+    static async getSubmissionHistory(trustedContactId: string) {
+        try {
+            return await prismaClient.trustedContactSubmission.findMany({
+                where: { trustedContactId },
+                orderBy: { createdAt: 'desc' },
+            });
+        } catch (error) {
+            console.error('[TrustedContactRepository] Unable to get submission history:', error);
+            throw error;
+        }
+    }
+
     static async updateConcernIndex(trustedContactId: string, index: number, weightedIndex: number) {
         try {
             return await prismaClient.trustedContact.update({
