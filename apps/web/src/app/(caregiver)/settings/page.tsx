@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useSession, signOut } from "next-auth/react"
 
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -32,6 +33,7 @@ const NOTIFICATION_ITEMS = [
 ]
 
 export default function SettingsPage() {
+  const { data: session } = useSession()
   const [notifications, setNotifications] = useState<Record<string, boolean>>({
     session: true,
     missed: true,
@@ -57,19 +59,13 @@ export default function SettingsPage() {
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="settings-name">Full name</Label>
-              <Input id="settings-name" placeholder="Your name" disabled />
+              <Input id="settings-name" value={session?.user?.name ?? ""} disabled />
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="settings-email">Email</Label>
-              <Input id="settings-email" type="email" placeholder="your@email.com" disabled />
+              <Input id="settings-email" type="email" value={session?.user?.email ?? ""} disabled />
             </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="settings-phone">Phone</Label>
-              <Input id="settings-phone" type="tel" placeholder="+1 (555) 000-0000" disabled />
-            </div>
-            <Button className="bg-teal text-ivory hover:bg-teal-light self-start" disabled>
-              Save changes
-            </Button>
+            <p className="text-xs text-warm-500">Account managed via Google. To update your name or email, update your Google account.</p>
           </div>
         </SectionCard>
 
@@ -93,13 +89,19 @@ export default function SettingsPage() {
           </div>
         </SectionCard>
 
-        <SectionCard heading="Security">
+        <SectionCard heading="Session">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-warm-900">Password</p>
-              <p className="text-xs text-warm-500 mt-0.5">An email will be sent to reset your password.</p>
+              <p className="text-sm font-medium text-warm-900">Sign out</p>
+              <p className="text-xs text-warm-500 mt-0.5">Sign out of your nAIber account on this device.</p>
             </div>
-            <Button variant="outline" size="sm">Change password</Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => signOut({ callbackUrl: "/login" })}
+            >
+              Sign out
+            </Button>
           </div>
         </SectionCard>
 

@@ -8,8 +8,8 @@ import { EmptyState } from "@/components/common/empty-state"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { InviteCaregiverDialog } from "@/components/caregiver/profile/invite-caregiver-dialog"
-
-const hasUser = false // no backend yet
+import { useActiveUserStore } from "@/stores/active-user.store"
+import { trpc } from "@/lib/trpc"
 
 function SectionCard({ heading, children }: { heading: string; children: React.ReactNode }) {
   return (
@@ -34,8 +34,14 @@ function InfoRow({ icon: Icon, label, value }: { icon: LucideIcon; label: string
 
 export default function ProfilePage() {
   const [inviteOpen, setInviteOpen] = useState(false)
+  const elderlyId = useActiveUserStore((s) => s.selectedElderlyId)
 
-  if (!hasUser) {
+  const { data: profile, isLoading } = trpc.user.getById.useQuery(
+    { id: elderlyId! },
+    { enabled: !!elderlyId }
+  )
+
+  if (!elderlyId) {
     return (
       <div className="p-8 min-h-screen bg-ivory">
         <div className="max-w-4xl mx-auto">
@@ -53,6 +59,20 @@ export default function ProfilePage() {
     )
   }
 
+  if (isLoading || !profile) {
+    return (
+      <div className="p-8 min-h-screen bg-ivory">
+        <div className="max-w-4xl mx-auto">
+          <h1 className="font-display font-medium text-warm-900 text-2xl mb-6">Profile</h1>
+          <div className="h-64 bg-white rounded-2xl animate-pulse" />
+        </div>
+      </div>
+    )
+  }
+
+  const initial = profile.name.charAt(0).toUpperCase()
+  const interests = profile.interests.length > 0 ? profile.interests.join(", ") : null
+
   return (
     <div className="p-8 min-h-screen bg-ivory">
       <div className="max-w-4xl mx-auto flex flex-col gap-6">
@@ -62,35 +82,87 @@ export default function ProfilePage() {
         <SectionCard heading="">
           <div className="flex items-start gap-5 mb-6">
             <div className="w-16 h-16 rounded-full bg-teal flex items-center justify-center shrink-0">
-              <span className="text-xl text-ivory font-display font-medium">M</span>
+              <span className="text-xl text-ivory font-display font-medium">{initial}</span>
             </div>
             <div className="flex-1">
               <div className="flex items-center gap-3 mb-1">
-                <h2 className="font-display font-medium text-warm-900 text-xl">Margaret Thompson</h2>
-                <Badge variant="outline">Awaiting activation</Badge>
+                <h2 className="font-display font-medium text-warm-900 text-xl">{profile.name}</h2>
+                <Badge variant="outline">
+                  {profile.activationStatus === "ACTIVE" ? "Active" : "Awaiting activation"}
+                </Badge>
               </div>
-              <p className="text-sm text-warm-500">Added 3 days ago</p>
+              {profile.age && <p className="text-sm text-warm-500">{profile.age} years old</p>}
             </div>
-            <Button variant="outline" size="sm">Edit profile</Button>
           </div>
 
-          <InfoRow icon={Calendar} label="Date of birth" value="—" />
-          <InfoRow icon={Phone} label="Phone" value="—" />
-          <InfoRow icon={Mail} label="Email" value="—" />
-          <InfoRow icon={Globe} label="Language" value="—" />
+          <InfoRow icon={Phone} label="Phone" value={profile.phone} />
+          <InfoRow icon={Mail} label="Email" value={profile.email ?? "—"} />
+          <InfoRow icon={Globe} label="Gender" value={profile.gender ?? "—"} />
         </SectionCard>
 
         <SectionCard heading="Preferences">
-          <InfoRow icon={Clock} label="Preferred call time" value="—" />
-          <InfoRow icon={Phone} label="Call frequency" value="—" />
+          <InfoRow icon={Clock} label="Call frequency" value={profile.callFrequency} />
           <div className="py-2.5 border-b border-border">
             <div className="flex items-center gap-3 mb-2">
               <Heart size={15} className="text-warm-300 shrink-0" />
               <span className="text-sm text-warm-500">Interests</span>
             </div>
-            <p className="text-sm text-warm-300 pl-6">No interests added</p>
+            {interests ? (
+              <div className="flex flex-wrap gap-2 pl-6">
+                {profile.interests.map((interest) => (
+                  <span
+                    key={interest}
+                    className="text-xs px-2.5 py-1 rounded-full bg-teal/10 text-teal font-medium"
+                  >
+                    {interest}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-warm-300 pl-6">No interests added</p>
+            )}
           </div>
         </SectionCard>
+
+        {profile.healthConditions.length > 0 && (
+          <SectionCard heading="Health conditions">
+            <div className="flex flex-col divide-y divide-border">
+              {profile.healthConditions.map((c) => (
+                <div key={c.id} className="flex items-center justify-between py-2.5">
+                  <span className="text-sm text-warm-900">{c.condition}</span>
+                  {c.severity && (
+                    <span className="text-xs text-warm-500">{c.severity}</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </SectionCard>
+        )}
+
+        {profile.medications.length > 0 && (
+          <SectionCard heading="Medications">
+            <div className="flex flex-col divide-y divide-border">
+              {profile.medications.map((m) => (
+                <div key={m.id} className="flex items-center justify-between py-2.5">
+                  <div>
+                    <span className="text-sm text-warm-900 font-medium">{m.name}</span>
+                    <span className="text-xs text-warm-500 ml-2">{m.dosage}</span>
+                  </div>
+                  <span className="text-xs text-warm-500">{m.frequency}</span>
+                </div>
+              ))}
+            </div>
+          </SectionCard>
+        )}
+
+        {profile.emergencyContact && (
+          <SectionCard heading="Emergency contact">
+            <InfoRow icon={User} label="Name" value={profile.emergencyContact.name} />
+            <InfoRow icon={Phone} label="Phone" value={profile.emergencyContact.phone} />
+            <InfoRow icon={Mail} label="Email" value={profile.emergencyContact.email ?? "—"} />
+            <InfoRow icon={UserCheck} label="Relationship" value={profile.emergencyContact.relationship} />
+          </SectionCard>
+        )}
 
         <SectionCard heading="Caregivers">
           <div className="flex items-center justify-between mb-4">
@@ -102,20 +174,6 @@ export default function ProfilePage() {
             >
               Invite another caregiver
             </Button>
-          </div>
-
-          <div className="flex items-center gap-3 bg-ivory rounded-xl px-4 py-3">
-            <div className="w-8 h-8 rounded-full bg-teal flex items-center justify-center shrink-0">
-              <span className="text-xs text-ivory font-medium">C</span>
-            </div>
-            <div className="flex-1">
-              <p className="text-sm text-warm-900 font-medium">You</p>
-              <p className="text-xs text-warm-500">Primary caregiver</p>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <UserCheck size={13} className="text-teal" />
-              <span className="text-xs text-teal font-medium">Active</span>
-            </div>
           </div>
         </SectionCard>
 
