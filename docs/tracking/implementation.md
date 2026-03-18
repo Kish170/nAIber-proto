@@ -1,0 +1,46 @@
+# Implementation Tracking
+
+Outstanding implementation work across the codebase.
+
+## Telephony
+- [ ] Implement CognitivePrompt.ts (placeholder — no substantive content)
+- [ ] Rename `server` → `telephony-server` (package.json, docker-compose, imports, tsconfig refs)
+- [ ] Review security of userId/phone in system prompts (ConversationResolver fallback)
+
+## AI Orchestration
+- [ ] Cognitive post-call bug: scores stored on `this` instead of LangGraph state channels (Phase 5A)
+
+## General Persona
+- [ ] Indirect cognitive signal extraction during general conversation calls (Phase 5C)
+  - `IndirectSignalExtractor` — vocabulary diversity, repetition markers, response latency, sentence complexity, topic coherence
+  - New `IndirectCognitiveSignal` Prisma model
+  - New node in `GeneralPostCallGraph` after summarization
+
+## Knowledge Graph
+- [ ] End-to-end KG pipeline validation (Phase 4)
+
+## Cognitive Assessment
+- [ ] Drift notifications — create Notification record on notable/significant drift
+- [ ] Distress detection → SMS emergency contact via Twilio
+
+## Notification System
+- [ ] Caregiver notification delivery (in-app + email/SMS)
+- [ ] Notification types: missed calls, health concerns, weekly summaries, medication reminders, system failures
+- [ ] Mark-as-read, dismiss, unread count (repository exists, no frontend wiring yet)
+- [ ] Notification triggers from cognitive drift, health check flags, missed calls
+
+## Web API
+- [ ] Elderly user update/preferences endpoint
+- [ ] Caregiver invitation flow backend (send invite, accept/reject)
+
+## Web Frontend
+- [ ] Welcome step 2 — data submission (needs elderly user update endpoint)
+- [ ] "Update observations" button — form/modal to create new submissions
+- [ ] "Invite another caregiver" dialog functionality
+
+## Documentation
+- [ ] Migrate `docs/prds/future/` content into proper PRD files, then delete the directory
+
+## Scheduler
+- [ ] QueuePopulator implementation (empty scaffold)
+- [ ] QueueProcessor implementation (empty scaffold)
