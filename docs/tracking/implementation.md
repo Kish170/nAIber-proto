@@ -41,6 +41,12 @@ Outstanding implementation work across the codebase.
 - [ ] "Update observations" button — form/modal to create new submissions
 - [ ] "Invite another caregiver" dialog functionality
 
+## Code Quality
+- [ ] Improve naming conventions across the codebase (variables, functions, files, packages)
+- [ ] Migrate from console.log/error to structured logging (pino or winston) with log levels and JSON output
+- [ ] Centralized log collection (Datadog, Grafana Loki, or similar) for production observability
+- [ ] Call tracing — correlate logs across server → ElevenLabs → llm-server using callSid/conversationId
+
 ## Documentation
 - [ ] Migrate `docs/prds/future/` content into proper PRD files, then delete the directory
 
