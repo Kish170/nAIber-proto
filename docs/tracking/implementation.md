@@ -8,6 +8,7 @@ Outstanding implementation work across the codebase.
 - [ ] Remove `rag:phone:{phone}` Redis key — only needed by insecure fallback
 - [ ] Remove regex extraction fallbacks from ConversationResolver (userId + phone from system prompt)
 - [ ] Keep only primary resolution path: `llm.user_id` → `rag:user:{userId}` → `session:{conversationId}`
+- [ ] Improve general call end-call mechanism (health/cognitive have programmatic termination via `scheduleCallEnd()`, general calls do not)
 
 ## AI Orchestration
 - [ ] Cognitive post-call bug: scores stored on `this` instead of LangGraph state channels (Phase 5A)
