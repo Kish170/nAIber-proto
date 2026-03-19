@@ -4,7 +4,7 @@
 Vector database access for storing and retrieving conversation memory embeddings.
 
 ## Two Clients
-- **`QdrantClient`** (`shared-clients`) — direct REST client for Qdrant. Kept for backward compatibility but largely superseded.
+- **`QdrantClient`** (`shared-clients`) — direct REST client for Qdrant. Kept for populating the Qdrant cluster with synthetic test data. Not used in production flows.
 - **`VectorStoreClient`** (`llm-server/src/clients/`) — LangChain `QdrantVectorStore` wrapper. Primary client used by the RAG pipeline.
   - `searchByEmbedding(userId, vector, limit)` — cosine similarity search filtered by userId
   - `addMemoriesWithIds(entries, metadata)` — upsert conversation highlights with Qdrant point IDs

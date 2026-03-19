@@ -50,9 +50,10 @@ Status of all PRD documents.
 - [ ] `prds/infrastructure/redis-keys.md`
 
 ## Decisions (ADRs)
-- [x] `decisions/adr-001-langgraph.md`
+- [x] `decisions/adr-001-langgraph.md` (updated with background + LangSmith note)
 - [x] `decisions/adr-002-elevenlabs-routing.md`
 - [x] `decisions/adr-003-shared-split.md`
 - [x] `decisions/adr-004-bullmq-postcall.md`
-- [ ] `decisions/adr-005-websocket-bridge.md` — why we manage Twilio↔ElevenLabs WSS ourselves
-- [ ] `decisions/adr-006-prompt-location.md` — why system prompts live in telephony server
+- [x] `decisions/adr-005-websocket-bridge.md` — why we manage Twilio↔ElevenLabs WSS ourselves (revisit planned)
+- [x] `decisions/adr-006-prompt-location.md` — why system prompts live in telephony server
+- [x] `decisions/adr-007-shallow-redis-saver.md` — why ShallowRedisSaver over RedisSaver

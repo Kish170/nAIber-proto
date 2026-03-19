@@ -47,3 +47,10 @@ Outstanding implementation work across the codebase.
 ## Scheduler
 - [ ] QueuePopulator implementation (empty scaffold)
 - [ ] QueueProcessor implementation (empty scaffold)
+
+## Post-Batch: Telephony Migration (after all batches, before deployment)
+- [ ] Build MCP server exposing tools: registerSession, getUserProfile, dispatchPostCall, getCallType
+- [ ] Migrate to ElevenLabs built-in Twilio integration (`POST /v1/convai/twilio/outbound-call`)
+- [ ] Use `conversation_config_override` for per-call prompt/first message injection
+- [ ] Update test specs and tests for new architecture
+- [ ] See [ADR-005](../decisions/adr-005-websocket-bridge.md) for full context
