@@ -50,6 +50,7 @@ Status of test spec documents and actual test implementations.
 - [ ] Install vitest + @vitest/coverage-v8
 - [ ] Root vitest.config.ts with workspace config
 - [ ] Per-package test configs
+- [ ] LangSmith integration — graph execution tracing, LLM output evaluation, durable flow debugging
 
 ## Test Implementation
 - [ ] Synthetic test data / fixtures

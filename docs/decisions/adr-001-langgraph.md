@@ -3,6 +3,10 @@
 **Status:** Accepted
 **Date:** Prototype phase, 2025
 
+## Background
+
+The system was initially built with manual orchestration — async function chains managing data flow, branching, and LLM control directly. As the system grew (multiple call types, multi-turn state, conditional RAG pipelines), the manual approach became difficult to maintain and extend. The transition to LangGraph was driven by the need for structured state management and durable execution.
+
 ## Context
 
 The AI orchestration layer needs to handle two meaningfully different call types:
@@ -44,3 +48,13 @@ A third factor: persona scalability. New call types map directly to new `StateGr
 - `@langchain/langgraph-checkpoint` must be pinned to `^1.0.0`. Version `^1.0.1` introduces breaking changes incompatible with `@langchain/langgraph@1.0.1`. This must be managed carefully on upgrades.
 - LangGraph's TypeScript types for `StateGraph` node names are strict in ways that conflict with our build. Workaround: use `graph: any` typing and `setEntryPoint()` instead of `addEdge(START, ...)`. This is a known limitation, not a bug.
 - Debugging requires understanding the graph execution model — not immediately obvious to engineers unfamiliar with LangGraph.
+
+## Observability
+
+LangSmith integration should be considered for testing and monitoring graph executions. Benefits:
+- Trace individual graph runs end-to-end (node-by-node timing, state transitions, LLM calls)
+- Evaluate LLM outputs against test datasets
+- Debug durable execution flows (interrupt/resume sequences)
+- Monitor production graph performance and failure rates
+
+This is tracked as a testing consideration in `docs/tracking/tests.md`.
