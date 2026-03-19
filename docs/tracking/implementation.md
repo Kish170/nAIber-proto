@@ -5,7 +5,9 @@ Outstanding implementation work across the codebase.
 ## Telephony
 - [ ] Implement CognitivePrompt.ts (placeholder — no substantive content)
 - [ ] Rename `server` → `telephony-server` (package.json, docker-compose, imports, tsconfig refs)
-- [ ] Review security of userId/phone in system prompts (ConversationResolver fallback)
+- [ ] Remove `rag:phone:{phone}` Redis key — only needed by insecure fallback
+- [ ] Remove regex extraction fallbacks from ConversationResolver (userId + phone from system prompt)
+- [ ] Keep only primary resolution path: `llm.user_id` → `rag:user:{userId}` → `session:{conversationId}`
 
 ## AI Orchestration
 - [ ] Cognitive post-call bug: scores stored on `this` instead of LangGraph state channels (Phase 5A)
