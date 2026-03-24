@@ -22,3 +22,7 @@ yarn-error.log*
 .DS_Store
 *.swp
 *.swo
+
+# Test results (generated)
+scripts/test-results/*.json
+scripts/test-results/*.md

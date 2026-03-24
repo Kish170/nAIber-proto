@@ -1,0 +1,10 @@
+{
+  "callType": "general",
+  "messages": [
+    "Hello! How are you doing today?",
+    "I was thinking about my granddaughter Sarah. She visited me last week and we had a lovely time in the garden.",
+    "Yes, we planted some new flowers together. Do you remember what kinds of things I like to do in my garden?",
+    "That's wonderful. My knee has been a bit sore lately though."
+  ],
+  "delayMs": 3000
+}

@@ -1,0 +1,13 @@
+{
+  "callType": "cognitive",
+  "messages": [
+    "Hello! I'm feeling good today, thank you.",
+    "Yes, I slept well last night.",
+    "Today is Tuesday.",
+    "March 24th.",
+    "March.",
+    "2026.",
+    "Spring."
+  ],
+  "delayMs": 4000
+}

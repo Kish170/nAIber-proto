@@ -1,0 +1,13 @@
+{
+  "callType": "health_check",
+  "messages": [
+    "Hello! I'm doing alright today.",
+    "I'd say about a 7.",
+    "My knee has been a bit sore from the cold weather.",
+    "I'd give it an 8, slept pretty well.",
+    "Yes, I took it this morning with breakfast.",
+    "The cold weather makes it flare up a bit but otherwise manageable.",
+    "No, I think that covers everything. Thank you!"
+  ],
+  "delayMs": 3000
+}

@@ -1,0 +1,9 @@
+{
+  "callType": "health_check",
+  "messages": [
+    "Hello, I'm okay.",
+    "About a 6.",
+    "Actually, I'm sorry but I have to go. Someone is at the door."
+  ],
+  "delayMs": 3000
+}
