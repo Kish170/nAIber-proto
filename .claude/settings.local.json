@@ -27,7 +27,9 @@
       "Bash(git stash*)",
       "Bash(cat *)",
       "Bash(ls *)",
-      "Bash(echo *)"
+      "Bash(echo *)",
+      "WebFetch(domain:elevenlabs.io)",
+      "WebFetch(domain:www.npmjs.com)"
     ],
     "deny": [
       "Bash(rm -rf*)",

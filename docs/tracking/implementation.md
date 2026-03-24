@@ -3,7 +3,7 @@
 Outstanding implementation work across the codebase.
 
 ## Telephony
-- [ ] Implement CognitivePrompt.ts (placeholder — no substantive content)
+- [x] ~~Implement CognitivePrompt.ts~~ (already fully implemented)
 - [ ] Rename `server` → `telephony-server` (package.json, docker-compose, imports, tsconfig refs)
 - [ ] Remove `rag:phone:{phone}` Redis key — only needed by insecure fallback
 - [ ] Remove regex extraction fallbacks from ConversationResolver (userId + phone from system prompt)
@@ -11,7 +11,7 @@ Outstanding implementation work across the codebase.
 - [ ] Improve general call end-call mechanism (health/cognitive have programmatic termination via `scheduleCallEnd()`, general calls do not)
 
 ## AI Orchestration
-- [ ] Cognitive post-call bug: scores stored on `this` instead of LangGraph state channels (Phase 5A)
+- [x] ~~Cognitive post-call bug: scores stored on `this` instead of LangGraph state channels (Phase 5A)~~ — fixed
 
 ## General Persona
 - [ ] Indirect cognitive signal extraction during general conversation calls (Phase 5C)
@@ -60,3 +60,14 @@ Outstanding implementation work across the codebase.
 - [ ] Use `conversation_config_override` for per-call prompt/first message injection
 - [ ] Update test specs and tests for new architecture
 - [ ] See [ADR-005](../decisions/adr-005-websocket-bridge.md) for full context
+
+## Post-Batch: General Persona Migration (after all batches, before deployment)
+- [ ] Migrate general persona to ElevenLabs native LLM (remove ConversationGraph for general calls)
+- [ ] Expose RAG as MCP tool: `retrieveMemories(query)` → Qdrant + KG enriched results
+- [ ] Route general calls to ElevenLabs native LLM (no `llm.url` override)
+- [ ] Route health/cognitive calls to llm-server via `llm.url` in `conversation_config_override`
+- [ ] Decide on topic tracking approach: post-call only vs `trackTopic` MCP tool
+- [ ] Verify MCP tool call latency is acceptable for conversational flow
+- [ ] Remove ConversationGraph, IntentClassifier, general call path from SupervisorGraph
+- [ ] GeneralPostCallGraph unchanged — still processes transcripts after call
+- [ ] See [ADR-008](../decisions/adr-008-general-persona-migration.md) for full context

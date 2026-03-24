@@ -18,6 +18,8 @@ export const CognitivePostCallState = Annotation.Root({
     isDeferred:             Annotation<boolean>({ reducer: (_, b) => b, default: () => false }),
     deferralReason:         Annotation<string>({ reducer: (_, b) => b, default: () => '' }),
     error:                  Annotation<string>({ reducer: (_, b) => b, default: () => '' }),
+    domainScores:           Annotation<any>({ reducer: (_, b) => b, default: () => null }),
+    stabilityIndex:         Annotation<number>({ reducer: (_, b) => b, default: () => 0 }),
 });
 
 export type CognitivePostCallStateType = typeof CognitivePostCallState.State;

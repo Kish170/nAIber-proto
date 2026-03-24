@@ -51,10 +51,7 @@ export class CognitivePostCallGraph {
                 abstraction: domainScores.abstractionReasoning.normalized,
             });
 
-            (this as any)._domainScores = domainScores;
-            (this as any)._stabilityIndex = stabilityIndex;
-
-            return {};
+            return { domainScores, stabilityIndex };
         } catch (err: any) {
             console.error('[CognitivePostCall] Score computation failed:', err);
             return { error: err.message ?? 'Score computation failed' };
@@ -63,8 +60,7 @@ export class CognitivePostCallGraph {
 
     private async persistResults(state: CognitivePostCallStateType) {
         try {
-            const domainScores = (this as any)._domainScores;
-            const stabilityIndex = (this as any)._stabilityIndex;
+            const { domainScores, stabilityIndex } = state;
 
             await CognitiveRepository.createTestResult({
                 elderlyProfileId: state.userId,
@@ -101,7 +97,7 @@ export class CognitivePostCallGraph {
                 return {};
             }
 
-            const domainScores = (this as any)._domainScores;
+            const { domainScores } = state;
             if (!domainScores) return {};
 
             const currentBaseline = await CognitiveRepository.getLatestBaseline(state.userId);

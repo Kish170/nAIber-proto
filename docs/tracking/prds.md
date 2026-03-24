@@ -57,3 +57,4 @@ Status of all PRD documents.
 - [x] `decisions/adr-005-websocket-bridge.md` — why we manage Twilio↔ElevenLabs WSS ourselves (revisit planned)
 - [x] `decisions/adr-006-prompt-location.md` — why system prompts live in telephony server
 - [x] `decisions/adr-007-shallow-redis-saver.md` — why ShallowRedisSaver over RedisSaver
+- [] `decisions/adr-008-general-persona-migration.md` — migrate general persona to ElevenLabs native LLM + RAG MCP tool (proposed, post-batch)
