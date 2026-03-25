@@ -5,21 +5,24 @@ Outstanding implementation work across the codebase.
 ## Telephony
 - [x] ~~Implement CognitivePrompt.ts~~ (already fully implemented)
 - [ ] Rename `server` → `telephony-server` (package.json, docker-compose, imports, tsconfig refs)
-- [ ] Remove `rag:phone:{phone}` Redis key — only needed by insecure fallback
-- [ ] Remove regex extraction fallbacks from ConversationResolver (userId + phone from system prompt)
-- [ ] Keep only primary resolution path: `llm.user_id` → `rag:user:{userId}` → `session:{conversationId}`
+- [x] ~~Remove `rag:phone:{phone}` Redis key — only needed by insecure fallback~~
+- [x] ~~Remove regex extraction fallbacks from ConversationResolver (userId + phone from system prompt)~~
+- [x] ~~Keep only primary resolution path: `llm.user_id` → `rag:user:{userId}` → `session:{conversationId}`~~
 - [ ] Improve general call end-call mechanism (health/cognitive have programmatic termination via `scheduleCallEnd()`, general calls do not)
 
 ## AI Orchestration
 - [x] ~~Cognitive post-call bug: scores stored on `this` instead of LangGraph state channels (Phase 5A)~~ — fixed
 
 ## General Persona
+- [ ] RAG retrieval quality — responses use generic context from current conversation rather than prior memory. Revisit after ADR-008 migration (general persona → native LLM + RAG MCP tool) since the retrieval architecture will change.
 - [ ] Indirect cognitive signal extraction during general conversation calls (Phase 5C)
   - `IndirectSignalExtractor` — vocabulary diversity, repetition markers, response latency, sentence complexity, topic coherence
   - New `IndirectCognitiveSignal` Prisma model
   - New node in `GeneralPostCallGraph` after summarization
 
 ## Knowledge Graph
+- [x] ~~NER person deduplication — NERService used random UUIDs, causing duplicate Person nodes across calls. Fixed with deterministic hash IDs.~~
+- [x] ~~Neo4j database name — Neo4jClient targeted `nAIber-KG` which doesn't exist in Community Edition. Fixed to use default `neo4j` database.~~
 - [ ] End-to-end KG pipeline validation (Phase 4)
 
 ## Cognitive Assessment

@@ -410,7 +410,6 @@ async function createRedisSession(
     try {
         await redis.set(`session:${conversationId}`, JSON.stringify(sessionData), { EX: ttl });
         await redis.set(`rag:user:${userId}`, conversationId, { EX: ttl });
-        await redis.set(`rag:phone:${phone}`, conversationId, { EX: ttl });
         tracker.record('redis_session_created', true);
     } catch (err: any) {
         tracker.record('redis_session_created', false, undefined, err.message);
@@ -418,11 +417,10 @@ async function createRedisSession(
     }
 }
 
-async function cleanupRedisSession(redis: RedisClient, conversationId: string, userId: string, phone: string): Promise<void> {
+async function cleanupRedisSession(redis: RedisClient, conversationId: string, userId: string): Promise<void> {
     try {
         await redis.deleteByPattern(`session:${conversationId}`);
         await redis.deleteByPattern(`rag:user:${userId}`);
-        await redis.deleteByPattern(`rag:phone:${phone}`);
         console.log('[cleanup] Redis session keys deleted');
     } catch (err) {
         console.warn('[cleanup] Failed to delete Redis keys:', err);
@@ -835,7 +833,7 @@ async function main(): Promise<void> {
         // Trigger post-call processing and verify results
         await triggerPostCall(conversationId, userId, callType, tracker);
 
-        await cleanupRedisSession(redis, conversationId, userId, phone);
+        await cleanupRedisSession(redis, conversationId, userId);
         tracker.printSummary();
         saveResults(tracker);
         await redis.disconnect();
@@ -855,7 +853,7 @@ async function main(): Promise<void> {
                 if (trimmed === '!quit') {
                     console.log('\n[session] Ending...');
                     await conversation.endSession();
-                    await cleanupRedisSession(redis, conversationId, userId, phone);
+                    await cleanupRedisSession(redis, conversationId, userId);
                     tracker.printSummary();
                     saveResults(tracker);
                     rl.close();

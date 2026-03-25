@@ -413,7 +413,6 @@ export class WebSocketService {
             });
 
             await redisInstance.set(`rag:user:${this.userProfile.id}`, this.conversationId, { EX: ttl });
-            await redisInstance.set(`rag:phone:${this.userProfile.phone}`, this.conversationId, { EX: ttl });
 
             console.log('[WebSocketService] Registered session:', {
                 conversationId: this.conversationId,
