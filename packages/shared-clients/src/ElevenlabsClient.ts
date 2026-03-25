@@ -87,7 +87,7 @@ export class ElevenLabsClient {
         throw new Error("Unable to retrieve transcript")
     }
 
-    async getStructuredTranscriptWithRetry(conversationId: string, retries = 5, delayMs = 1000): Promise<TranscriptMessage[]> {
+    async getStructuredTranscriptWithRetry(conversationId: string, retries = 10, delayMs = 2000): Promise<TranscriptMessage[]> {
         for (let i = 0; i < retries; i++) {
             const res = await fetch(`https://api.elevenlabs.io/v1/convai/conversations/${conversationId}`, {
                 headers: {

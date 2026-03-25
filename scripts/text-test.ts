@@ -520,36 +520,36 @@ async function verifyPostCallResults(
 
                 // Check Conversation node
                 const convResult = await session.run(
-                    'MATCH (c:Conversation {id: $id}) RETURN c', { id: conversationId }
+                    'MATCH (c:Conversation {conversationId: $conversationId}) RETURN c', { conversationId }
                 );
                 tracker.recordPostcall('postcall_kg_conversation_node', convResult.records.length > 0);
 
-                // Check Summary node
+                // Check Summary node (Conversation -[:HAS_SUMMARY]-> Summary)
                 const summaryResult = await session.run(
-                    'MATCH (c:Conversation {id: $id})-[:HAS_SUMMARY]->(s:Summary) RETURN s', { id: conversationId }
+                    'MATCH (c:Conversation {conversationId: $conversationId})-[:HAS_SUMMARY]->(s:Summary) RETURN s', { conversationId }
                 );
                 tracker.recordPostcall('postcall_kg_summary_node', summaryResult.records.length > 0);
 
-                // Check Topic nodes
+                // Check Topic nodes (Summary -[:MENTIONS]-> Topic)
                 const topicResult = await session.run(
-                    'MATCH (c:Conversation {id: $id})-[:DISCUSSED]->(t:Topic) RETURN t', { id: conversationId }
+                    'MATCH (c:Conversation {conversationId: $conversationId})-[:HAS_SUMMARY]->(s)-[:MENTIONS]->(t:Topic) RETURN t', { conversationId }
                 );
                 tracker.recordPostcall('postcall_kg_topics', topicResult.records.length > 0, {
                     topicNodes: topicResult.records.length,
                 });
 
-                // Check Person nodes
+                // Check Person nodes (User -[:MENTIONED]-> Person)
                 const personResult = await session.run(
-                    'MATCH (c:Conversation {id: $id})-[:MENTIONED]->(p:Person) RETURN p', { id: conversationId }
+                    'MATCH (u:User {userId: $userId})-[:MENTIONED]->(p:Person) RETURN p', { userId }
                 );
                 tracker.recordPostcall('postcall_kg_persons', true, {
                     persons: personResult.records.map(r => r.get('p').properties.name),
                 });
 
-                // Check relationships
+                // Check relationships from Conversation node
                 const relResult = await session.run(
-                    `MATCH (c:Conversation {id: $id})-[r]->() RETURN type(r) as relType, count(*) as cnt`,
-                    { id: conversationId }
+                    `MATCH (c:Conversation {conversationId: $conversationId})-[r]->() RETURN type(r) as relType, count(*) as cnt`,
+                    { conversationId }
                 );
                 const rels: Record<string, number> = {};
                 for (const r of relResult.records) {
@@ -827,6 +827,14 @@ async function main(): Promise<void> {
         // Cleanup scripted mode
         console.log('\n[session] Scripted mode complete, ending session...');
         await conversation.endSession();
+
+        // Give ElevenLabs time to finalize the transcript before post-call
+        console.log('[session] Waiting 5s for transcript to become available...');
+        await new Promise(r => setTimeout(r, 5000));
+
+        // Trigger post-call processing and verify results
+        await triggerPostCall(conversationId, userId, callType, tracker);
+
         await cleanupRedisSession(redis, conversationId, userId, phone);
         tracker.printSummary();
         saveResults(tracker);
