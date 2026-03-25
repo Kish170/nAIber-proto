@@ -3,38 +3,40 @@
 Status of all PRD documents.
 
 ## Batch 1: Telephony + AI Orchestration + Shared
-- [ ] `prds/telephony/call-flow.md`
-- [ ] `prds/telephony/media-streaming.md`
-- [ ] `prds/telephony/session-management.md`
-- [ ] `prds/telephony/prompts.md`
-- [ ] `prds/ai-orchestration/supervisor.md`
-- [ ] `prds/ai-orchestration/conversation-resolver.md`
-- [ ] `prds/ai-orchestration/post-call-worker.md`
-- [ ] `prds/shared/clients/openai.md`
-- [ ] `prds/shared/clients/elevenlabs.md`
-- [ ] `prds/shared/clients/twilio.md`
-- [ ] `prds/shared/clients/prisma.md`
-- [ ] `prds/shared/clients/redis.md`
-- [ ] `prds/shared/clients/qdrant.md`
-- [ ] `prds/shared/data/repositories.md`
-- [ ] `prds/shared/data/stores.md`
-- [ ] `prds/shared/services/embeddings.md`
+- [x] `prds/telephony/call-flow.md`
+- [x] `prds/telephony/media-streaming.md`
+- [x] `prds/telephony/session-management.md`
+- [x] `prds/telephony/prompts.md`
+- [x] `prds/ai-orchestration/supervisor.md`
+- [x] `prds/ai-orchestration/conversation-resolver.md`
+- [x] `prds/ai-orchestration/post-call-worker.md`
+- [x] `prds/shared/clients/openai.md`
+- [x] `prds/shared/clients/elevenlabs.md`
+- [x] `prds/shared/clients/twilio.md`
+- [x] `prds/shared/clients/prisma.md`
+- [x] `prds/shared/clients/redis.md`
+- [x] `prds/shared/clients/qdrant.md`
+- [x] `prds/shared/data/repositories.md`
+- [x] `prds/shared/data/stores.md`
+- [x] `prds/shared/services/embeddings.md`
 
 ## Batch 2: Knowledge Graph + General Persona
-- [ ] `prds/knowledge-graph/population.md`
-- [ ] `prds/knowledge-graph/retrieval.md`
-- [ ] `prds/knowledge-graph/schema.md`
-- [ ] `prds/personas/general/conversation.md`
-- [ ] `prds/personas/general/rag-pipeline.md`
-- [ ] `prds/personas/general/post-call.md`
+- [x] `prds/knowledge-graph/population.md`
+- [x] `prds/knowledge-graph/retrieval.md`
+- [x] `prds/knowledge-graph/schema.md`
+- [x] `prds/personas/general/conversation.md`
+- [x] `prds/personas/general/rag-pipeline.md`
+- [x] `prds/personas/general/post-call.md`
 
 ## Batch 3: Health + Cognitive Persona
-- [ ] `prds/personas/health/health-check.md` (update existing `personas/health.md`)
-- [ ] `prds/personas/health/post-call.md`
-- [ ] `prds/personas/cognitive/assessment.md` (update existing `personas/cognitive.md`)
-- [ ] `prds/personas/cognitive/scoring.md`
-- [ ] `prds/personas/cognitive/baseline-drift.md`
-- [ ] `prds/personas/cognitive/post-call.md`
+- [x] `prds/personas/health.md` (top-level, comprehensive)
+- [x] `prds/personas/health/health-check.md` (implementation details)
+- [x] `prds/personas/health/post-call.md`
+- [x] `prds/personas/cognitive.md` (top-level, referenced by sub-PRDs)
+- [x] `prds/personas/cognitive/assessment.md`
+- [x] `prds/personas/cognitive/scoring.md`
+- [x] `prds/personas/cognitive/baseline-drift.md`
+- [x] `prds/personas/cognitive/post-call.md`
 
 ## Batch 4: Web
 - [ ] `prds/web/back-end.md`
@@ -49,6 +51,11 @@ Status of all PRD documents.
 - [ ] `prds/infrastructure/queues.md`
 - [ ] `prds/infrastructure/redis-keys.md`
 
+## Future (superseded — content migrated to proper PRDs)
+- `prds/future/cognitive-persona.md` — empty, superseded by `personas/cognitive/assessment.md`
+- `prds/future/knowledge-graph.md` — superseded by `knowledge-graph/*.md`
+- `prds/future/rag-intergration.md` — empty, superseded by `personas/general/rag-pipeline.md`
+
 ## Decisions (ADRs)
 - [x] `decisions/adr-001-langgraph.md` (updated with background + LangSmith note)
 - [x] `decisions/adr-002-elevenlabs-routing.md`
@@ -57,4 +64,4 @@ Status of all PRD documents.
 - [x] `decisions/adr-005-websocket-bridge.md` — why we manage Twilio↔ElevenLabs WSS ourselves (revisit planned)
 - [x] `decisions/adr-006-prompt-location.md` — why system prompts live in telephony server
 - [x] `decisions/adr-007-shallow-redis-saver.md` — why ShallowRedisSaver over RedisSaver
-- [] `decisions/adr-008-general-persona-migration.md` — migrate general persona to ElevenLabs native LLM + RAG MCP tool (proposed, post-batch)
+- [x] `decisions/adr-008-general-persona-migration.md` — migrate general persona to ElevenLabs native LLM + RAG MCP tool (proposed, post-batch)
