@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { OpenAIClient } from '@naiber/shared-clients';
 
 export interface ExtractedPerson {
@@ -59,11 +60,11 @@ export class NERService {
         const raw: Array<{ name: string; role?: string; context: string }> = parsed.persons ?? [];
 
         return raw.map(p => ({
-            id: crypto.randomUUID(),
+            id: createHash('sha256').update(`${p.name.toLowerCase().trim()}:${(p.role || '').toLowerCase().trim()}`).digest('hex').slice(0, 16),
             name: p.name,
             role: p.role,
             context: p.context,
-            highlightIndices: [] 
+            highlightIndices: []
         }));
     }
 }
