@@ -29,7 +29,9 @@
       "Bash(ls *)",
       "Bash(echo *)",
       "WebFetch(domain:elevenlabs.io)",
-      "WebFetch(domain:www.npmjs.com)"
+      "WebFetch(domain:www.npmjs.com)",
+      "Bash(find /Users/kishanrajagunathas/Documents/projects/nAIber-proto -name *.sql -o -name *schema* -o -name *migration*)",
+      "Bash(find /Users/kishanrajagunathas/Documents/projects/nAIber-proto -name docker-compose* -o -name Dockerfile*)"
     ],
     "deny": [
       "Bash(rm -rf*)",
