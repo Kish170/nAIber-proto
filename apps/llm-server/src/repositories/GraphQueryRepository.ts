@@ -1,4 +1,4 @@
-import { Session } from 'neo4j-driver';
+import neo4j, { Session } from 'neo4j-driver';
 import { Neo4jClient } from '../clients/Neo4jClient.js';
 import type {
     KGHighlightResult,
@@ -33,7 +33,7 @@ export class GraphQueryRepository {
                             topicLabels
                      ORDER BY h.importanceScore DESC
                      LIMIT $limit`,
-                    { topicIds, limit }
+                    { topicIds, limit: neo4j.int(limit) }
                 );
                 return result.records.map(r => ({
                     qdrantPointId: r.get('qdrantPointId'),
