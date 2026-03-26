@@ -80,6 +80,15 @@ export function LLMRouter(checkpointer: BaseCheckpointSaver): Router {
         kgRetrievalService
     );
 
+    // Debug: track request patterns per conversation to diagnose double-response
+    const requestTracker = new Map<string, { count: number; lastTimestamp: number }>();
+    setInterval(() => {
+        const now = Date.now();
+        for (const [key, val] of requestTracker) {
+            if (now - val.lastTimestamp > 60_000) requestTracker.delete(key);
+        }
+    }, 30_000);
+
     const conversationGraphHandler = async (req: Request, res: Response) => {
         try {
             const request: ChatCompletionRequest = req.body;
@@ -94,13 +103,40 @@ export function LLMRouter(checkpointer: BaseCheckpointSaver): Router {
                 return;
             }
 
+            // Debug: log request pattern details
+            const lastMsg = request.messages[request.messages.length - 1];
+            const lastContent = typeof lastMsg?.content === 'string'
+                ? lastMsg.content.substring(0, 80)
+                : JSON.stringify(lastMsg?.content)?.substring(0, 80);
+            const msgRoles = request.messages.map(m => m.role).join(',');
+
             console.log('[LLM Route] Request params:', {
                 model: request.model,
                 stream: request.stream,
-                messageCount: request.messages.length
+                messageCount: request.messages.length,
+                roles: msgRoles,
+                lastRole: lastMsg?.role,
+                lastContent,
+                timestamp: Date.now()
             });
 
             const conversation = await conversationResolver.resolveConversation(request);
+
+            if (conversation) {
+                const key = conversation.conversationId;
+                const tracker = requestTracker.get(key) || { count: 0, lastTimestamp: 0 };
+                const gap = tracker.lastTimestamp ? Date.now() - tracker.lastTimestamp : 0;
+                tracker.count++;
+                tracker.lastTimestamp = Date.now();
+                requestTracker.set(key, tracker);
+                console.log('[LLM Route] DEBUG request pattern:', {
+                    conversationId: key,
+                    requestNum: tracker.count,
+                    msSinceLastRequest: gap,
+                    messageCount: request.messages.length,
+                    lastRole: lastMsg?.role,
+                });
+            }
 
             if (!conversation) {
                 console.log('[LLM Route] Could not resolve conversation, falling back to LLMController');

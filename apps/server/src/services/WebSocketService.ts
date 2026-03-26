@@ -244,6 +244,7 @@ export class WebSocketService {
 
         const initMessage = {
             type: 'conversation_initiation_client_data',
+            custom_llm_extra_body: { user_id: this.userProfile!.id },
             conversation_config_override: {
                 agent: {
                     prompt: {
@@ -252,9 +253,6 @@ export class WebSocketService {
                     first_message: firstMessage,
                     language: 'en',
                     auto_start_conversation: true
-                },
-                llm: {
-                    user_id: this.userProfile!.id 
                 },
                 tts: {
                     voice_id: process.env.ELEVENLABS_VOICE_ID
