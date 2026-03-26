@@ -17,11 +17,13 @@ Supplements the [top-level health check PRD](../health.md) with implementation-s
 1. Scale (1-10): "How are you feeling overall right now?" — category: `general`
 2. Text: "Any physical symptoms? (pain, nausea, dizziness)" — category: `symptom`
 3. Scale (1-10): "How would you rate your sleep last night?" — category: `general`
-4. Text (optional): "Anything else about how you're feeling?" — category: `general`
 
-**Dynamic questions (from user profile):**
+**Dynamic questions (from user profile, inserted after base questions):**
 - Per active health condition: Text — "How has your [condition] been lately?" — category: `condition-specific`
 - Per active medication: Boolean — "Have you taken your [medication] today?" — category: `medication`
+
+**Closing question (always last):**
+4. Text (optional): "Is there anything else about your health you'd like to mention before we finish?" — category: `general`
 
 ## Validation (ValidationTools)
 
@@ -40,6 +42,11 @@ Supplements the [top-level health check PRD](../health.md) with implementation-s
 - `MAX_RETRY_ATTEMPTS`: 2
 - `MAX_FOLLOW_UP_QUESTIONS`: 2
 - Exit keywords: `i have to go, i need to go, stop, end, quit, skip all, i'm done, goodbye, bye`
+
+## Known Gap — Exit Intent Detection
+The current exit keyword list is narrow and misses natural completion phrases like "that covers everything", "I think we're good", "no more questions". This causes the graph to continue asking questions after the user has signalled they are done.
+
+**Resolution:** Exit intent will be handled as an MCP tool call (`endCall`) once the telephony migration to ElevenLabs built-in Twilio integration is complete (ADR-005). The agent will invoke `endCall` when it detects conversational completion, replacing keyword matching entirely. Do not expand the keyword list — fix it properly via the MCP tool.
 
 ## State Channels
 Key fields: `healthCheckQuestions`, `currentQuestionIndex`, `questionAttempts`, `healthCheckAnswers`, `rawAnswer`, `validatedAnswer`, `isValid`, `pendingClarification`, `isHealthCheckComplete`

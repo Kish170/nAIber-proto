@@ -64,15 +64,6 @@ export class HealthCheckHandler {
             )
         );
 
-        questions.push(
-            new TextQuestion(
-                "extra_notes",
-                "Is there anything else you'd like to note about how you're feeling?",
-                "general",
-                "Allows the user to provide additional details that weren't covered by other questions."
-            )
-        );
-
         const conditions = await HealthRepository.findHealthConditionsByElderlyProfileId(userId);
         const activeConditions = conditions.filter(c => c.isActive);
 
@@ -107,6 +98,16 @@ export class HealthCheckHandler {
                 );
             }
         }
+
+        questions.push(
+            new TextQuestion(
+                "extra_notes",
+                "Is there anything else about your health you'd like to mention before we finish?",
+                "general",
+                "Allows the user to raise anything not covered by the structured questions — acts as a natural closing.",
+                true
+            )
+        );
 
         return questions;
     }

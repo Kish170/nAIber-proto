@@ -1,0 +1,19 @@
+{
+  "callType": "health_check",
+  "description": "Full health check covering all 11 questions for Margaret Thompson (3 conditions, 4 medications). Question order: overall wellbeing → physical symptoms → sleep → Type 2 Diabetes → Hypertension → Osteoarthritis → Metformin → Lisinopril → Vitamin D3 → Ibuprofen → extra notes.",
+  "messages": [
+    "Hello, I'm doing alright today.",
+    "I'd say about a 7 out of 10.",
+    "My knee has been a bit sore from the cold weather.",
+    "About an 8, I slept pretty well last night.",
+    "My diabetes has been fairly stable. I've been watching my diet and my readings have been okay.",
+    "My blood pressure seems fine, no headaches or dizziness recently.",
+    "The cold weather makes my joints flare up a bit but it's manageable with rest.",
+    "Yes, I took my Metformin this morning with breakfast.",
+    "Yes, I took my Lisinopril this morning as well.",
+    "Yes, I've been taking my Vitamin D3 every day.",
+    "No, I haven't needed the Ibuprofen today.",
+    "No, I think that covers everything. Thank you."
+  ],
+  "delayMs": 4000
+}

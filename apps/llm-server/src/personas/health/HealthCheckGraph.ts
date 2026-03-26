@@ -78,11 +78,19 @@ export class HealthCheckGraph {
             };
         }
 
-        const systemPrompt = this.buildQuestionContext(currentQuestion, state);
+        const questionContext = this.buildQuestionContext(currentQuestion, state);
+        const originalSystemMsg = state.messages.find(m => m instanceof SystemMessage);
+        const combinedPrompt = originalSystemMsg
+            ? `${originalSystemMsg.content}\n\n${questionContext}`
+            : questionContext;
+
+        const conversationHistory = state.messages
+            .filter(m => !(m instanceof SystemMessage))
+            .slice(-4);
 
         const messages = [
-            new SystemMessage(systemPrompt),
-            ...state.messages.slice(-4)
+            new SystemMessage(combinedPrompt),
+            ...conversationHistory
         ];
 
         const response = await this.llm.invoke(messages);
