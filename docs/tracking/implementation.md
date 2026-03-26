@@ -13,6 +13,18 @@ Outstanding implementation work across the codebase.
 ## AI Orchestration
 - [x] ~~Cognitive post-call bug: scores stored on `this` instead of LangGraph state channels (Phase 5A)~~ — fixed
 
+## Health Persona — Build Now
+- [ ] Structured health post-call — uncomment `saveHealthLog()`, `saveMedicationLogs()`, `saveHealthConditionLogs()` in HealthCheckHandler; expand HealthPostCallGraph to 4-node graph (parse → persist → analyze → alerts)
+- [ ] PHQ-2 depression screen — 2 scale questions (0-3) every health call; score ≥ 3 triggers full GDS-15 next call; results shared to cognitive via Redis signal
+- [ ] IADL questions — 4 boolean questions (medication mgmt, financial mgmt, transportation, meal prep) every health call
+- [ ] Cognitive self-report questions — 3 questions (forgetfulness, word-finding, repetition) every health call
+- [ ] New Prisma models: HealthLog, MedicationLog, HealthConditionLog, IADLAssessment
+
+## Health Persona — Build Next
+- [ ] Full GDS-15 with trigger logic — 15 yes/no items, administered when PHQ-2 score ≥ 3
+- [ ] Health trend analysis — `HealthTrendAnalyzer.ts` (wellbeing trajectory, sleep trajectory, medication adherence, IADL decline, symptom recurrence, GDS trajectory)
+- [ ] ElderlyProfile schema expansion — sensory impairments, primary language, living situation
+
 ## General Persona
 - [ ] RAG retrieval quality — responses use generic context from current conversation rather than prior memory. Revisit after ADR-008 migration (general persona → native LLM + RAG MCP tool) since the retrieval architecture will change.
 - [ ] Indirect cognitive signal extraction during general conversation calls (Phase 5C)
@@ -25,9 +37,31 @@ Outstanding implementation work across the codebase.
 - [x] ~~Neo4j database name — Neo4jClient targeted `nAIber-KG` which doesn't exist in Community Edition. Fixed to use default `neo4j` database.~~
 - [ ] End-to-end KG pipeline validation (Phase 4)
 
-## Cognitive Assessment
+## Cognitive Assessment — Build Now
+- [ ] Demographic-adjusted scoring — `DemographicAdjustment.ts` modifies interpretation thresholds using education/age from ElderlyProfile (Rossetti 2011, Borland 2017 normative data)
+- [ ] Baseline initialization from onboarding — `BaselineInitializer.ts` converts IQCODE informant data into prior expectations, blends with first test (0.6 test + 0.4 priors)
+- [ ] Assessment confidence scoring — `ConfidenceScoring.ts` produces 0-1 meta-score per session (completion rate, retries, hearing difficulty, illness, medication changes). Add `confidenceScore`/`confidenceFactors` to CognitiveTestResult schema
+- [ ] Health-to-cognitive confounding flags — read Redis health signals before scoring; downgrade drift category when confounders present
+
+## Cognitive Assessment — Build Next
+- [ ] MCID/RCI-based drift detection — `ReliableChangeDetector.ts` validates score changes exceed measurement error (`z = (X2 - X1) / sqrt(2 * SEM²)`)
+- [ ] Personal norms scoring — after 5+ sessions, per-domain personal bests/variance/stable-period means become primary drift input
+- [ ] Wellbeing gate confounding expansion — add acute illness, medication change, hearing difficulty questions to pre-test screening
 - [ ] Drift notifications — create Notification record on notable/significant drift
 - [ ] Distress detection → SMS emergency contact via Twilio
+
+## Cognitive Assessment — Later
+- [ ] Adaptive testing / supplementary probes — optional domain-specific probes after standard battery based on decline patterns (max 3-5 min)
+- [ ] Indirect speech signal extraction (Phase 5C) — type-token ratio, MLU, repetition markers, filler density, self-corrections from transcript
+- [ ] Extended content rotation — additional word lists/digit sequences for increased testing frequency
+- [ ] Acoustic/prosodic analysis — requires audio pipeline, not just transcript
+
+## Cross-Persona — Build Now
+- [ ] Redis signal sharing — health→cognitive and cognitive→health signals with 30-day TTL (mood, sleep, IADL, medication, drift)
+
+## Cross-Persona — Build Next
+- [ ] Unified escalation framework — `EscalationService.ts` with 4 tiers (Log → Dashboard → Alert → SMS) based on signal severity
+- [ ] New NotificationType values: `COGNITIVE_DRIFT`, `MOOD_CONCERN`, `IADL_DECLINE`
 
 ## Notification System
 - [ ] Caregiver notification delivery (in-app + email/SMS)
