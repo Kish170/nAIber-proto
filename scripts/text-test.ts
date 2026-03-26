@@ -748,6 +748,7 @@ async function main(): Promise<void> {
     try {
         conversation = await TextConversation.startSession({
             signedUrl,
+            customLlmExtraBody: { user_id: userId },
             overrides: {
                 agent: {
                     prompt: { prompt: systemPrompt },

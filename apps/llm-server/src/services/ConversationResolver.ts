@@ -17,7 +17,8 @@ export class ConversationResolver {
 
     async resolveConversation(request: ChatCompletionRequest): Promise<ResolvedConversation | null> {
         try {
-            const userId = (request as any).user || (request as any).user_id;
+            const req = request as any;
+            const userId = req.user || req.user_id || req.elevenlabs_extra_body?.user_id;
             if (!userId) {
                 console.warn('[ConversationResolver] No userId in request — cannot resolve conversation');
                 return null;
