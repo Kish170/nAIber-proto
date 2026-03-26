@@ -1,0 +1,23 @@
+{
+  "callType": "cognitive",
+  "description": "Full cognitive assessment — all 9 tasks completed. Session index 0 content: word list A (face/silk/church/daisy/red), digit set 0 (forward: 3=[5,8,2] 4=[7,1,8,3] 5=[4,2,7,3,1]; reverse: 3=[2,4,9] 4=[3,8,1,5]), letter F, abstraction set 0 (train/bicycle + watch/ruler), vigilance set 0 (6 A's in sequence).",
+  "messages": [
+    "I'm feeling pretty good today, thank you for asking.",
+    "Yes, I slept quite well last night.",
+    "No, nothing worrying on my mind today.",
+    "Today is Thursday, March 26th, 2026, and we are in spring.",
+    "Face, silk, church, daisy, red.",
+    "5, 8, 2",
+    "7, 1, 8, 3",
+    "4, 2, 7, 3, 1",
+    "9, 4, 2",
+    "5, 1, 8, 3",
+    "93, 86, 79, 72, 65",
+    "I counted 6 A's.",
+    "Farm, fish, flower, finger, fork, fence, floor, funny, friend, free.",
+    "They are both vehicles, forms of transportation.",
+    "They are both measuring instruments.",
+    "Face, silk, church, daisy, and red."
+  ],
+  "delayMs": 5000
+}

@@ -1,13 +1,13 @@
 {
   "callType": "cognitive",
+  "description": "Partial cognitive assessment — completes wellbeing + orientation + word registration, then exits. Tests isPartial=true path. Session index 0: word list A (face/silk/church/daisy/red).",
   "messages": [
-    "Hello! I'm feeling good today, thank you.",
-    "Yes, I slept well last night.",
-    "Today is Tuesday.",
-    "March 24th.",
-    "March.",
-    "2026.",
-    "Spring."
+    "I'm feeling pretty good today, thank you for asking.",
+    "Yes, I slept quite well last night.",
+    "No, nothing worrying on my mind today.",
+    "Today is Thursday, March 26th, 2026, and we are in spring.",
+    "Face, silk, church, daisy, red.",
+    "I'm sorry, I have to go now. Goodbye."
   ],
   "delayMs": 4000
 }

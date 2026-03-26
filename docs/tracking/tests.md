@@ -57,6 +57,11 @@ See [Testing Strategy](../tests/testing-strategy.md) for the 3-layer approach.
 - [ ] Add post-call verification to scripted mode
 - [ ] Expand general scenario (more messages, topic shifts)
 
+### Per-Persona Run Status
+- [x] Health — ran `health-full.json` + `health-early-exit.json`; fixed `resolvedTo` IDs on medications/conditions, fixed system prompt issue
+- [ ] Cognitive — not yet run
+- [ ] General — not yet run
+
 ## Layer 2: Integration Tests (Implementation)
 - [ ] Vitest setup in llm-server
 - [ ] KG schema: GraphRepository + GraphQueryRepository tests
