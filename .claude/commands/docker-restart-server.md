@@ -1,7 +1,7 @@
 Restart only the naiber-server container without 
 rebuilding:
 ```bash
-docker compose restart naiber-server
+docker compose restart server
 ```
 
 Then tail the logs to confirm it came up cleanly:

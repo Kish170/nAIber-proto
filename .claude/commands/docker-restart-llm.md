@@ -1,7 +1,7 @@
 Restart only the naiber-llm-server container 
 without rebuilding:
 ```bash
-docker compose restart naiber-llm-server
+docker compose restart llm-server
 ```
 
 Then tail the logs to confirm it came up cleanly:
