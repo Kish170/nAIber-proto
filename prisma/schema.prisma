@@ -95,6 +95,9 @@ model ElderlyProfile {
   authUser              User?                 @relation(fields: [authUserId], references: [id])
   emergencyContact      EmergencyContact?
   healthCheckLogs       HealthCheckLog[]
+  wellbeingLogs         WellbeingLog[]
+  medicationLogs        MedicationLog[]
+  conditionLogs         HealthConditionLog[]
   notifications         Notification[]
   trustedContacts       TrustedContact[]
   healthConditions      UserHealthCondition[]
@@ -160,6 +163,7 @@ model UserHealthCondition {
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
   medicationConditions MedicationCondition[]
+  conditionLogs        HealthConditionLog[]
   elderlyProfile       ElderlyProfile        @relation(fields: [elderlyProfileId], references: [id], onDelete: Cascade)
 
   @@unique([elderlyProfileId, condition])
@@ -180,6 +184,7 @@ model UserMedication {
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
   medicationConditions MedicationCondition[]
+  medicationLogs       MedicationLog[]
   elderlyProfile       ElderlyProfile        @relation(fields: [elderlyProfileId], references: [id], onDelete: Cascade)
 
   @@unique([elderlyProfileId, name])
@@ -272,8 +277,11 @@ model HealthCheckLog {
   callLogId        String?        @unique
   answers          Json
   createdAt        DateTime       @default(now())
-  callLog          CallLog?       @relation(fields: [callLogId], references: [id], onDelete: Cascade)
-  elderlyProfile   ElderlyProfile @relation(fields: [elderlyProfileId], references: [id], onDelete: Cascade)
+  callLog          CallLog?           @relation(fields: [callLogId], references: [id], onDelete: Cascade)
+  elderlyProfile   ElderlyProfile     @relation(fields: [elderlyProfileId], references: [id], onDelete: Cascade)
+  wellbeingLog     WellbeingLog?
+  medicationLogs   MedicationLog[]
+  conditionLogs    HealthConditionLog[]
 
   @@index([elderlyProfileId, createdAt])
   @@map("health_check_logs")
@@ -386,6 +394,62 @@ model Notification {
 
   @@index([elderlyProfileId, createdAt])
   @@map("notifications")
+}
+
+model WellbeingLog {
+  id               String         @id @default(uuid())
+  healthCheckLogId String         @unique
+  elderlyProfileId String
+  conversationId   String         @unique
+  overallWellbeing Int?
+  sleepQuality     Int?
+  physicalSymptoms String[]
+  generalNotes     String?
+  createdAt        DateTime       @default(now())
+  healthCheckLog   HealthCheckLog @relation(fields: [healthCheckLogId], references: [id], onDelete: Cascade)
+  elderlyProfile   ElderlyProfile @relation(fields: [elderlyProfileId], references: [id], onDelete: Cascade)
+
+  @@index([elderlyProfileId, createdAt])
+  @@map("wellbeing_logs")
+}
+
+model MedicationLog {
+  id               String         @id @default(uuid())
+  healthCheckLogId String
+  elderlyProfileId String
+  conversationId   String
+  medicationId     String
+  medicationTaken  Boolean
+  notes            String?
+  createdAt        DateTime       @default(now())
+  healthCheckLog   HealthCheckLog @relation(fields: [healthCheckLogId], references: [id], onDelete: Cascade)
+  medication       UserMedication @relation(fields: [medicationId], references: [id], onDelete: Cascade)
+  elderlyProfile   ElderlyProfile @relation(fields: [elderlyProfileId], references: [id], onDelete: Cascade)
+
+  @@index([elderlyProfileId, createdAt])
+  @@index([medicationId])
+  @@map("medication_logs")
+}
+
+model HealthConditionLog {
+  id                 String              @id @default(uuid())
+  healthCheckLogId   String
+  elderlyProfileId   String
+  conversationId     String
+  conditionId        String
+  rawNotes           String?
+  symptoms           String[]
+  severity           String?
+  changeFromBaseline String?
+  notableFlags       String[]
+  createdAt          DateTime            @default(now())
+  healthCheckLog     HealthCheckLog      @relation(fields: [healthCheckLogId], references: [id], onDelete: Cascade)
+  condition          UserHealthCondition @relation(fields: [conditionId], references: [id], onDelete: Cascade)
+  elderlyProfile     ElderlyProfile      @relation(fields: [elderlyProfileId], references: [id], onDelete: Cascade)
+
+  @@index([elderlyProfileId, createdAt])
+  @@index([conditionId])
+  @@map("health_condition_logs")
 }
 
 enum Gender {
