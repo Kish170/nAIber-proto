@@ -405,6 +405,8 @@ model WellbeingLog {
   sleepQuality     Int?
   physicalSymptoms String[]
   generalNotes     String?
+  concerns         String[]
+  positives        String[]
   createdAt        DateTime       @default(now())
   healthCheckLog   HealthCheckLog @relation(fields: [healthCheckLogId], references: [id], onDelete: Cascade)
   elderlyProfile   ElderlyProfile @relation(fields: [elderlyProfileId], references: [id], onDelete: Cascade)

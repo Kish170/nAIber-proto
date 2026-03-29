@@ -7,6 +7,39 @@ export interface HealthCheckLogData {
     answers: object[];
 }
 
+export interface WellbeingLogData {
+    healthCheckLogId: string;
+    elderlyProfileId: string;
+    conversationId: string;
+    overallWellbeing?: number | null;
+    sleepQuality?: number | null;
+    physicalSymptoms?: string[];
+    generalNotes?: string | null;
+    concerns?: string[];
+    positives?: string[];
+}
+
+export interface MedicationLogData {
+    healthCheckLogId: string;
+    elderlyProfileId: string;
+    conversationId: string;
+    medicationId: string;
+    medicationTaken: boolean;
+    notes?: string | null;
+}
+
+export interface HealthConditionLogData {
+    healthCheckLogId: string;
+    elderlyProfileId: string;
+    conversationId: string;
+    conditionId: string;
+    rawNotes?: string | null;
+    symptoms?: string[];
+    severity?: string | null;
+    changeFromBaseline?: string | null;
+    notableFlags?: string[];
+}
+
 export class HealthRepository {
     static async findHealthConditionsByElderlyProfileId(elderlyProfileId: string) {
         try {
@@ -94,6 +127,39 @@ export class HealthRepository {
             return await prismaClient.healthCheckLog.create({ data });
         } catch (error) {
             console.error('[HealthRepository] Unable to create health check log:', error);
+            throw error;
+        }
+    }
+
+    static async createWellbeingLog(data: WellbeingLogData) {
+        try {
+            return await prismaClient.wellbeingLog.create({ data });
+        } catch (error) {
+            console.error('[HealthRepository] Unable to create wellbeing log:', error);
+            throw error;
+        }
+    }
+
+    static async createMedicationLog(data: MedicationLogData) {
+        try {
+            return await prismaClient.medicationLog.create({ data });
+        } catch (error) {
+            console.error('[HealthRepository] Unable to create medication log:', error);
+            throw error;
+        }
+    }
+
+    static async createHealthConditionLog(data: HealthConditionLogData) {
+        try {
+            return await prismaClient.healthConditionLog.create({
+                data: {
+                    ...data,
+                    symptoms: data.symptoms ?? [],
+                    notableFlags: data.notableFlags ?? []
+                }
+            });
+        } catch (error) {
+            console.error('[HealthRepository] Unable to create health condition log:', error);
             throw error;
         }
     }

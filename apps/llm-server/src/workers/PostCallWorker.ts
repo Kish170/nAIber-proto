@@ -49,7 +49,7 @@ export class PostCallWorker {
             elevenLabsClient
         ).compile();
 
-        this.healthPostCallGraph = new HealthPostCallGraph().compile();
+        this.healthPostCallGraph = new HealthPostCallGraph(openAIClient).compile();
         this.cognitivePostCallGraph = new CognitivePostCallGraph().compile();
 
         this.worker = new Worker<PostCallJobData>(
