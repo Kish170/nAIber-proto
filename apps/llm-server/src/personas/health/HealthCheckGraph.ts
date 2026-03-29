@@ -11,8 +11,6 @@ import { OpenAIClient } from "@naiber/shared-clients";
 const MAX_RETRY_ATTEMPTS = 2;
 const MAX_FOLLOW_UP_QUESTIONS = 2;
 
-const EXIT_KEYWORDS = ['i have to go', 'i need to go', 'stop', 'end', 'quit', 'skip all', "i'm done", 'i am done', 'goodbye', 'bye'];
-
 export class HealthCheckGraph {
     private llm: ChatOpenAI;
     private compiledGraph: any;
@@ -141,11 +139,6 @@ export class HealthCheckGraph {
         if (!currentQuestion) {
             console.error('[HealthCheckGraph] No question at index for validation:', state.currentQuestionIndex);
             return { isValid: false, validatedAnswer: state.rawAnswer };
-        }
-
-        if (this.isExitIntent(state.rawAnswer)) {
-            console.log('[HealthCheckGraph] Exit intent detected, finalizing early');
-            return { isHealthCheckComplete: true };
         }
 
         const validation = validateAnswer(currentQuestion, state.rawAnswer);
@@ -322,11 +315,6 @@ export class HealthCheckGraph {
         } catch {
             return null;
         }
-    }
-
-    private isExitIntent(rawAnswer: string): boolean {
-        const normalized = rawAnswer.trim().toLowerCase();
-        return EXIT_KEYWORDS.some(kw => normalized.includes(kw));
     }
 
     private recordAnswer(state: HealthCheckStateType, validatedAnswer: string, isValid: boolean) {

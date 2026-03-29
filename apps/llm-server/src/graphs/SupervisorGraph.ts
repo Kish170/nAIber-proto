@@ -160,6 +160,13 @@ export class SupervisorGraph {
 
         const currentState = await this.cognitiveGraph.graph.getState(config);
 
+        console.log("[SupervisorGraph] Cognitive state:", {
+            next: currentState.next,
+            currentTaskIndex: currentState.values?.currentTaskIndex,
+            isComplete: currentState.values?.isComplete,
+            taskResponseCount: currentState.values?.taskResponses?.length,
+        });
+
         if (!currentState.values || Object.keys(currentState.values).length === 0) {
             console.log("[SupervisorGraph] Starting new cognitive assessment");
 

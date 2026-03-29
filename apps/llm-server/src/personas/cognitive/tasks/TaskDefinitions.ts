@@ -1,4 +1,5 @@
 export enum CognitiveTaskType {
+    WELLBEING = 'WELLBEING',
     ORIENTATION = 'ORIENTATION',
     WORD_REGISTRATION = 'WORD_REGISTRATION',
     DIGIT_SPAN_FORWARD = 'DIGIT_SPAN_FORWARD',
@@ -11,6 +12,7 @@ export enum CognitiveTaskType {
 }
 
 export enum CognitiveDomain {
+    WELLBEING = 'WELLBEING',
     ORIENTATION = 'ORIENTATION',
     ATTENTION_CONCENTRATION = 'ATTENTION_CONCENTRATION',
     WORKING_MEMORY = 'WORKING_MEMORY',
@@ -23,7 +25,8 @@ export interface TaskDefinition {
     taskType: CognitiveTaskType;
     domain: CognitiveDomain;
     position: number;
-    maxScore: number | null; // null for uncapped (fluency)
+    maxScore: number | null; // null for uncapped (fluency) or non-scored
+    prompt?: string;
 }
 
 export interface RetrievalLevel {
@@ -66,69 +69,94 @@ export interface WellbeingResponse {
     distressDetected: boolean;
 }
 
-export const WELLBEING_QUESTIONS = [
-    "Before we get started, I just want to check in — how are you feeling today overall?",
-    "Have you had a chance to sleep okay recently?",
-    "Is there anything on your mind today, or anything that's been worrying you?",
-] as const;
-
 /**
- * Canonical 9-task sequence. Order is fixed across all sessions —
+ * Canonical task sequence. Wellbeing check-in (positions 1-3) followed by
+ * 9 cognitive tasks (positions 4-12). Order is fixed across all sessions —
  * changing it would invalidate longitudinal comparisons.
  */
 export const TASK_SEQUENCE: TaskDefinition[] = [
     {
+        taskType: CognitiveTaskType.WELLBEING,
+        domain: CognitiveDomain.WELLBEING,
+        position: 1,
+        maxScore: null,
+        prompt: "Before we get started, I just want to check in — how are you feeling today overall?",
+    },
+    {
+        taskType: CognitiveTaskType.WELLBEING,
+        domain: CognitiveDomain.WELLBEING,
+        position: 2,
+        maxScore: null,
+        prompt: "Have you had a chance to sleep okay recently?",
+    },
+    {
+        taskType: CognitiveTaskType.WELLBEING,
+        domain: CognitiveDomain.WELLBEING,
+        position: 3,
+        maxScore: null,
+        prompt: "Is there anything on your mind today, or anything that's been worrying you?",
+    },
+    {
         taskType: CognitiveTaskType.ORIENTATION,
         domain: CognitiveDomain.ORIENTATION,
-        position: 1,
+        position: 4,
         maxScore: 5,
+        prompt: "Can you tell me what today's date is? And what month are we in? What year? And what season would you say we're in right now?",
     },
     {
         taskType: CognitiveTaskType.WORD_REGISTRATION,
         domain: CognitiveDomain.DELAYED_RECALL,
-        position: 2,
+        position: 5,
         maxScore: null, // not scored — encoding confirmation only
+        prompt: "I'm going to say five words, and I'd like you to repeat them back to me when I'm done. Don't worry about remembering them for now — just repeat them after me. Ready?",
     },
     {
         taskType: CognitiveTaskType.DIGIT_SPAN_FORWARD,
         domain: CognitiveDomain.ATTENTION_CONCENTRATION,
-        position: 3,
+        position: 6,
         maxScore: 5,
+        prompt: "I'm going to read some numbers. When I'm done, can you repeat them back to me in the same order I said them?",
     },
     {
         taskType: CognitiveTaskType.DIGIT_SPAN_REVERSE,
         domain: CognitiveDomain.WORKING_MEMORY,
-        position: 4,
+        position: 7,
         maxScore: 4,
+        prompt: "This time, when I read the numbers, I'd like you to say them back to me in reverse order — so the last number first.",
     },
     {
         taskType: CognitiveTaskType.SERIAL_7S,
         domain: CognitiveDomain.ATTENTION_CONCENTRATION,
-        position: 5,
+        position: 8,
         maxScore: 5,
+        prompt: "I'd like you to start at 100 and keep subtracting 7. Take your time.",
     },
     {
         taskType: CognitiveTaskType.LETTER_VIGILANCE,
         domain: CognitiveDomain.ATTENTION_CONCENTRATION,
-        position: 6,
+        position: 9,
         maxScore: 6,
+        prompt: "I'm going to read a list of letters. Every time you hear the letter A, I'd like you to say 'yes' out loud.",
     },
     {
         taskType: CognitiveTaskType.LETTER_FLUENCY,
         domain: CognitiveDomain.LANGUAGE_VERBAL_FLUENCY,
-        position: 7,
-        maxScore: null, // uncapped
+        position: 10,
+        maxScore: null, 
+        prompt: "Now I'd like you to say as many words as you can that begin with a certain letter. No names of people or places, and no numbers. Just regular words — as many as you can think of.",
     },
     {
         taskType: CognitiveTaskType.ABSTRACTION,
         domain: CognitiveDomain.ABSTRACTION_REASONING,
-        position: 8,
+        position: 11,
         maxScore: 4,
+        prompt: "I'm going to name two things, and I'd like you to tell me how they're similar — what do they have in common?",
     },
     {
         taskType: CognitiveTaskType.DELAYED_RECALL,
         domain: CognitiveDomain.DELAYED_RECALL,
-        position: 9,
+        position: 12,
         maxScore: 10,
+        prompt: "Earlier I mentioned five words and asked you to hold onto them. Can you remember what those words were?",
     },
 ];

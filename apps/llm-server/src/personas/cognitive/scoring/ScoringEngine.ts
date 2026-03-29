@@ -31,7 +31,7 @@ export interface DriftResult {
     threshold: number;
 }
 
-const DOMAIN_WEIGHTS = {
+const DOMAIN_WEIGHTS: Record<string, number> = {
     [CognitiveDomain.DELAYED_RECALL]: 0.30,
     [CognitiveDomain.ATTENTION_CONCENTRATION]: 0.20,
     [CognitiveDomain.WORKING_MEMORY]: 0.15,

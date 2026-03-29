@@ -9,26 +9,23 @@ datasource db {
 }
 
 model User {
-  id            String    @id @default(uuid())
-  name          String?
-  email         String?   @unique
-  emailVerified DateTime?
-  image         String?
-
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-
-  accounts      Account[]
-  sessions      Session[]
-
+  id               String            @id @default(uuid())
+  name             String?
+  email            String?           @unique
+  emailVerified    DateTime?
+  image            String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  accounts         Account[]
   caregiverProfile CaregiverProfile?
   elderlyProfile   ElderlyProfile?
+  sessions         Session[]
 
   @@map("users")
 }
 
 model Account {
-  id                String  @id @default(uuid())
+  id                String   @id @default(uuid())
   userId            String
   type              String
   provider          String
@@ -40,10 +37,8 @@ model Account {
   scope             String?
   id_token          String?
   session_state     String?
-
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
-
   user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
@@ -55,10 +50,8 @@ model Session {
   sessionToken String   @unique
   userId       String
   expires      DateTime
-
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
-
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("sessions")
@@ -74,76 +67,65 @@ model VerificationToken {
 }
 
 model ElderlyProfile {
-  id                  String    @id @default(uuid())
-  authUserId          String?   @unique
-
-  name                String
-  age                 Int?
-  phone               String    @unique
-  email               String?   @unique
-  gender              Gender?
-  educationLevel      EducationLevel?
-
-  interests           String[]
-  dislikes            String[]
-
-  callFrequency       CheckInFrequency @default(DAILY)
-  preferredCallTime   DateTime         @db.Time
-
-  isFirstCall         Boolean   @default(true)
-  enableHealthCheckIns Boolean  @default(false)
-  hasWebAccess        Boolean   @default(false)
-  activationStatus    ActivationStatus @default(PENDING)
-
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
-  lastCallAt          DateTime?
-
-  authUser              User?                @relation(fields: [authUserId], references: [id], onDelete: SetNull)
-  emergencyContact      EmergencyContact?
-  healthConditions      UserHealthCondition[]
-  medications           UserMedication[]
+  id                    String                @id @default(uuid())
+  authUserId            String?               @unique
+  name                  String
+  age                   Int?
+  phone                 String                @unique
+  email                 String?               @unique
+  gender                Gender?
+  educationLevel        EducationLevel?
+  interests             String[]
+  dislikes              String[]
+  callFrequency         CheckInFrequency      @default(DAILY)
+  preferredCallTime     DateTime              @db.Time(6)
+  isFirstCall           Boolean               @default(true)
+  enableHealthCheckIns  Boolean               @default(false)
+  hasWebAccess          Boolean               @default(false)
+  activationStatus      ActivationStatus      @default(PENDING)
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  lastCallAt            DateTime?
   callLogs              CallLog[]
+  caregiverLinks        CaregiverUserLink[]
+  cognitiveBaselines    CognitiveBaseline[]
+  cognitiveTestResults  CognitiveTestResult[]
   conversationSummaries ConversationSummary[]
   conversationTopics    ConversationTopic[]
+  authUser              User?                 @relation(fields: [authUserId], references: [id])
+  emergencyContact      EmergencyContact?
   healthCheckLogs       HealthCheckLog[]
-  cognitiveTestResults  CognitiveTestResult[]
-  cognitiveBaselines    CognitiveBaseline[]
-  trustedContacts       TrustedContact[]
-  caregiverLinks        CaregiverUserLink[]
   notifications         Notification[]
+  trustedContacts       TrustedContact[]
+  healthConditions      UserHealthCondition[]
+  medications           UserMedication[]
 
   @@map("elderly_profiles")
 }
 
 model CaregiverProfile {
-  id            String       @id @default(uuid())
-  authUserId    String       @unique
-
-  name          String
-  phone         String?
-  relationship  Relationship
-
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
-
-  authUser      User         @relation(fields: [authUserId], references: [id], onDelete: Cascade)
-  managedUsers  CaregiverUserLink[]
+  id           String              @id @default(uuid())
+  authUserId   String              @unique
+  name         String
+  phone        String?
+  relationship Relationship
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  authUser     User                @relation(fields: [authUserId], references: [id], onDelete: Cascade)
+  managedUsers CaregiverUserLink[]
 
   @@map("caregiver_profiles")
 }
 
 model CaregiverUserLink {
-  id                String           @id @default(uuid())
+  id                 String           @id @default(uuid())
   caregiverProfileId String
   elderlyProfileId   String
-  isPrimary         Boolean          @default(false)
-  status            LinkStatus       @default(ACTIVE)
-
-  createdAt         DateTime         @default(now())
-
-  caregiverProfile  CaregiverProfile @relation(fields: [caregiverProfileId], references: [id], onDelete: Cascade)
-  elderlyProfile    ElderlyProfile   @relation(fields: [elderlyProfileId], references: [id], onDelete: Cascade)
+  isPrimary          Boolean          @default(false)
+  status             LinkStatus       @default(ACTIVE)
+  createdAt          DateTime         @default(now())
+  caregiverProfile   CaregiverProfile @relation(fields: [caregiverProfileId], references: [id], onDelete: Cascade)
+  elderlyProfile     ElderlyProfile   @relation(fields: [elderlyProfileId], references: [id], onDelete: Cascade)
 
   @@unique([caregiverProfileId, elderlyProfileId])
   @@index([elderlyProfileId])
@@ -151,41 +133,34 @@ model CaregiverUserLink {
 }
 
 model EmergencyContact {
-  id                  String          @id @default(uuid())
-  elderlyProfileId    String          @unique
-
+  id                  String         @id @default(uuid())
+  elderlyProfileId    String         @unique
   name                String
   phone               String
   email               String?
   relationship        String
-
-  smsEnabled          Boolean @default(true)
-  notifyOnMissedCalls Boolean @default(true)
-
-  createdAt           DateTime        @default(now())
-  updatedAt           DateTime        @updatedAt
-
-  elderlyProfile      ElderlyProfile  @relation(fields: [elderlyProfileId], references: [id], onDelete: Cascade)
+  smsEnabled          Boolean        @default(true)
+  notifyOnMissedCalls Boolean        @default(true)
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+  elderlyProfile      ElderlyProfile @relation(fields: [elderlyProfileId], references: [id], onDelete: Cascade)
 
   @@index([elderlyProfileId])
   @@map("emergency_contacts")
 }
 
 model UserHealthCondition {
-  id                    String          @id @default(uuid())
-  elderlyProfileId      String
-
-  condition             String
-  severity              String?
-  diagnosedAt           DateTime?
-  notes                 String?
-  isActive              Boolean   @default(true)
-
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
-
-  elderlyProfile        ElderlyProfile @relation(fields: [elderlyProfileId], references: [id], onDelete: Cascade)
-  medicationConditions  MedicationCondition[]
+  id                   String                @id @default(uuid())
+  elderlyProfileId     String
+  condition            String
+  severity             String?
+  diagnosedAt          DateTime?
+  notes                String?
+  isActive             Boolean               @default(true)
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  medicationConditions MedicationCondition[]
+  elderlyProfile       ElderlyProfile        @relation(fields: [elderlyProfileId], references: [id], onDelete: Cascade)
 
   @@unique([elderlyProfileId, condition])
   @@index([elderlyProfileId, isActive])
@@ -193,23 +168,19 @@ model UserHealthCondition {
 }
 
 model UserMedication {
-  id                    String          @id @default(uuid())
-  elderlyProfileId      String
-
-  name                  String
-  dosage                String
-  frequency             String
-
-  startedAt             DateTime?
-  endedAt               DateTime?
-  notes                 String?
-  isActive              Boolean   @default(true)
-
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
-
-  elderlyProfile        ElderlyProfile @relation(fields: [elderlyProfileId], references: [id], onDelete: Cascade)
-  medicationConditions  MedicationCondition[]
+  id                   String                @id @default(uuid())
+  elderlyProfileId     String
+  name                 String
+  dosage               String
+  frequency            String
+  startedAt            DateTime?
+  endedAt              DateTime?
+  notes                String?
+  isActive             Boolean               @default(true)
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  medicationConditions MedicationCondition[]
+  elderlyProfile       ElderlyProfile        @relation(fields: [elderlyProfileId], references: [id], onDelete: Cascade)
 
   @@unique([elderlyProfileId, name])
   @@index([elderlyProfileId, isActive])
@@ -217,33 +188,25 @@ model UserMedication {
 }
 
 model CallLog {
-  id                       String       @id @default(uuid())
+  id                       String               @id @default(uuid())
   elderlyProfileId         String
-
-  callType                 CallType     @default(GENERAL)
-
+  callType                 CallType             @default(GENERAL)
   scheduledTime            DateTime
   endTime                  DateTime?
-
-  status                   CallStatus   @default(PENDING)
+  status                   CallStatus           @default(PENDING)
   outcome                  CallOutcome?
-
-  noAnswerCount            Int          @default(0)
-  retryCount               Int          @default(0)
+  noAnswerCount            Int                  @default(0)
+  retryCount               Int                  @default(0)
   nextRetryTime            DateTime?
-
   twilioCallSid            String?
   elevenlabsConversationId String?
-
   checkInCompleted         Boolean
-
-  createdAt                DateTime     @default(now())
-  updatedAt                DateTime     @updatedAt
-
+  createdAt                DateTime             @default(now())
+  updatedAt                DateTime             @updatedAt
   elderlyProfile           ElderlyProfile       @relation(fields: [elderlyProfileId], references: [id], onDelete: Cascade)
+  cognitiveTestResult      CognitiveTestResult?
   conversationSummary      ConversationSummary?
   healthCheckLog           HealthCheckLog?
-  cognitiveTestResult      CognitiveTestResult?
 
   @@index([elderlyProfileId, scheduledTime])
   @@index([status])
@@ -254,23 +217,17 @@ model CallLog {
 }
 
 model ConversationSummary {
-  id                    String          @id @default(uuid())
+  id                    String                       @id @default(uuid())
   elderlyProfileId      String
-  conversationId        String          @unique
-
+  conversationId        String                       @unique
   summaryText           String
   durationMinutes       Int?
-
   topicsDiscussed       String[]
-
   keyHighlights         Json?
-
-  createdAt             DateTime @default(now())
-
-  callLogId             String?  @unique
-
-  elderlyProfile        ElderlyProfile               @relation(fields: [elderlyProfileId], references: [id], onDelete: Cascade)
+  createdAt             DateTime                     @default(now())
+  callLogId             String?                      @unique
   callLog               CallLog?                     @relation(fields: [callLogId], references: [id], onDelete: Cascade)
+  elderlyProfile        ElderlyProfile               @relation(fields: [elderlyProfileId], references: [id], onDelete: Cascade)
   conversationTopicRefs ConversationTopicReference[]
 
   @@index([elderlyProfileId, createdAt])
@@ -278,20 +235,16 @@ model ConversationSummary {
 }
 
 model ConversationTopic {
-  id                     String          @id @default(uuid())
+  id                     String                       @id @default(uuid())
   elderlyProfileId       String
-
   topicName              String
   variations             String[]
   category               String?
-
   topicEmbedding         Float[]
-
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
-
-  elderlyProfile         ElderlyProfile               @relation(fields: [elderlyProfileId], references: [id], onDelete: Cascade)
+  createdAt              DateTime                     @default(now())
+  updatedAt              DateTime                     @updatedAt
   conversationReferences ConversationTopicReference[]
+  elderlyProfile         ElderlyProfile               @relation(fields: [elderlyProfileId], references: [id], onDelete: Cascade)
 
   @@unique([elderlyProfileId, topicName])
   @@index([elderlyProfileId, updatedAt])
@@ -303,9 +256,7 @@ model ConversationTopicReference {
   id                    String              @id @default(uuid())
   conversationSummaryId String
   conversationTopicId   String
-
   mentionedAt           DateTime            @updatedAt
-
   conversationSummary   ConversationSummary @relation(fields: [conversationSummaryId], references: [id], onDelete: Cascade)
   conversationTopic     ConversationTopic   @relation(fields: [conversationTopicId], references: [id], onDelete: Cascade)
 
@@ -315,32 +266,27 @@ model ConversationTopicReference {
 }
 
 model HealthCheckLog {
-  id                 String          @id @default(uuid())
-  elderlyProfileId   String
-  conversationId     String
-  callLogId          String?         @unique
-
-  answers            Json
-
-  createdAt          DateTime @default(now())
-
-  elderlyProfile     ElderlyProfile @relation(fields: [elderlyProfileId], references: [id], onDelete: Cascade)
-  callLog            CallLog?       @relation(fields: [callLogId], references: [id], onDelete: Cascade)
+  id               String         @id @default(uuid())
+  elderlyProfileId String
+  conversationId   String
+  callLogId        String?        @unique
+  answers          Json
+  createdAt        DateTime       @default(now())
+  callLog          CallLog?       @relation(fields: [callLogId], references: [id], onDelete: Cascade)
+  elderlyProfile   ElderlyProfile @relation(fields: [elderlyProfileId], references: [id], onDelete: Cascade)
 
   @@index([elderlyProfileId, createdAt])
   @@map("health_check_logs")
 }
 
 model MedicationCondition {
-  id                    String               @id @default(uuid())
-  medicationId          String
-  healthConditionId     String
-
-  createdAt             DateTime             @default(now())
-  updatedAt             DateTime             @updatedAt
-
-  medication            UserMedication       @relation(fields: [medicationId], references: [id], onDelete: Cascade)
-  healthCondition       UserHealthCondition  @relation(fields: [healthConditionId], references: [id], onDelete: Cascade)
+  id                String              @id @default(uuid())
+  medicationId      String
+  healthConditionId String
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  healthCondition   UserHealthCondition @relation(fields: [healthConditionId], references: [id], onDelete: Cascade)
+  medication        UserMedication      @relation(fields: [medicationId], references: [id], onDelete: Cascade)
 
   @@unique([medicationId, healthConditionId])
   @@index([medicationId])
@@ -349,34 +295,28 @@ model MedicationCondition {
 }
 
 model CognitiveTestResult {
-  id                      String          @id @default(uuid())
+  id                      String         @id @default(uuid())
   elderlyProfileId        String
-  conversationId          String          @unique
-  callLogId               String?         @unique
-
-  source                  String   @default("voice")
-  modality                String   @default("phone_call")
+  conversationId          String         @unique
+  callLogId               String?        @unique
+  source                  String         @default("voice")
+  modality                String         @default("phone_call")
   sessionIndex            Int
   wordListUsed            String
   digitSetUsed            Int
   letterUsed              String
   abstractionSetUsed      Int
   vigilanceSetUsed        Int
-
   domainScores            Json
   taskResponses           Json
-
   stabilityIndex          Float?
-  isPartial               Boolean  @default(false)
-
+  isPartial               Boolean        @default(false)
   wellbeingCheckResponses Json?
-  distressDetected        Boolean  @default(false)
+  distressDetected        Boolean        @default(false)
   deferralReason          String?
-
-  completedAt             DateTime @default(now())
-
-  elderlyProfile          ElderlyProfile @relation(fields: [elderlyProfileId], references: [id], onDelete: Cascade)
+  completedAt             DateTime       @default(now())
   callLog                 CallLog?       @relation(fields: [callLogId], references: [id], onDelete: Cascade)
+  elderlyProfile          ElderlyProfile @relation(fields: [elderlyProfileId], references: [id], onDelete: Cascade)
 
   @@index([elderlyProfileId, completedAt])
   @@index([elderlyProfileId, sessionIndex])
@@ -384,40 +324,33 @@ model CognitiveTestResult {
 }
 
 model CognitiveBaseline {
-  id              String          @id @default(uuid())
+  id               String         @id @default(uuid())
   elderlyProfileId String
-
-  featureVector   Json
-  rawValues       Json
-  domainBaselines Json
-
-  version         Int
-  createdAt       DateTime @default(now())
-
-  elderlyProfile  ElderlyProfile @relation(fields: [elderlyProfileId], references: [id], onDelete: Cascade)
+  featureVector    Json
+  rawValues        Json
+  domainBaselines  Json
+  version          Int
+  createdAt        DateTime       @default(now())
+  elderlyProfile   ElderlyProfile @relation(fields: [elderlyProfileId], references: [id], onDelete: Cascade)
 
   @@index([elderlyProfileId, version])
   @@map("cognitive_baselines")
 }
 
 model TrustedContact {
-  id                     String           @id @default(uuid())
+  id                     String                     @id @default(uuid())
   elderlyProfileId       String
-
   name                   String
   relationship           String
   knownDurationYears     Int
   contactFrequency       ContactFrequency
   reliabilityTier        ReliabilityTier
-
   informantConcernIndex  Float?
   weightedInformantIndex Float?
-
-  createdAt              DateTime         @default(now())
-  updatedAt              DateTime         @updatedAt
-
-  elderlyProfile         ElderlyProfile   @relation(fields: [elderlyProfileId], references: [id], onDelete: Cascade)
+  createdAt              DateTime                   @default(now())
+  updatedAt              DateTime                   @updatedAt
   submissions            TrustedContactSubmission[]
+  elderlyProfile         ElderlyProfile             @relation(fields: [elderlyProfileId], references: [id], onDelete: Cascade)
 
   @@index([elderlyProfileId])
   @@map("trusted_contacts")
@@ -426,17 +359,13 @@ model TrustedContact {
 model TrustedContactSubmission {
   id                    String         @id @default(uuid())
   trustedContactId      String
-
   submissionType        SubmissionType
   structuredResponses   Json
   openTextResponses     Json?
   referencePointNote    String?
-
   rawScore              Int
   informantConcernIndex Float
-
   createdAt             DateTime       @default(now())
-
   trustedContact        TrustedContact @relation(fields: [trustedContactId], references: [id], onDelete: Cascade)
 
   @@index([trustedContactId, createdAt])
@@ -444,18 +373,16 @@ model TrustedContactSubmission {
 }
 
 model Notification {
-  id                 String             @id @default(uuid())
-  elderlyProfileId   String
-  type               NotificationType
-  status             NotificationStatus @default(PENDING)
-  title              String
-  body               String
-  metadata           Json?
-
-  createdAt          DateTime           @default(now())
-  readAt             DateTime?
-
-  elderlyProfile     ElderlyProfile     @relation(fields: [elderlyProfileId], references: [id], onDelete: Cascade)
+  id               String             @id @default(uuid())
+  elderlyProfileId String
+  type             NotificationType
+  status           NotificationStatus @default(PENDING)
+  title            String
+  body             String
+  metadata         Json?
+  createdAt        DateTime           @default(now())
+  readAt           DateTime?
+  elderlyProfile   ElderlyProfile     @relation(fields: [elderlyProfileId], references: [id], onDelete: Cascade)
 
   @@index([elderlyProfileId, createdAt])
   @@map("notifications")

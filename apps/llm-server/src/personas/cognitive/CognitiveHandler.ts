@@ -44,8 +44,8 @@ export class CognitiveHandler {
             registrationWords: wordList.words,
             selectedDigitSet: sessionIndex % 3,
             selectedLetter: letter,
-            selectedAbstractionSet: abstractionSet.id,
-            selectedVigilanceSet: vigilanceSet.id,
+            selectedAbstractionSet: sessionIndex,
+            selectedVigilanceSet: sessionIndex,
         };
     }
 }

@@ -59,8 +59,15 @@ See [Testing Strategy](../tests/testing-strategy.md) for the 3-layer approach.
 
 ### Per-Persona Run Status
 - [x] Health — ran `health-full.json` + `health-early-exit.json`; fixed `resolvedTo` IDs on medications/conditions, fixed system prompt issue
-- [ ] Cognitive — not yet run
+- [x] Cognitive — ran `cognitive-full.json` (17 messages); FixedShallowRedisSaver (ADR-009); unified graph loop with single interrupt node; fixed content rotation bug; fixed prompt context bleed (`slice(-4)` → last message only + stronger task directives) (2026-03-27)
 - [ ] General — not yet run
+
+### Cognitive — Outstanding Issues
+- [ ] **Retry limits**: multi-turn tasks (digit span, word registration, abstraction) have no max retry cap — add configurable limit per task type, record as partial after limit
+- [ ] **Skip functionality**: if user can't do a task (e.g. "I can't do that one"), graph should skip to next task and mark as skipped — will be handled via MCP tools
+- [ ] **TaskValidation accuracy for voice**: digit span uses `match(/\d/g)` which fails on speech-to-text word-form numbers ("five eight two"); vigilance only validates self-reported count (no real-time per-letter tracking); word registration/recall depends on STT accuracy for specific words — revisit validation for voice robustness
+- [ ] **ElevenLabs turn detection**: cognitive tasks (word reading, digit reading, letter vigilance) need interruption disabled or reduced so AI can finish speaking sequences — configure via ElevenLabs UI agent settings
+- [ ] **Test scenario session dependency**: `cognitive-full.json` assumes session index 0 — CognitiveTestResult rows must be cleared for the test user before running, otherwise content rotation mismatch causes failures
 
 ## Layer 2: Integration Tests (Implementation)
 - [ ] Vitest setup in llm-server

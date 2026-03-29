@@ -1,6 +1,7 @@
 import { Annotation } from "@langchain/langgraph";
 import { BaseMessage } from "@langchain/core/messages";
 import type { TaskResponse, WellbeingResponse, RetrievalLevel } from "./tasks/TaskDefinitions.js";
+// WellbeingResponse kept for post-call backward compatibility
 
 const keep = <T>(fallback: T) => ({
     reducer: (x: T, y: T | undefined | null) => (y !== undefined && y !== null) ? y : (x !== undefined && x !== null ? x : fallback),
@@ -23,8 +24,6 @@ export const CognitiveState = Annotation.Root({
     response: Annotation<string>(keep<string>("")),
     rawAnswer: Annotation<string>(keep<string>("")),
 
-    currentPhase: Annotation<string>(keep<string>("wellbeing")), // 'wellbeing' | 'tasks' | 'complete' | 'deferred'
-    wellbeingQuestionIndex: Annotation<number>(keep<number>(0)),
     currentTaskIndex: Annotation<number>(keep<number>(0)),
 
     sessionIndex: Annotation<number>(keep<number>(0)),
