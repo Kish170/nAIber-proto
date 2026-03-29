@@ -55,11 +55,13 @@ LangGraph AI orchestration — SupervisorGraph routes incoming messages to perso
 
 ## Key Patterns
 - LangGraph `StateGraph` uses `graph: any` + `setEntryPoint()` to avoid TS strict type issues.
-- Health check uses durable execution: `ShallowRedisSaver` checkpointer with interrupt/resume. Thread ID: `health_check:{userId}:{conversationId}`.
+- Health check and cognitive graphs use durable execution: `FixedShallowRedisSaver` checkpointer with interrupt/resume. Thread IDs: `health_check:{userId}:{conversationId}`, `cognitive:{userId}:{conversationId}`.
+- `FixedShallowRedisSaver` wraps `ShallowRedisSaver` to fix an async durability race condition (ADR-009). All checkpointer ops are serialized through a single promise chain.
 - PostCallWorker reads checkpoint state for health answers, then deletes the thread after persistence.
 
 ## Gotchas
 - `@langchain/langgraph-checkpoint` must be `^1.0.0` (not `^1.0.1`).
+- Use `FixedShallowRedisSaver` (not `ShallowRedisSaver`) for all checkpointers — see ADR-009.
 - Bull Board dashboard at `/admin/queues` for queue monitoring.
 - PostCallWorker concurrency is 1, rate limited to 3 jobs per 60s.
 - Health check call-end has a 5s delay via `scheduleCallEnd()` in LLMRoute.

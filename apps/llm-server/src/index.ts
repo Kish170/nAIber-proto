@@ -6,7 +6,7 @@ import { StatusRouter } from './routes/StatusRoute.js';
 import { BullBoardRouter } from './routes/BullBoardRoute.js';
 import { PostCallWorker } from './workers/PostCallWorker.js';
 import { RedisClient } from '@naiber/shared-clients';
-import { ShallowRedisSaver } from '@langchain/langgraph-checkpoint-redis/shallow';
+import { FixedShallowRedisSaver } from './checkpointers/FixedShallowRedisSaver.js';
 import { Neo4jClient } from './clients/Neo4jClient.js';
 
 const app = express();
@@ -30,15 +30,15 @@ const neo4jClient = Neo4jClient.getInstance({
 });
 
 let postCallWorker: PostCallWorker | null = null;
-let checkpointer: ShallowRedisSaver | null = null;
+let checkpointer: FixedShallowRedisSaver | null = null;
 
 redisClient.connect().then(async () => {
   console.log('[LLM Server] Redis connected');
 
   await neo4jClient.verifyConnectivity();
 
-  checkpointer = await ShallowRedisSaver.fromUrl(REDIS_URL);
-  console.log('[LLM Server] ShallowRedisSaver checkpointer initialized');
+  checkpointer = await FixedShallowRedisSaver.create(REDIS_URL);
+  console.log('[LLM Server] FixedShallowRedisSaver checkpointer initialized');
 
   app.use(LLMRouter(checkpointer));
   server.listen(PORT, () => {
