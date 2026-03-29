@@ -1,6 +1,7 @@
 import { Annotation } from "@langchain/langgraph";
 import { BaseMessage } from "@langchain/core/messages";
 import { QuestionData } from "./questions/index.js";
+import type { ExtractionMethod } from "./validation/AnswerExtractor.js";
 
 export interface HealthCheckAnswer {
     questionIndex: number;
@@ -9,6 +10,8 @@ export interface HealthCheckAnswer {
     validatedAnswer: string;
     isValid: boolean;
     attemptCount: number;
+    extractionMethod: ExtractionMethod;
+    confidence: number;
 }
 
 const keep = <T>(fallback: T) => ({

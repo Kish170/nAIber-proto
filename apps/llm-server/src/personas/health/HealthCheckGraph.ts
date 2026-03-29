@@ -5,19 +5,25 @@ import { SystemMessage } from "@langchain/core/messages";
 import { HealthCheckState, HealthCheckStateType, HealthCheckAnswer } from "./HealthCheckState.js";
 import { HealthCheckHandler } from "./HealthCheckHandler.js";
 import { QuestionData } from "./questions/index.js";
-import { validateAnswer } from "./tools/ValidationTools.js";
 import { OpenAIClient } from "@naiber/shared-clients";
+import { IntentClassifier } from "./validation/IntentClassifier.js";
+import { AnswerExtractor } from "./validation/AnswerExtractor.js";
 
 const MAX_RETRY_ATTEMPTS = 2;
 const MAX_FOLLOW_UP_QUESTIONS = 2;
 
 export class HealthCheckGraph {
     private llm: ChatOpenAI;
+    private intentClassifier: IntentClassifier;
+    private answerExtractor: AnswerExtractor;
     private compiledGraph: any;
     private initialQuestions?: QuestionData[];
 
     constructor(openAIClient: OpenAIClient, checkpointer: BaseCheckpointSaver, initialQuestions?: QuestionData[]) {
-        this.llm = openAIClient.returnChatModel() as any;
+        const chatModel = openAIClient.returnChatModel() as ChatOpenAI;
+        this.llm = chatModel;
+        this.intentClassifier = new IntentClassifier(chatModel);
+        this.answerExtractor = new AnswerExtractor(chatModel);
         this.initialQuestions = initialQuestions;
 
         const graph: any = new StateGraph(HealthCheckState);
@@ -141,26 +147,14 @@ export class HealthCheckGraph {
             return { isValid: false, validatedAnswer: state.rawAnswer };
         }
 
-        const validation = validateAnswer(currentQuestion, state.rawAnswer);
-
-        console.log('[HealthCheckGraph] Validation result:', {
-            questionIndex: state.currentQuestionIndex,
-            isValid: validation.isValid,
-            attempts: state.questionAttempts
-        });
-
-        if (validation.isValid) {
-            return this.recordAnswer(state, validation.validatedAnswer, true);
-        }
-
-        const intent = await this.classifyIntent(state.rawAnswer);
-        console.log('[HealthCheckGraph] Intent classified:', intent);
+        const { intent, tier } = await this.intentClassifier.classify(state.rawAnswer);
+        console.log('[HealthCheckGraph] Intent:', { intent, tier, questionIndex: state.currentQuestionIndex });
 
         if (intent === 'ASKING') {
             return {
                 pendingClarification: true,
                 clarificationContext: state.rawAnswer,
-                lastValidationError: validation.error ?? ""
+                lastValidationError: ""
             };
         }
 
@@ -169,23 +163,23 @@ export class HealthCheckGraph {
             return this.skipQuestion(state);
         }
 
-        if (state.questionAttempts === 0 || state.questionAttempts >= MAX_RETRY_ATTEMPTS - 1) {
-            const extracted = await this.extractAnswerWithLLM(currentQuestion, state.rawAnswer);
-            if (extracted !== null) {
-                const revalidation = validateAnswer(currentQuestion, extracted);
-                if (revalidation.isValid) {
-                    console.log('[HealthCheckGraph] LLM extracted valid answer:', extracted);
-                    return this.recordAnswer(state, revalidation.validatedAnswer, true);
-                }
-            }
+        const extraction = await this.answerExtractor.extract(currentQuestion, state.rawAnswer);
+        console.log('[HealthCheckGraph] Extraction:', {
+            method: extraction.method,
+            confidence: extraction.confidence,
+            questionIndex: state.currentQuestionIndex
+        });
+
+        if (extraction.method !== 'not-extractable') {
+            return this.recordAnswer(state, extraction.value, true, extraction.method, extraction.confidence);
         }
 
         if (state.questionAttempts < MAX_RETRY_ATTEMPTS - 1) {
             return {
                 isValid: false,
-                validatedAnswer: validation.validatedAnswer,
+                validatedAnswer: '',
                 questionAttempts: state.questionAttempts + 1,
-                lastValidationError: validation.error ?? ""
+                lastValidationError: `Please provide a valid ${currentQuestion.type} answer`
             };
         }
 
@@ -243,51 +237,6 @@ export class HealthCheckGraph {
         return "finalize";
     }
 
-    private async classifyIntent(rawAnswer: string): Promise<'ANSWERING' | 'ASKING' | 'REFUSING'> {
-        try {
-            const response = await this.llm.invoke([
-                new SystemMessage(
-                    `Classify the following user message as exactly one of: ANSWERING, ASKING, REFUSING.\n` +
-                    `ANSWERING = the user is attempting to give an answer, even if poorly formatted.\n` +
-                    `ASKING = the user is asking a clarifying question.\n` +
-                    `REFUSING = the user is explicitly declining to answer.\n` +
-                    `Respond with only the classification word, nothing else.\n\n` +
-                    `User message: "${rawAnswer}"`
-                )
-            ]);
-            const content = String(response.content).trim().toUpperCase();
-            if (content === 'ASKING' || content === 'REFUSING') return content;
-            return 'ANSWERING';
-        } catch {
-            return 'ANSWERING';
-        }
-    }
-
-    private async extractAnswerWithLLM(question: QuestionData, rawAnswer: string): Promise<string | null> {
-        const constraint = question.type === 'scale'
-            ? `a number between ${question.min} and ${question.max}`
-            : question.type === 'boolean'
-                ? `"yes" or "no"`
-                : `a text response`;
-
-        try {
-            const response = await this.llm.invoke([
-                new SystemMessage(
-                    `The user was asked: "${question.question}"\n` +
-                    `Expected answer format: ${constraint}\n` +
-                    `The user responded: "${rawAnswer}"\n\n` +
-                    `Extract a valid ${question.type} answer from their response. ` +
-                    `Return only the extracted value (e.g. "yes", "no", "7", or a short text). ` +
-                    `If no valid answer can be extracted, respond with exactly: CANNOT_EXTRACT`
-                )
-            ]);
-            const extracted = String(response.content).trim();
-            return extracted === 'CANNOT_EXTRACT' ? null : extracted;
-        } catch {
-            return null;
-        }
-    }
-
     private async generateFollowUpQuestion(lastAnswer: HealthCheckAnswer): Promise<QuestionData | null> {
         try {
             const response = await this.llm.invoke([
@@ -317,7 +266,13 @@ export class HealthCheckGraph {
         }
     }
 
-    private recordAnswer(state: HealthCheckStateType, validatedAnswer: string, isValid: boolean) {
+    private recordAnswer(
+        state: HealthCheckStateType,
+        validatedAnswer: string,
+        isValid: boolean,
+        extractionMethod: HealthCheckAnswer['extractionMethod'] = 'rule-based',
+        confidence: number = 1.0
+    ) {
         const currentQuestion = state.healthCheckQuestions[state.currentQuestionIndex];
         const answerRecord: HealthCheckAnswer = {
             questionIndex: state.currentQuestionIndex,
@@ -325,7 +280,9 @@ export class HealthCheckGraph {
             rawAnswer: state.rawAnswer,
             validatedAnswer,
             isValid,
-            attemptCount: state.questionAttempts + 1
+            attemptCount: state.questionAttempts + 1,
+            extractionMethod,
+            confidence
         };
         return {
             isValid,
@@ -345,7 +302,9 @@ export class HealthCheckGraph {
             rawAnswer: state.rawAnswer,
             validatedAnswer: 'not answered',
             isValid: false,
-            attemptCount: state.questionAttempts + 1
+            attemptCount: state.questionAttempts + 1,
+            extractionMethod: 'not-extractable',
+            confidence: 0
         };
         return {
             isValid: false,
@@ -399,10 +358,7 @@ export class HealthCheckGraph {
             context += `"${question.question}"\n\n`;
 
             if (state.questionAttempts > 0) {
-                context += `NOTE: The user's previous answer was not valid.\n`;
-                if (state.lastValidationError) {
-                    context += `Reason: ${state.lastValidationError}\n`;
-                }
+                context += `NOTE: The user's previous answer was not clear enough to extract a valid response.\n`;
                 context += `Gently explain what format you need and ask again.\n`;
             }
         }
