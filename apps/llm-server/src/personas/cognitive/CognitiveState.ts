@@ -1,7 +1,8 @@
 import { Annotation } from "@langchain/langgraph";
 import { BaseMessage } from "@langchain/core/messages";
-import type { TaskResponse, WellbeingResponse, RetrievalLevel } from "./tasks/TaskDefinitions.js";
-// WellbeingResponse kept for post-call backward compatibility
+import type { TaskResponse, WellbeingResponse, RetrievalLevel, TaskDefinition } from "./tasks/TaskDefinitions.js";
+import type { CognitiveInterpretationResult } from "./CognitiveAnswerInterpreter.js";
+import type { CognitiveDecision } from "./CognitiveDecisionEngine.js";
 
 const keep = <T>(fallback: T) => ({
     reducer: (x: T, y: T | undefined | null) => (y !== undefined && y !== null) ? y : (x !== undefined && x !== null ? x : fallback),
@@ -55,6 +56,11 @@ export const CognitiveState = Annotation.Root({
     delayedRecallMissedWords: Annotation<string[]>(keep<string[]>([])),
 
     taskAttempts: Annotation<number>(keep<number>(0)),
+
+    tasks: Annotation<TaskDefinition[]>(keep<TaskDefinition[]>([])),
+    lastInterpretation: Annotation<CognitiveInterpretationResult | null>(keep<CognitiveInterpretationResult | null>(null)),
+    currentDecision: Annotation<CognitiveDecision | null>(keep<CognitiveDecision | null>(null)),
+
     isComplete: Annotation<boolean>(keep<boolean>(false)),
     isDeferred: Annotation<boolean>(keep<boolean>(false)),
     deferralReason: Annotation<string>(keep<string>("")),

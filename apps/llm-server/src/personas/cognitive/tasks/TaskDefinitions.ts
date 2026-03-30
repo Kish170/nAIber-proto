@@ -131,13 +131,15 @@ export const TASK_SEQUENCE: TaskDefinition[] = [
         maxScore: 5,
         prompt: "I'd like you to start at 100 and keep subtracting 7. Take your time.",
     },
-    {
-        taskType: CognitiveTaskType.LETTER_VIGILANCE,
-        domain: CognitiveDomain.ATTENTION_CONCENTRATION,
-        position: 9,
-        maxScore: 6,
-        prompt: "I'm going to read a list of letters. Every time you hear the letter A, I'd like you to say 'yes' out loud.",
-    },
+    // LETTER_VIGILANCE temporarily removed — requires real-time letter-tap detection
+    // which adds scoring complexity not yet supported. Re-enable when MCP tool handles it.
+    // {
+    //     taskType: CognitiveTaskType.LETTER_VIGILANCE,
+    //     domain: CognitiveDomain.ATTENTION_CONCENTRATION,
+    //     position: 9,
+    //     maxScore: 6,
+    //     prompt: "I'm going to read a list of letters. Every time you hear the letter A, I'd like you to say 'yes' out loud.",
+    // },
     {
         taskType: CognitiveTaskType.LETTER_FLUENCY,
         domain: CognitiveDomain.LANGUAGE_VERBAL_FLUENCY,
