@@ -2,28 +2,28 @@ import { StateGraph, END, interrupt } from "@langchain/langgraph";
 import { BaseCheckpointSaver } from "@langchain/langgraph-checkpoint";
 import { ChatOpenAI } from "@langchain/openai";
 import { SystemMessage } from "@langchain/core/messages";
-import { HealthCheckState, HealthCheckStateType, HealthCheckAnswer } from "./HealthCheckState.js";
+import { HealthCheckState, HealthCheckStateType } from "./HealthCheckState.js";
 import { HealthCheckHandler } from "./HealthCheckHandler.js";
 import { QuestionData } from "./questions/index.js";
 import { OpenAIClient } from "@naiber/shared-clients";
-import { IntentClassifier } from "./validation/IntentClassifier.js";
-import { AnswerExtractor } from "./validation/AnswerExtractor.js";
-
-const MAX_RETRY_ATTEMPTS = 2;
-const MAX_FOLLOW_UP_QUESTIONS = 2;
+import { AnswerInterpreter } from "./AnswerInterpreter.js";
+import { DecisionEngine } from "./DecisionEngine.js";
+import { QuestionContextBuilder } from "./QuestionContextBuilder.js";
 
 export class HealthCheckGraph {
     private llm: ChatOpenAI;
-    private intentClassifier: IntentClassifier;
-    private answerExtractor: AnswerExtractor;
+    private answerInterpreter: AnswerInterpreter;
+    private decisionEngine: DecisionEngine;
+    private contextBuilder: QuestionContextBuilder;
     private compiledGraph: any;
     private initialQuestions?: QuestionData[];
 
     constructor(openAIClient: OpenAIClient, checkpointer: BaseCheckpointSaver, initialQuestions?: QuestionData[]) {
         const chatModel = openAIClient.returnChatModel() as ChatOpenAI;
         this.llm = chatModel;
-        this.intentClassifier = new IntentClassifier(chatModel);
-        this.answerExtractor = new AnswerExtractor(chatModel);
+        this.answerInterpreter = new AnswerInterpreter(chatModel);
+        this.decisionEngine = new DecisionEngine(chatModel);
+        this.contextBuilder = new QuestionContextBuilder();
         this.initialQuestions = initialQuestions;
 
         const graph: any = new StateGraph(HealthCheckState);
@@ -31,16 +31,16 @@ export class HealthCheckGraph {
         graph.addNode("orchestrator", this.orchestrate.bind(this));
         graph.addNode("ask_question", this.askQuestion.bind(this));
         graph.addNode("wait_for_answer", this.waitForAnswer.bind(this));
-        graph.addNode("validate_answer", this.validateAnswer.bind(this));
-        graph.addNode("check_follow_up", this.checkFollowUp.bind(this));
+        graph.addNode("interpret_answer", this.interpretAnswer.bind(this));
+        graph.addNode("evaluate_and_decide", this.evaluateAndDecide.bind(this));
         graph.addNode("finalize", this.finalize.bind(this));
 
         graph.setEntryPoint("orchestrator");
         graph.addEdge("orchestrator", "ask_question");
         graph.addEdge("ask_question", "wait_for_answer");
-        graph.addEdge("wait_for_answer", "validate_answer");
-        graph.addConditionalEdges("validate_answer", this.routeAfterValidation.bind(this));
-        graph.addConditionalEdges("check_follow_up", this.routeAfterFollowUp.bind(this));
+        graph.addEdge("wait_for_answer", "interpret_answer");
+        graph.addEdge("interpret_answer", "evaluate_and_decide");
+        graph.addConditionalEdges("evaluate_and_decide", this.routeFromDecision.bind(this));
         graph.addEdge("finalize", END);
 
         this.compiledGraph = graph.compile({ checkpointer });
@@ -72,9 +72,9 @@ export class HealthCheckGraph {
     }
 
     private async askQuestion(state: HealthCheckStateType) {
-        const currentQuestion = state.healthCheckQuestions[state.currentQuestionIndex];
+        const question = state.healthCheckQuestions[state.currentQuestionIndex];
 
-        if (!currentQuestion) {
+        if (!question) {
             console.error('[HealthCheckGraph] No question at index:', state.currentQuestionIndex);
             return {
                 response: "I'm sorry, something went wrong. Let's end the health check here.",
@@ -82,34 +82,26 @@ export class HealthCheckGraph {
             };
         }
 
-        const questionContext = this.buildQuestionContext(currentQuestion, state);
-        const originalSystemMsg = state.messages.find(m => m instanceof SystemMessage);
-        const combinedPrompt = originalSystemMsg
-            ? `${originalSystemMsg.content}\n\n${questionContext}`
-            : questionContext;
+        const { systemPrompt, messageWindowSize } = this.contextBuilder.build(question, state);
+        const history = this.contextBuilder.filterMessages(state.messages, messageWindowSize);
 
-        const conversationHistory = state.messages
-            .filter(m => !(m instanceof SystemMessage))
-            .slice(-4);
+        const originalSystem = state.messages.find(m => m instanceof SystemMessage);
+        const combined = originalSystem
+            ? `${originalSystem.content}\n\n${systemPrompt}`
+            : systemPrompt;
 
-        const messages = [
-            new SystemMessage(combinedPrompt),
-            ...conversationHistory
-        ];
+        const llmResponse = await this.llm.invoke([new SystemMessage(combined), ...history]);
 
-        const response = await this.llm.invoke(messages);
-
-        const content = typeof response.content === 'string'
-            ? response.content
-            : Array.isArray(response.content)
-                ? response.content.map(p => typeof p === 'string' ? p : JSON.stringify(p)).join('')
-                : String(response.content);
+        const content = typeof llmResponse.content === 'string'
+            ? llmResponse.content
+            : Array.isArray(llmResponse.content)
+                ? llmResponse.content.map(p => typeof p === 'string' ? p : JSON.stringify(p)).join('')
+                : String(llmResponse.content);
 
         console.log('[HealthCheckGraph] Question generated:', {
             questionIndex: state.currentQuestionIndex,
             total: state.healthCheckQuestions.length,
-            isRetry: state.questionAttempts > 0,
-            isClarification: state.pendingClarification
+            action: state.currentDecision?.action ?? 'initial'
         });
 
         return {
@@ -139,77 +131,18 @@ export class HealthCheckGraph {
         return { rawAnswer: String(userAnswer) };
     }
 
-    private async validateAnswer(state: HealthCheckStateType) {
-        const currentQuestion = state.healthCheckQuestions[state.currentQuestionIndex];
-
-        if (!currentQuestion) {
-            console.error('[HealthCheckGraph] No question at index for validation:', state.currentQuestionIndex);
-            return { isValid: false, validatedAnswer: state.rawAnswer };
-        }
-
-        const { intent, tier } = await this.intentClassifier.classify(state.rawAnswer);
-        console.log('[HealthCheckGraph] Intent:', { intent, tier, questionIndex: state.currentQuestionIndex });
-
-        if (intent === 'ASKING') {
-            return {
-                pendingClarification: true,
-                clarificationContext: state.rawAnswer,
-                lastValidationError: ""
-            };
-        }
-
-        if (intent === 'REFUSING') {
-            console.log('[HealthCheckGraph] User refused question, skipping');
-            return this.skipQuestion(state);
-        }
-
-        const extraction = await this.answerExtractor.extract(currentQuestion, state.rawAnswer);
-        console.log('[HealthCheckGraph] Extraction:', {
-            method: extraction.method,
-            confidence: extraction.confidence,
-            questionIndex: state.currentQuestionIndex
-        });
-
-        if (extraction.method !== 'not-extractable') {
-            return this.recordAnswer(state, extraction.value, true, extraction.method, extraction.confidence);
-        }
-
-        if (state.questionAttempts < MAX_RETRY_ATTEMPTS - 1) {
-            return {
-                isValid: false,
-                validatedAnswer: '',
-                questionAttempts: state.questionAttempts + 1,
-                lastValidationError: `Please provide a valid ${currentQuestion.type} answer`
-            };
-        }
-
-        console.warn('[HealthCheckGraph] Max attempts reached, skipping question');
-        return this.skipQuestion(state);
+    private async interpretAnswer(state: HealthCheckStateType) {
+        const question = state.healthCheckQuestions[state.currentQuestionIndex];
+        const interpretation = await this.answerInterpreter.interpret(question, state.rawAnswer);
+        return { lastInterpretation: interpretation };
     }
 
-    private async checkFollowUp(state: HealthCheckStateType) {
-        const allQuestionsAnswered = state.currentQuestionIndex >= state.healthCheckQuestions.length;
-        if (!allQuestionsAnswered) {
-            return {};
-        }
-
-        const followUpCount = state.healthCheckQuestions.filter(q => q.id.startsWith('follow_up_')).length;
-        if (followUpCount >= MAX_FOLLOW_UP_QUESTIONS) {
-            return {};
-        }
-
-        const lastAnswer = state.healthCheckAnswers[state.healthCheckAnswers.length - 1];
-        if (!lastAnswer?.isValid) {
-            return {};
-        }
-
-        const followUp = await this.generateFollowUpQuestion(lastAnswer);
-        if (followUp) {
-            console.log('[HealthCheckGraph] Adding follow-up question:', followUp.question);
-            return { healthCheckQuestions: [...state.healthCheckQuestions, followUp] };
-        }
-
-        return {};
+    private async evaluateAndDecide(state: HealthCheckStateType) {
+        const { decision, stateUpdates } = await this.decisionEngine.evaluate(
+            state,
+            state.lastInterpretation!
+        );
+        return { currentDecision: decision, ...stateUpdates };
     }
 
     private finalize(state: HealthCheckStateType) {
@@ -225,146 +158,10 @@ export class HealthCheckGraph {
         };
     }
 
-    private routeAfterValidation(state: HealthCheckStateType): "ask_question" | "check_follow_up" | "finalize" {
+    private routeFromDecision(state: HealthCheckStateType): "ask_question" | "finalize" {
         if (state.isHealthCheckComplete) return "finalize";
-        if (state.pendingClarification) return "ask_question";
-        if (state.questionAttempts > 0) return "ask_question";
-        return "check_follow_up";
-    }
-
-    private routeAfterFollowUp(state: HealthCheckStateType): "ask_question" | "finalize" {
-        if (state.currentQuestionIndex < state.healthCheckQuestions.length) return "ask_question";
-        return "finalize";
-    }
-
-    private async generateFollowUpQuestion(lastAnswer: HealthCheckAnswer): Promise<QuestionData | null> {
-        try {
-            const response = await this.llm.invoke([
-                new SystemMessage(
-                    `A health check patient answered "${lastAnswer.validatedAnswer}" to the question: "${lastAnswer.question.question}".\n` +
-                    `Does this answer warrant a brief follow-up question to gather more useful health information?\n` +
-                    `If yes, return a JSON object with this exact shape (no markdown, no explanation):\n` +
-                    `{"question": "...", "category": "${lastAnswer.question.category}", "context": "..."}\n` +
-                    `If no follow-up is needed, respond with exactly: NO_FOLLOW_UP`
-                )
-            ]);
-            const content = String(response.content).trim();
-            if (content === 'NO_FOLLOW_UP') return null;
-
-            const parsed = JSON.parse(content);
-            return {
-                id: `follow_up_${lastAnswer.questionIndex}_${Date.now()}`,
-                question: parsed.question,
-                type: 'text',
-                category: parsed.category ?? lastAnswer.question.category,
-                context: parsed.context ?? '',
-                validation: 'Free text response',
-                optional: true
-            } as QuestionData;
-        } catch {
-            return null;
-        }
-    }
-
-    private recordAnswer(
-        state: HealthCheckStateType,
-        validatedAnswer: string,
-        isValid: boolean,
-        extractionMethod: HealthCheckAnswer['extractionMethod'] = 'rule-based',
-        confidence: number = 1.0
-    ) {
-        const currentQuestion = state.healthCheckQuestions[state.currentQuestionIndex];
-        const answerRecord: HealthCheckAnswer = {
-            questionIndex: state.currentQuestionIndex,
-            question: currentQuestion,
-            rawAnswer: state.rawAnswer,
-            validatedAnswer,
-            isValid,
-            attemptCount: state.questionAttempts + 1,
-            extractionMethod,
-            confidence
-        };
-        return {
-            isValid,
-            validatedAnswer,
-            healthCheckAnswers: [...state.healthCheckAnswers, answerRecord],
-            currentQuestionIndex: state.currentQuestionIndex + 1,
-            questionAttempts: 0,
-            lastValidationError: ""
-        };
-    }
-
-    private skipQuestion(state: HealthCheckStateType) {
-        const currentQuestion = state.healthCheckQuestions[state.currentQuestionIndex];
-        const answerRecord: HealthCheckAnswer = {
-            questionIndex: state.currentQuestionIndex,
-            question: currentQuestion,
-            rawAnswer: state.rawAnswer,
-            validatedAnswer: 'not answered',
-            isValid: false,
-            attemptCount: state.questionAttempts + 1,
-            extractionMethod: 'not-extractable',
-            confidence: 0
-        };
-        return {
-            isValid: false,
-            validatedAnswer: 'not answered',
-            healthCheckAnswers: [...state.healthCheckAnswers, answerRecord],
-            currentQuestionIndex: state.currentQuestionIndex + 1,
-            questionAttempts: 0,
-            lastValidationError: ""
-        };
-    }
-
-    private buildQuestionContext(question: QuestionData, state: HealthCheckStateType): string {
-        const questionNumber = state.currentQuestionIndex + 1;
-        const totalQuestions = state.healthCheckQuestions.length;
-
-        let context = `You are conducting a health check-in with an elderly user.\n`;
-        context += `Progress: Question ${questionNumber} of ${totalQuestions}.\n\n`;
-
-        if (state.currentQuestionIndex === 0 && state.questionAttempts === 0 && !state.pendingClarification) {
-            context += `## Starting Health Check\n`;
-            context += `Tell the user: "Before you go, let's do a quick health check-in."\n\n`;
-        }
-
-        if (state.healthCheckAnswers.length > 0) {
-            const validAnswers = state.healthCheckAnswers.filter(a => a.isValid);
-            if (validAnswers.length > 0) {
-                context += `## Previous Responses\n`;
-                validAnswers.forEach(a => {
-                    context += `- ${a.question.question}: ${a.validatedAnswer}\n`;
-                });
-                context += `\n`;
-            }
-        }
-
-        if (state.pendingClarification) {
-            context += `## Clarification Request\n`;
-            context += `The user asked: "${state.clarificationContext}"\n`;
-            context += `Kindly answer their question, then gently re-ask the following question:\n`;
-            context += `"${question.question}"\n`;
-        } else {
-            context += `## Current Question\n`;
-            context += `Type: ${question.type}\n`;
-            context += `Category: ${question.category}\n`;
-
-            if (question.type === 'scale') {
-                context += `Scale range: ${question.min}-${question.max}\n`;
-            }
-
-            context += `\n## Instructions\n`;
-            context += `Ask the following question in a warm, conversational way:\n`;
-            context += `"${question.question}"\n\n`;
-
-            if (state.questionAttempts > 0) {
-                context += `NOTE: The user's previous answer was not clear enough to extract a valid response.\n`;
-                context += `Gently explain what format you need and ask again.\n`;
-            }
-        }
-
-        context += `\nBe empathetic and conversational. Provide context for why you're asking.`;
-        return context;
+        if (state.currentQuestionIndex >= state.healthCheckQuestions.length) return "finalize";
+        return "ask_question";
     }
 
     get graph() {

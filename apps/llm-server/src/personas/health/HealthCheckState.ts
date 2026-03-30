@@ -1,7 +1,8 @@
 import { Annotation } from "@langchain/langgraph";
 import { BaseMessage } from "@langchain/core/messages";
 import { QuestionData } from "./questions/index.js";
-import type { ExtractionMethod } from "./validation/AnswerExtractor.js";
+import type { ExtractionMethod, ExtractionResult } from "./validation/AnswerExtractor.js";
+import type { AnswerSignals } from "./validation/SignalDetector.js";
 
 export interface HealthCheckAnswer {
     questionIndex: number;
@@ -12,6 +13,22 @@ export interface HealthCheckAnswer {
     attemptCount: number;
     extractionMethod: ExtractionMethod;
     confidence: number;
+}
+
+export interface InterpretationResult {
+    intent: 'ANSWERING' | 'ASKING' | 'REFUSING';
+    intentTier: 1 | 2;
+    extraction?: ExtractionResult;
+    signals: AnswerSignals;
+}
+
+export interface AgentDecision {
+    extractedSlots: Record<string, string | number | boolean | null>;
+    confidence: number;
+    action: 'next' | 'followup' | 'confirm' | 'retry' | 'skip';
+    followupQuestion?: string;
+    confirmQuestion?: string;
+    reasoning: string;
 }
 
 const keep = <T>(fallback: T) => ({
@@ -46,6 +63,17 @@ export const HealthCheckState = Annotation.Root({
     pendingClarification: Annotation<boolean>(keep<boolean>(false)),
     clarificationContext: Annotation<string>(keep<string>("")),
     response: Annotation<string>(keep<string>("")),
+
+    lastInterpretation: Annotation<InterpretationResult | null>({
+        reducer: (_x, y) => (y !== undefined ? y : null),
+        default: () => null
+    }),
+    currentDecision: Annotation<AgentDecision | null>({
+        reducer: (_x, y) => (y !== undefined ? y : null),
+        default: () => null
+    }),
+    currentQuestionFollowUpCount: Annotation<number>(keep<number>(0)),
+    previousCallContext: Annotation<string>(keep<string>("")),
 });
 
 export type HealthCheckStateType = typeof HealthCheckState.State;

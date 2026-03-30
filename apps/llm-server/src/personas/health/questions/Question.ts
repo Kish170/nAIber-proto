@@ -6,6 +6,14 @@ export interface ValidatedAnswer {
 
 export type QuestionCategory = 'general' | 'medication' | 'condition-specific' | 'symptom';
 
+export type HealthDataSlot =
+    | 'wellbeing_score'
+    | 'sleep_score'
+    | 'symptoms'
+    | 'medication_adherence'   // relatedTo = medicationId
+    | 'condition_status'       // relatedTo = conditionId
+    | 'general_notes';
+
 export interface BaseQuestionData {
     id: string;
     question: string;
@@ -14,6 +22,7 @@ export interface BaseQuestionData {
     context: string;
     validation: string;
     relatedTo?: string;
+    slot?: HealthDataSlot;
 }
 
 export interface BooleanQuestionData extends BaseQuestionData {
