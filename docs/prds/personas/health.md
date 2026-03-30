@@ -243,6 +243,25 @@ Post-call, adherence is stored differently depending on the question type used:
 
 ---
 
+## Previous Call Context (Phase D)
+
+During each call, the agent is seeded with a `previousCallContext` string derived from the most recent completed health check log. This gives the LLM enough context to ask more relevant follow-up questions and reference prior symptoms or missed medications.
+
+The context is formatted at call initialisation time by `HealthCheckHandler.formatPreviousCallContext()` and includes: date of last check, wellbeing/sleep scores, reported symptoms, condition change-from-baseline, and medication adherence.
+
+### Gold Layer — Future Enhancement
+
+The current implementation uses the **single most recent call** as context. The plan is to eventually replace this with a **gold-layer aggregated summary** computed offline across the last N calls. This summary would be:
+
+- Computed by a small LLM or BERT model after each call (not in the call hot path)
+- Stored as a pre-computed text field on the `ElderlyProfile` or a dedicated `HealthSummary` model
+- Used verbatim during calls to eliminate per-call aggregation and reduce token usage
+- Also used as the data source for dashboard trend queries (Phase E)
+
+The `HealthRepository.findRecentHealthChecksWithDetails(elderlyProfileId, count)` method exists to support this future aggregation step. It is not yet called in the call path.
+
+---
+
 ## Known Gaps
 
 - **Exact question set** is not documented here — it lives in `HealthCheckHandler.initializeHealthCheck()`. It should be extracted and listed explicitly once finalised.

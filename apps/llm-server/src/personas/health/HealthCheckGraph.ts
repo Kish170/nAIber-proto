@@ -54,20 +54,29 @@ export class HealthCheckGraph {
 
         console.log('[HealthCheckGraph] Initializing health check for userId:', state.userId);
 
-        const questionData = this.initialQuestions
-            ? this.initialQuestions
-            : (await HealthCheckHandler.initializeHealthCheck(state.userId)).map(q => q.toJSON() as QuestionData);
+        let questionData: QuestionData[];
+        let previousCallContext: string | null = null;
+
+        if (this.initialQuestions) {
+            questionData = this.initialQuestions;
+        } else {
+            const initialized = await HealthCheckHandler.initializeHealthCheck(state.userId);
+            questionData = initialized.questions.map(q => q.toJSON() as QuestionData);
+            previousCallContext = initialized.previousCallContext;
+        }
 
         console.log('[HealthCheckGraph] Loaded questions:', {
             userId: state.userId,
-            totalQuestions: questionData.length
+            totalQuestions: questionData.length,
+            hasPreviousContext: previousCallContext != null
         });
 
         return {
             healthCheckQuestions: questionData,
             currentQuestionIndex: 0,
             questionAttempts: 0,
-            healthCheckAnswers: []
+            healthCheckAnswers: [],
+            ...(previousCallContext != null ? { previousCallContext } : {})
         };
     }
 

@@ -127,6 +127,102 @@ export class HealthRepository {
         }
     }
 
+    static async getLastHealthCheckWithDetails(elderlyProfileId: string) {
+        try {
+            return await prismaClient.healthCheckLog.findFirst({
+                where: { elderlyProfileId },
+                orderBy: { createdAt: 'desc' },
+                include: {
+                    wellbeingLog: {
+                        select: {
+                            overallWellbeing: true,
+                            sleepQuality: true,
+                            physicalSymptoms: true,
+                            generalNotes: true,
+                        }
+                    },
+                    medicationLogs: {
+                        select: {
+                            medicationTaken: true,
+                            adherenceRating: true,
+                            adherenceContext: true,
+                            medication: { select: { name: true } }
+                        }
+                    },
+                    conditionLogs: {
+                        select: {
+                            severity: true,
+                            changeFromBaseline: true,
+                            notableFlags: true,
+                            condition: { select: { condition: true } }
+                        }
+                    }
+                }
+            });
+        } catch (error) {
+            console.error('[HealthRepository] Unable to get last health check details:', error);
+            return null;
+        }
+    }
+
+    static async findRecentHealthChecksWithDetails(elderlyProfileId: string, count: number = 5) {
+        try {
+            return await prismaClient.healthCheckLog.findMany({
+                where: { elderlyProfileId },
+                orderBy: { createdAt: 'desc' },
+                take: count,
+                include: {
+                    wellbeingLog: {
+                        select: {
+                            overallWellbeing: true,
+                            sleepQuality: true,
+                            physicalSymptoms: true,
+                            generalNotes: true,
+                        }
+                    },
+                    medicationLogs: {
+                        select: {
+                            medicationTaken: true,
+                            adherenceRating: true,
+                            adherenceContext: true,
+                            medication: { select: { id: true, name: true } }
+                        }
+                    },
+                    conditionLogs: {
+                        select: {
+                            severity: true,
+                            changeFromBaseline: true,
+                            notableFlags: true,
+                            condition: { select: { id: true, condition: true } }
+                        }
+                    }
+                }
+            });
+        } catch (error) {
+            console.error('[HealthRepository] Unable to find recent health checks with details:', error);
+            return [];
+        }
+    }
+
+    // --- Dashboard query stubs (Phase E) ---
+    // These will be implemented once the gold-layer aggregation design is settled.
+
+    static async getWellbeingTrend(_elderlyProfileId: string, _days: number = 30): Promise<never> {
+        throw new Error('Not implemented — pending Phase E gold-layer design');
+    }
+
+    static async getMedicationAdherenceSummary(_elderlyProfileId: string, _days: number = 30): Promise<never> {
+        throw new Error('Not implemented — pending Phase E gold-layer design');
+    }
+
+    static async getConditionHistory(_elderlyProfileId: string): Promise<never> {
+        throw new Error('Not implemented — pending Phase E gold-layer design');
+    }
+
+    static async getSymptomFrequency(_elderlyProfileId: string, _days: number = 30): Promise<never> {
+        throw new Error('Not implemented — pending Phase E gold-layer design');
+    }
+
     static async findHealthCheckLogsByElderlyProfileId(elderlyProfileId: string, limit: number = 10) {
         try {
             return await prismaClient.healthCheckLog.findMany({

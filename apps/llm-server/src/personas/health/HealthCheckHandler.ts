@@ -52,6 +52,51 @@ function buildMedQuestion(
     );
 }
 
+type LastHealthCheck = Awaited<ReturnType<typeof HealthRepository.getLastHealthCheckWithDetails>>;
+
+function formatPreviousCallContext(lastCheck: LastHealthCheck): string | null {
+    if (!lastCheck) return null;
+
+    const date = lastCheck.createdAt.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    const lines: string[] = [`Previous health check (${date}):`];
+
+    const wb = lastCheck.wellbeingLog;
+    if (wb) {
+        const scores: string[] = [];
+        if (wb.overallWellbeing != null) scores.push(`Wellbeing: ${wb.overallWellbeing}/10`);
+        if (wb.sleepQuality != null) scores.push(`Sleep: ${wb.sleepQuality}/10`);
+        if (scores.length) lines.push(`- ${scores.join(', ')}`);
+        if (wb.physicalSymptoms?.length) lines.push(`- Symptoms reported: ${wb.physicalSymptoms.join(', ')}`);
+        if (wb.generalNotes) lines.push(`- Notes: ${wb.generalNotes}`);
+    }
+
+    if (lastCheck.conditionLogs?.length) {
+        const summaries = lastCheck.conditionLogs.map(cl => {
+            const change = cl.changeFromBaseline ? ` (${cl.changeFromBaseline})` : '';
+            return `${cl.condition.condition}${change}`;
+        });
+        lines.push(`- Conditions: ${summaries.join(', ')}`);
+    }
+
+    if (lastCheck.medicationLogs?.length) {
+        const summaries = lastCheck.medicationLogs.map(ml => {
+            if (ml.adherenceContext === 'specific_date') {
+                return `${ml.medication.name} ${ml.medicationTaken ? '✓' : '✗'}`;
+            }
+            return `${ml.medication.name} (${ml.adherenceRating ?? 'unknown'})`;
+        });
+        lines.push(`- Medications: ${summaries.join(', ')}`);
+    }
+
+    lines.push('Reference prior data when contextually relevant. Do not recite all of it — only surface what matters for the current question.');
+    return lines.join('\n');
+}
+
+export interface InitializedHealthCheck {
+    questions: Question[];
+    previousCallContext: string | null;
+}
+
 export interface HealthCheckState {
     questions: Question[];
     answers: string[];
@@ -85,7 +130,7 @@ export interface ParsedHealthCheckData {
 }
 
 export class HealthCheckHandler {
-    static async initializeHealthCheck(userId: string): Promise<Question[]> {
+    static async initializeHealthCheck(userId: string): Promise<InitializedHealthCheck> {
         const questions: Question[] = [];
 
         questions.push(
@@ -118,10 +163,11 @@ export class HealthCheckHandler {
             )
         );
 
-        const [conditions, medications, callFrequency] = await Promise.all([
+        const [conditions, medications, callFrequency, lastHealthCheck] = await Promise.all([
             HealthRepository.findHealthConditionsByElderlyProfileId(userId),
             HealthRepository.findMedicationsByElderlyProfileId(userId),
-            HealthRepository.getCallFrequency(userId)
+            HealthRepository.getCallFrequency(userId),
+            HealthRepository.getLastHealthCheckWithDetails(userId)
         ]);
 
         const activeConditions = conditions.filter(c => c.isActive);
@@ -160,7 +206,10 @@ export class HealthCheckHandler {
             )
         );
 
-        return questions;
+        return {
+            questions,
+            previousCallContext: formatPreviousCallContext(lastHealthCheck)
+        };
     }
 
     static validateAnswer(question: Question, answer: string): ValidatedAnswer {
