@@ -181,7 +181,9 @@ export class HealthPostCallGraph {
                     overallWellbeing: state.wellbeingData.overallWellbeing,
                     sleepQuality: state.wellbeingData.sleepQuality,
                     physicalSymptoms: state.wellbeingData.physicalSymptoms,
-                    generalNotes: state.wellbeingData.generalNotes
+                    generalNotes: state.wellbeingData.generalNotes,
+                    concerns: state.wellbeingData.concerns,
+                    positives: state.wellbeingData.positives
                 });
             }
 

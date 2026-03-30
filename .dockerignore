@@ -56,6 +56,9 @@ ngrok.yml
 dump.rdb
 test-webhook.js
 
+# Prisma (we'll regenerate in container)
+generated/prisma
+
 # CI/CD
 .github
 .gitlab-ci.yml

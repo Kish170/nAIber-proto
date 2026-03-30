@@ -17,7 +17,9 @@ COPY apps/llm-server/package.json ./apps/llm-server/
 RUN npm ci
 
 COPY prisma ./prisma
-COPY generated/prisma ./generated/prisma
+
+RUN npx prisma generate
+
 
 COPY packages/shared-core ./packages/shared-core
 COPY packages/shared-clients ./packages/shared-clients
