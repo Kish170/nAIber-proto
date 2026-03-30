@@ -1,11 +1,11 @@
-import { Question, ValidatedAnswer, QuestionCategory } from './Question.js';
+import { Question, ValidatedAnswer, QuestionCategory, HealthDataSlot } from './Question.js';
 
 export class ScaleQuestion extends Question {
     private readonly min: number;
     private readonly max: number;
 
-    constructor(id: string, questionText: string, category: QuestionCategory, context: string, min: number = 1, max: number = 10, relatedTo?: string) {
-        super(id, questionText, category, context, relatedTo);
+    constructor(id: string, questionText: string, category: QuestionCategory, context: string, min: number = 1, max: number = 10, relatedTo?: string, slot?: HealthDataSlot) {
+        super(id, questionText, category, context, relatedTo, slot);
         this.min = min;
         this.max = max;
     }

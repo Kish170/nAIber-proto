@@ -51,22 +51,24 @@ export class HealthPostCallGraph {
         for (const a of answers) {
             if (!a.answer || a.answer === 'not answered') continue;
 
-            switch (a.category) {
-                case 'general':
-                    if (a.id === 'overall_wellbeing') {
-                        wellbeingData.overallWellbeing = parseInt(a.answer) || null;
-                    } else if (a.id === 'sleep_assessment') {
-                        wellbeingData.sleepQuality = parseInt(a.answer) || null;
-                    } else if (a.id === 'extra_notes') {
-                        wellbeingData.generalNotes = a.answer;
-                    }
+            switch (a.slot) {
+                case 'wellbeing_score':
+                    wellbeingData.overallWellbeing = parseInt(a.answer) || null;
                     break;
 
-                case 'symptom':
+                case 'sleep_score':
+                    wellbeingData.sleepQuality = parseInt(a.answer) || null;
+                    break;
+
+                case 'symptoms':
                     wellbeingData.physicalSymptoms = [a.answer];
                     break;
 
-                case 'medication':
+                case 'general_notes':
+                    wellbeingData.generalNotes = a.answer;
+                    break;
+
+                case 'medication_adherence':
                     if (a.relatedTo) {
                         medicationEntries.push({
                             medicationId: a.relatedTo,
@@ -75,7 +77,7 @@ export class HealthPostCallGraph {
                     }
                     break;
 
-                case 'condition-specific':
+                case 'condition_status':
                     if (a.relatedTo) {
                         conditionEntries.push({
                             conditionId: a.relatedTo,
@@ -105,7 +107,7 @@ export class HealthPostCallGraph {
         const enrichedConditions = [...state.conditionEntries];
         let physicalSymptoms: string[] = [...(state.wellbeingData?.physicalSymptoms ?? [])];
 
-        const symptomAnswer = answers.find(a => a.category === 'symptom' && a.answer && a.answer !== 'not answered');
+        const symptomAnswer = answers.find(a => a.slot === 'symptoms' && a.answer && a.answer !== 'not answered');
         if (symptomAnswer?.answer) {
             const result = await this.normalizer.normalizeSymptomReport(symptomAnswer.answer);
             if (!result.no_symptoms) {
@@ -120,7 +122,7 @@ export class HealthPostCallGraph {
             if (!entry.rawNotes) continue;
 
             const conditionAnswer = answers.find(
-                a => a.category === 'condition-specific' && a.relatedTo === entry.conditionId
+                a => a.slot === 'condition_status' && a.relatedTo === entry.conditionId
             );
             const conditionName = conditionAnswer
                 ? conditionAnswer.question.replace(/How has your (.+?) been lately.*/, '$1')
@@ -138,7 +140,7 @@ export class HealthPostCallGraph {
 
         let concerns: string[] = [];
         let positives: string[] = [];
-        const notesAnswer = answers.find(a => a.id === 'extra_notes' && a.answer && a.answer !== 'not answered');
+        const notesAnswer = answers.find(a => a.slot === 'general_notes' && a.answer && a.answer !== 'not answered');
         let generalNotes = state.wellbeingData?.generalNotes ?? null;
         if (notesAnswer?.answer) {
             const result = await this.normalizer.normalizeGeneralNotes(notesAnswer.answer);

@@ -42,7 +42,8 @@ export class HealthCheckHandler {
                 "overall_wellbeing",
                 "On a scale of 1-10, how are you feeling overall right now?",
                 "general",
-                "Helps understand the user's state of mind when they provided their other answers."
+                "Helps understand the user's state of mind when they provided their other answers.",
+                1, 10, undefined, 'wellbeing_score'
             )
         );
 
@@ -51,7 +52,8 @@ export class HealthCheckHandler {
                 "physical_symptoms_assessment",
                 "Are you experiencing any physical symptoms at the moment? (e.g., pain, nausea, dizziness)",
                 "symptom",
-                "Used to identify any physical issues or discomfort the user is feeling right now."
+                "Used to identify any physical issues or discomfort the user is feeling right now.",
+                true, undefined, 'symptoms'
             )
         );
 
@@ -60,7 +62,8 @@ export class HealthCheckHandler {
                 "sleep_assessment",
                 "How would you rate your sleep last night from 1-10?",
                 "general",
-                "Helps determine how sleep quality might be affecting the user's energy or mood today."
+                "Helps determine how sleep quality might be affecting the user's energy or mood today.",
+                1, 10, undefined, 'sleep_score'
             )
         );
 
@@ -79,7 +82,8 @@ export class HealthCheckHandler {
                         "condition-specific",
                         "Tracks the status of a pre-existing condition to identify flare-ups or improvements over time.",
                         true,
-                        condition.id
+                        condition.id,
+                        'condition_status'
                     )
                 );
             }
@@ -93,7 +97,10 @@ export class HealthCheckHandler {
                         `Have you taken your ${medication.name} today?`,
                         "medication",
                         "Tracks daily medication adherence to ensure the user is following their prescribed treatment plan.",
-                        medication.id
+                        medication.id,
+                        undefined,
+                        undefined,
+                        'medication_adherence'
                     )
                 );
             }
@@ -105,7 +112,9 @@ export class HealthCheckHandler {
                 "Is there anything else about your health you'd like to mention before we finish?",
                 "general",
                 "Allows the user to raise anything not covered by the structured questions — acts as a natural closing.",
-                true
+                true,
+                undefined,
+                'general_notes'
             )
         );
 

@@ -50,13 +50,15 @@ export abstract class Question {
     public readonly questionText: string;
     public readonly id: string;
     public readonly context: string;
+    public readonly slot?: HealthDataSlot;
 
-    constructor(id: string, questionText: string, category: QuestionCategory, context: string, relatedTo?: string) {
+    constructor(id: string, questionText: string, category: QuestionCategory, context: string, relatedTo?: string, slot?: HealthDataSlot) {
         this.questionText = questionText;
         this.category = category;
         this.relatedTo = relatedTo;
         this.id = id;
         this.context = context;
+        this.slot = slot;
     }
 
     abstract validate(answer: string): ValidatedAnswer;
@@ -75,7 +77,8 @@ export abstract class Question {
             category: this.category,
             context: this.context,
             validation: this.getValidationProcess(),
-            relatedTo: this.relatedTo
+            relatedTo: this.relatedTo,
+            slot: this.slot
         };
     }
 }

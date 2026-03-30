@@ -154,6 +154,7 @@ export class PostCallWorker {
                 category: a.question?.category ?? '',
                 type: a.question?.type ?? '',
                 relatedTo: a.question?.relatedTo ?? null,
+                slot: a.question?.slot ?? null,
                 answer: a.isValid ? a.validatedAnswer : null,
                 isValid: a.isValid
             }));

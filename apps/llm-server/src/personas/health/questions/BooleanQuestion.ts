@@ -1,4 +1,4 @@
-import { Question, ValidatedAnswer, QuestionCategory } from './Question.js';
+import { Question, ValidatedAnswer, QuestionCategory, HealthDataSlot } from './Question.js';
 
 const DEFAULT_ACCEPTED_TRUE = ['yes', 'y', 'yeah', 'yep', 'true', '1'];
 const DEFAULT_ACCEPTED_FALSE = ['no', 'n', 'nope', 'false', '0'];
@@ -14,9 +14,10 @@ export class BooleanQuestion extends Question {
         context: string,
         relatedTo?: string,
         acceptedTrue?: string[],
-        acceptedFalse?: string[]
+        acceptedFalse?: string[],
+        slot?: HealthDataSlot
     ) {
-        super(id, questionText, category, context, relatedTo);
+        super(id, questionText, category, context, relatedTo, slot);
         this.acceptedTrue = acceptedTrue ?? DEFAULT_ACCEPTED_TRUE;
         this.acceptedFalse = acceptedFalse ?? DEFAULT_ACCEPTED_FALSE;
     }

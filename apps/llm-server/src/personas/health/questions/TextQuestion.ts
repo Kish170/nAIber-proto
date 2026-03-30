@@ -1,10 +1,10 @@
-import { Question, ValidatedAnswer, QuestionCategory } from './Question.js';
+import { Question, ValidatedAnswer, QuestionCategory, HealthDataSlot } from './Question.js';
 
 export class TextQuestion extends Question {
     private readonly optional: boolean;
 
-    constructor(id: string, questionText: string, category: QuestionCategory, context: string, optional: boolean = true, relatedTo?: string) {
-        super(id, questionText, category, context, relatedTo);
+    constructor(id: string, questionText: string, category: QuestionCategory, context: string, optional: boolean = true, relatedTo?: string, slot?: HealthDataSlot) {
+        super(id, questionText, category, context, relatedTo, slot);
         this.optional = optional;
     }
 

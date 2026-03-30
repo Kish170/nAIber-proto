@@ -6,6 +6,7 @@ export interface ParsedAnswer {
     category: string;
     type: string;
     relatedTo: string | null;
+    slot: string | null;
     answer: string | null;
     isValid: boolean;
 }
