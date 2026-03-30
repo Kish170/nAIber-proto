@@ -190,6 +190,59 @@ Call ends (isHealthCheckComplete = true, or call drops)
 
 ---
 
+## Medication Tracking
+
+### Schedule model
+
+Medication frequency is stored as a structured `MedicationSchedule` JSON object on `UserMedication.frequency` (Prisma `Json` field). This replaces the previous free-text string and allows programmatic reasoning about call relevance.
+
+```typescript
+interface MedicationSchedule {
+    timesPerDay?: number;    // 1, 2, 3 — covers once/twice/three times daily
+    perWeek?: number;        // 1–7 — covers "three times a week", "weekly"
+    intervalDays?: number;   // every N days — covers bi-weekly (14), monthly (30)
+    prn?: boolean;           // as-needed / PRN
+}
+```
+
+### Frequency classification
+
+At question-generation time, each medication's schedule is classified into one of four classes:
+
+| Class | Condition | Behaviour |
+|---|---|---|
+| `daily` | `timesPerDay` set, or fallback | Ask on DAILY calls; on WEEKLY calls ask general adherence ("have you been taking it regularly this week?") |
+| `weekly` | `perWeek` set (no `timesPerDay`) | Ask on WEEKLY calls; skip on DAILY calls (not relevant today) |
+| `infrequent` | `intervalDays >= 14` | Skip on all calls — we cannot determine the correct window without tracking last dose date |
+| `prn` | `prn: true` | Skip on all calls |
+
+### Call cadence × question type matrix
+
+| Call frequency | Med class | Question type | Example |
+|---|---|---|---|
+| DAILY | daily | `BooleanQuestion` | "Have you taken your Metformin today?" |
+| DAILY | weekly | skip | — |
+| DAILY | infrequent | skip | — |
+| WEEKLY | daily | `TextQuestion` | "Have you been taking your Metformin regularly this week?" |
+| WEEKLY | weekly | `BooleanQuestion` | "Did you take your Vitamin D this week?" |
+| WEEKLY | infrequent | skip | — |
+| Any | prn | skip | — |
+
+### Adherence model
+
+Post-call, adherence is stored differently depending on the question type used:
+
+- **`BooleanQuestion`** (`adherenceContext: 'specific_date'`): `medicationTaken: boolean`, `takenAt: date of call`
+- **`TextQuestion`** (`adherenceContext: 'general_period'`): `adherenceRating: string`, `periodStart / periodEnd: last 7 days`
+
+### Known limitations
+
+- **Infrequent medications** (`intervalDays >= 14`) are currently skipped entirely. To ask about these correctly, the system would need to track the last confirmed dose date and compute the next expected window. This is a planned future enhancement.
+- **Sub-daily scheduling** (e.g. "take with breakfast, lunch, and dinner") is not modelled beyond `timesPerDay`. Meal-linked timing is captured in the medication `notes` field only.
+- **Call cadence changes**: If a user switches from DAILY to WEEKLY calls, their medication question history will mix `specific_date` and `general_period` entries — trend queries should group by `adherenceContext`.
+
+---
+
 ## Known Gaps
 
 - **Exact question set** is not documented here — it lives in `HealthCheckHandler.initializeHealthCheck()`. It should be extracted and listed explicitly once finalised.

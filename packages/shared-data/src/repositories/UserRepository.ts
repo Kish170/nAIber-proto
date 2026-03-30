@@ -1,5 +1,5 @@
 import { prismaClient } from '@naiber/shared-clients';
-import { elderlyProfileInclude, ElderlyProfileData } from '@naiber/shared-core';
+import { elderlyProfileInclude, ElderlyProfileData, MedicationSchedule } from '@naiber/shared-core';
 import type { Gender, EducationLevel, CheckInFrequency } from '../../../../generated/prisma/index.js';
 
 export interface CreateElderlyProfileData {
@@ -23,7 +23,7 @@ export interface CreateElderlyProfileData {
         notifyOnMissedCalls?: boolean;
     };
     healthConditions?: { condition: string }[];
-    medications?: { name: string; dosage: string; frequency: string }[];
+    medications?: { name: string; dosage: string; frequency: MedicationSchedule }[];
 }
 
 export class UserRepository {
@@ -50,7 +50,7 @@ export class UserRepository {
                         ? { create: data.healthConditions }
                         : undefined,
                     medications: data.medications?.length
-                        ? { create: data.medications }
+                        ? { create: data.medications as any[] }
                         : undefined,
                     caregiverLinks: {
                         create: {
@@ -61,7 +61,7 @@ export class UserRepository {
                 },
                 include: elderlyProfileInclude,
             });
-            return profile;
+            return profile as unknown as ElderlyProfileData;
         } catch (error) {
             console.error('[UserRepository] Error creating elderly profile:', error);
             throw error;

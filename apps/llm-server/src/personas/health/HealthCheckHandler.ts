@@ -1,5 +1,56 @@
 import { HealthRepository } from '@naiber/shared-data';
+import { MedicationSchedule } from '@naiber/shared-core';
 import { Question, QuestionData, ScaleQuestion, BooleanQuestion, TextQuestion, ValidatedAnswer } from './questions/index.js';
+
+type CallFrequency = 'DAILY' | 'WEEKLY';
+type MedFrequencyClass = 'daily' | 'weekly' | 'infrequent' | 'prn';
+
+function classifyMedFrequency(schedule: MedicationSchedule | null): MedFrequencyClass {
+    if (!schedule || schedule.prn) return 'prn';
+    if (schedule.timesPerDay) return 'daily';
+    if (schedule.perWeek) return 'weekly';
+    if (schedule.intervalDays && schedule.intervalDays >= 14) return 'infrequent';
+    return 'daily';
+}
+
+function shouldAskMedQuestion(callFreq: CallFrequency, medFreq: MedFrequencyClass): boolean {
+    if (medFreq === 'prn' || medFreq === 'infrequent') return false;
+    if (callFreq === 'DAILY' && medFreq === 'weekly') return false;
+    return true;
+}
+
+function buildMedQuestion(
+    medName: string,
+    medId: string,
+    callFreq: CallFrequency,
+    medFreq: MedFrequencyClass
+): Question {
+    if (callFreq === 'DAILY' || medFreq === 'weekly') {
+        const text = callFreq === 'DAILY'
+            ? `Have you taken your ${medName} today?`
+            : `Did you take your ${medName} this week?`;
+        return new BooleanQuestion(
+            'medication_tracking',
+            text,
+            'medication',
+            'Tracks daily medication adherence to ensure the user is following their prescribed treatment plan.',
+            medId,
+            undefined,
+            undefined,
+            'medication_adherence'
+        );
+    }
+    // WEEKLY call + daily med → general adherence text question
+    return new TextQuestion(
+        'medication_tracking',
+        `Have you been taking your ${medName} regularly this week?`,
+        'medication',
+        'General adherence check for a weekly call — captures how consistently the user has taken their daily medication.',
+        false,
+        medId,
+        'medication_adherence'
+    );
+}
 
 export interface HealthCheckState {
     questions: Question[];
@@ -67,43 +118,34 @@ export class HealthCheckHandler {
             )
         );
 
-        const conditions = await HealthRepository.findHealthConditionsByElderlyProfileId(userId);
-        const activeConditions = conditions.filter(c => c.isActive);
+        const [conditions, medications, callFrequency] = await Promise.all([
+            HealthRepository.findHealthConditionsByElderlyProfileId(userId),
+            HealthRepository.findMedicationsByElderlyProfileId(userId),
+            HealthRepository.getCallFrequency(userId)
+        ]);
 
-        const medications = await HealthRepository.findMedicationsByElderlyProfileId(userId);
+        const activeConditions = conditions.filter(c => c.isActive);
         const activeMedications = medications.filter(m => m.isActive);
 
-        if (activeConditions.length > 0) {
-            for (const condition of activeConditions) {
-                questions.push(
-                    new TextQuestion(
-                        "health_condition",
-                        `How has your ${condition.condition} been lately? Any changes or concerns?`,
-                        "condition-specific",
-                        "Tracks the status of a pre-existing condition to identify flare-ups or improvements over time.",
-                        true,
-                        condition.id,
-                        'condition_status'
-                    )
-                );
-            }
+        for (const condition of activeConditions) {
+            questions.push(
+                new TextQuestion(
+                    "health_condition",
+                    `How has your ${condition.condition} been lately? Any changes or concerns?`,
+                    "condition-specific",
+                    "Tracks the status of a pre-existing condition to identify flare-ups or improvements over time.",
+                    true,
+                    condition.id,
+                    'condition_status'
+                )
+            );
         }
 
-        if (activeMedications.length > 0) {
-            for (const medication of activeMedications) {
-                questions.push(
-                    new BooleanQuestion(
-                        "medication_tracking",
-                        `Have you taken your ${medication.name} today?`,
-                        "medication",
-                        "Tracks daily medication adherence to ensure the user is following their prescribed treatment plan.",
-                        medication.id,
-                        undefined,
-                        undefined,
-                        'medication_adherence'
-                    )
-                );
-            }
+        for (const medication of activeMedications) {
+            const schedule = medication.frequency as MedicationSchedule | null;
+            const medFreq = classifyMedFrequency(schedule);
+            if (!shouldAskMedQuestion(callFrequency, medFreq)) continue;
+            questions.push(buildMedQuestion(medication.name, medication.id, callFrequency, medFreq));
         }
 
         questions.push(

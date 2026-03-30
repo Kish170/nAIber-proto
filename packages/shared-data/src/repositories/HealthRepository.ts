@@ -24,8 +24,13 @@ export interface MedicationLogData {
     elderlyProfileId: string;
     conversationId: string;
     medicationId: string;
-    medicationTaken: boolean;
+    medicationTaken?: boolean | null;
     notes?: string | null;
+    adherenceContext?: string | null;
+    takenAt?: Date | string | null;
+    periodStart?: Date | string | null;
+    periodEnd?: Date | string | null;
+    adherenceRating?: string | null;
 }
 
 export interface HealthConditionLogData {
@@ -41,6 +46,19 @@ export interface HealthConditionLogData {
 }
 
 export class HealthRepository {
+    static async getCallFrequency(elderlyProfileId: string): Promise<'DAILY' | 'WEEKLY'> {
+        try {
+            const profile = await prismaClient.elderlyProfile.findUnique({
+                where: { id: elderlyProfileId },
+                select: { callFrequency: true }
+            });
+            return (profile?.callFrequency as 'DAILY' | 'WEEKLY') ?? 'DAILY';
+        } catch (error) {
+            console.error('[HealthRepository] Unable to get call frequency:', error);
+            return 'DAILY';
+        }
+    }
+
     static async findHealthConditionsByElderlyProfileId(elderlyProfileId: string) {
         try {
             return await prismaClient.userHealthCondition.findMany({

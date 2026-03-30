@@ -159,7 +159,12 @@ export class PostCallWorker {
                 isValid: a.isValid
             }));
 
-            const result = await this.healthPostCallGraph.invoke({ userId, conversationId, answers });
+            const result = await this.healthPostCallGraph.invoke({
+                userId,
+                conversationId,
+                callDate: new Date().toISOString(),
+                answers
+            });
 
             if (result.error) {
                 throw new Error(result.error);

@@ -22,7 +22,12 @@ export interface WellbeingData {
 
 export interface MedicationLogEntry {
     medicationId: string;
-    medicationTaken: boolean;
+    adherenceContext: 'specific_date' | 'general_period';
+    medicationTaken: boolean | null;
+    takenAt: string | null;
+    periodStart: string | null;
+    periodEnd: string | null;
+    adherenceRating: string | null;
 }
 
 export interface ConditionLogEntry {
@@ -42,6 +47,7 @@ const keep = <T>(fallback: T): { reducer: (a: T, b: T) => T; default: () => T } 
 export const HealthPostCallState = Annotation.Root({
     userId:            Annotation<string>(keep<string>('')),
     conversationId:    Annotation<string>(keep<string>('')),
+    callDate:          Annotation<string>(keep<string>('')),
     answers:           Annotation<ParsedAnswer[]>(keep<ParsedAnswer[]>([])),
     wellbeingData:     Annotation<WellbeingData | null>(keep<WellbeingData | null>(null)),
     medicationEntries: Annotation<MedicationLogEntry[]>(keep<MedicationLogEntry[]>([])),

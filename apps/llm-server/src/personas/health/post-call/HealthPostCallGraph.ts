@@ -70,10 +70,32 @@ export class HealthPostCallGraph {
 
                 case 'medication_adherence':
                     if (a.relatedTo) {
-                        medicationEntries.push({
-                            medicationId: a.relatedTo,
-                            medicationTaken: a.answer.toLowerCase() === 'yes'
-                        });
+                        const isSpecific = a.type === 'boolean';
+                        const callDate = state.callDate || new Date().toISOString();
+                        if (isSpecific) {
+                            medicationEntries.push({
+                                medicationId: a.relatedTo,
+                                adherenceContext: 'specific_date',
+                                medicationTaken: a.answer.toLowerCase() === 'yes',
+                                takenAt: callDate,
+                                periodStart: null,
+                                periodEnd: null,
+                                adherenceRating: null
+                            });
+                        } else {
+                            const end = new Date(callDate);
+                            const start = new Date(end);
+                            start.setDate(start.getDate() - 7);
+                            medicationEntries.push({
+                                medicationId: a.relatedTo,
+                                adherenceContext: 'general_period',
+                                medicationTaken: null,
+                                takenAt: null,
+                                periodStart: start.toISOString(),
+                                periodEnd: end.toISOString(),
+                                adherenceRating: a.answer
+                            });
+                        }
                     }
                     break;
 
@@ -195,7 +217,12 @@ export class HealthPostCallGraph {
                     elderlyProfileId: state.userId,
                     conversationId: state.conversationId,
                     medicationId: entry.medicationId,
-                    medicationTaken: entry.medicationTaken
+                    adherenceContext: entry.adherenceContext,
+                    medicationTaken: entry.medicationTaken,
+                    takenAt: entry.takenAt ? new Date(entry.takenAt) : null,
+                    periodStart: entry.periodStart ? new Date(entry.periodStart) : null,
+                    periodEnd: entry.periodEnd ? new Date(entry.periodEnd) : null,
+                    adherenceRating: entry.adherenceRating
                 });
             }
 

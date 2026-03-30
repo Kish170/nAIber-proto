@@ -32,18 +32,27 @@ export enum MemoryConcern {
     UNSURE = 'unsure',
 }
 
-export enum MedicationFrequency {
-    ONCE_DAILY = 'Once daily',
-    TWICE_DAILY = 'Twice daily',
-    THREE_TIMES_DAILY = 'Three times daily',
-    AS_NEEDED = 'As needed',
-    WEEKLY = 'Weekly',
+export interface MedicationSchedule {
+    timesPerDay?: number;
+    perWeek?: number;
+    intervalDays?: number;
+    prn?: boolean;
 }
+
+export const FREQUENCY_OPTIONS: { label: string; schedule: MedicationSchedule }[] = [
+    { label: 'Once daily',       schedule: { timesPerDay: 1 } },
+    { label: 'Twice daily',      schedule: { timesPerDay: 2 } },
+    { label: 'Three times daily', schedule: { timesPerDay: 3 } },
+    { label: 'Weekly',           schedule: { perWeek: 1 } },
+    { label: 'Every other week', schedule: { intervalDays: 14 } },
+    { label: 'Monthly',          schedule: { intervalDays: 30 } },
+    { label: 'As needed',        schedule: { prn: true } },
+];
 
 export interface Medication {
     name: string;
     dosage: string;
-    frequency: string;
+    frequency: MedicationSchedule;
 }
 
 export interface EmergencyContact {

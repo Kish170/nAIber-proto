@@ -1,5 +1,12 @@
 import { Prisma } from '../../../../generated/prisma/index.js';
 
+export interface MedicationSchedule {
+    timesPerDay?: number;
+    perWeek?: number;
+    intervalDays?: number;
+    prn?: boolean;
+}
+
 export const elderlyProfileInclude = Prisma.validator<Prisma.ElderlyProfileInclude>()({
     emergencyContact: {
         select: {

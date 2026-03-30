@@ -111,23 +111,23 @@ async function main() {
           {
             name: 'Metformin',
             dosage: '500mg',
-            frequency: 'Twice daily with meals',
+            frequency: { timesPerDay: 2 },
             startedAt: new Date('2015-03-15'),
-            notes: 'For diabetes management',
+            notes: 'For diabetes management. Take with meals.',
             isActive: true
           },
           {
             name: 'Lisinopril',
             dosage: '10mg',
-            frequency: 'Once daily in the morning',
+            frequency: { timesPerDay: 1 },
             startedAt: new Date('2012-06-20'),
-            notes: 'For blood pressure',
+            notes: 'For blood pressure. Take in the morning.',
             isActive: true
           },
           {
             name: 'Vitamin D3',
             dosage: '2000 IU',
-            frequency: 'Once daily',
+            frequency: { timesPerDay: 1 },
             startedAt: new Date('2020-01-01'),
             notes: 'Supplement for bone health',
             isActive: true
@@ -135,8 +135,8 @@ async function main() {
           {
             name: 'Ibuprofen',
             dosage: '200mg',
-            frequency: 'As needed for pain',
-            notes: 'For arthritis pain, not daily',
+            frequency: { prn: true },
+            notes: 'For arthritis pain, as needed',
             isActive: true
           }
         ]

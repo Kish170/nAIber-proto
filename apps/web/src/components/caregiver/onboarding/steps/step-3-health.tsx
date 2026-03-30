@@ -21,14 +21,15 @@ import { StepLayout } from "../step-layout"
 import { useOnboardingStore } from "@/stores/onboarding.store"
 import {
   SUGGESTED_CONDITIONS,
-  MedicationFrequency,
+  FREQUENCY_OPTIONS,
   type Medication,
+  type MedicationSchedule,
 } from "@/types/onboarding"
 
 const medicationSchema = z.object({
   name: z.string(),
   dosage: z.string(),
-  frequency: z.string(),
+  frequency: z.record(z.unknown()),
 })
 
 const schema = z.object({
@@ -37,8 +38,6 @@ const schema = z.object({
 })
 
 type FormData = z.infer<typeof schema>
-
-const FREQUENCIES = Object.values(MedicationFrequency)
 
 export function Step3Health() {
   const router = useRouter()
@@ -168,16 +167,21 @@ export function Step3Health() {
                 </div>
                 <div className="flex flex-col gap-1">
                   <Select
-                    value={med.frequency}
-                    onValueChange={(val) => updateMedication(i, "frequency", val)}
+                    value={FREQUENCY_OPTIONS.find(o =>
+                      JSON.stringify(o.schedule) === JSON.stringify(med.frequency)
+                    )?.label ?? ''}
+                    onValueChange={(label) => {
+                      const opt = FREQUENCY_OPTIONS.find(o => o.label === label)
+                      if (opt) updateMedication(i, "frequency", opt.schedule)
+                    }}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Frequency" />
                     </SelectTrigger>
                     <SelectContent>
-                      {FREQUENCIES.map((f) => (
-                        <SelectItem key={f} value={f}>
-                          {f}
+                      {FREQUENCY_OPTIONS.map((opt) => (
+                        <SelectItem key={opt.label} value={opt.label}>
+                          {opt.label}
                         </SelectItem>
                       ))}
                     </SelectContent>

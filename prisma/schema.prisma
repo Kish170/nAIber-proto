@@ -177,7 +177,7 @@ model UserMedication {
   elderlyProfileId     String
   name                 String
   dosage               String
-  frequency            String
+  frequency            Json
   startedAt            DateTime?
   endedAt              DateTime?
   notes                String?
@@ -417,17 +417,22 @@ model WellbeingLog {
 }
 
 model MedicationLog {
-  id               String         @id @default(uuid())
-  healthCheckLogId String
-  elderlyProfileId String
-  conversationId   String
-  medicationId     String
-  medicationTaken  Boolean
-  notes            String?
-  createdAt        DateTime       @default(now())
-  healthCheckLog   HealthCheckLog @relation(fields: [healthCheckLogId], references: [id], onDelete: Cascade)
-  medication       UserMedication @relation(fields: [medicationId], references: [id], onDelete: Cascade)
-  elderlyProfile   ElderlyProfile @relation(fields: [elderlyProfileId], references: [id], onDelete: Cascade)
+  id                String         @id @default(uuid())
+  healthCheckLogId  String
+  elderlyProfileId  String
+  conversationId    String
+  medicationId      String
+  medicationTaken   Boolean?
+  notes             String?
+  adherenceContext  String?        // 'specific_date' | 'general_period'
+  takenAt           DateTime?      // specific date (daily call)
+  periodStart       DateTime?      // period start (weekly call)
+  periodEnd         DateTime?      // period end (weekly call)
+  adherenceRating   String?        // 'always'|'mostly'|'sometimes'|'rarely' (weekly call)
+  createdAt         DateTime       @default(now())
+  healthCheckLog    HealthCheckLog @relation(fields: [healthCheckLogId], references: [id], onDelete: Cascade)
+  medication        UserMedication @relation(fields: [medicationId], references: [id], onDelete: Cascade)
+  elderlyProfile    ElderlyProfile @relation(fields: [elderlyProfileId], references: [id], onDelete: Cascade)
 
   @@index([elderlyProfileId, createdAt])
   @@index([medicationId])

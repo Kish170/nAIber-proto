@@ -3,10 +3,17 @@ import { z } from 'zod';
 import { caregiverProcedure, router } from '../trpc/init.js';
 import { UserRepository, TrustedContactRepository } from '@naiber/shared-data';
 
+const medicationScheduleSchema = z.object({
+    timesPerDay: z.number().int().positive().optional(),
+    perWeek: z.number().int().min(1).max(7).optional(),
+    intervalDays: z.number().int().positive().optional(),
+    prn: z.boolean().optional(),
+});
+
 const medicationSchema = z.object({
     name: z.string().min(1),
     dosage: z.string().min(1),
-    frequency: z.string().min(1),
+    frequency: medicationScheduleSchema,
 });
 
 const emergencyContactSchema = z.object({
