@@ -1,4 +1,5 @@
 import { prismaClient } from '@naiber/shared-clients';
+import type { ConditionSeverity, ConditionChangeStatus } from '../../../../generated/prisma/index.js';
 
 export interface HealthCheckLogData {
     elderlyProfileId: string;
@@ -204,23 +205,172 @@ export class HealthRepository {
         }
     }
 
-    // --- Dashboard query stubs (Phase E) ---
-    // These will be implemented once the gold-layer aggregation design is settled.
+    static async upsertHealthBaseline(elderlyProfileId: string, data: {
+        callsIncluded: number;
+        avgWellbeing: number | null;
+        avgSleepQuality: number | null;
+        symptoms: Array<{ symptom: string; count: number }>;
+        medications: Array<{ medicationId: string; medicationName: string; takenCount: number; totalCount: number; adherenceRate: number }>;
+        conditions: Array<{ conditionId: string; conditionName: string; latestSeverity: ConditionSeverity | null; latestChange: ConditionChangeStatus | null }>;
+    }) {
+        try {
+            return await prismaClient.$transaction(async (tx) => {
+                const baseline = await tx.healthBaseline.upsert({
+                    where: { elderlyProfileId },
+                    create: {
+                        elderlyProfileId,
+                        callsIncluded: data.callsIncluded,
+                        avgWellbeing: data.avgWellbeing,
+                        avgSleepQuality: data.avgSleepQuality,
+                        computedAt: new Date(),
+                    },
+                    update: {
+                        callsIncluded: data.callsIncluded,
+                        avgWellbeing: data.avgWellbeing,
+                        avgSleepQuality: data.avgSleepQuality,
+                        computedAt: new Date(),
+                    }
+                });
 
-    static async getWellbeingTrend(_elderlyProfileId: string, _days: number = 30): Promise<never> {
-        throw new Error('Not implemented — pending Phase E gold-layer design');
+                await tx.healthBaselineSymptom.deleteMany({ where: { baselineId: baseline.id } });
+                await tx.healthBaselineMedication.deleteMany({ where: { baselineId: baseline.id } });
+                await tx.healthBaselineCondition.deleteMany({ where: { baselineId: baseline.id } });
+
+                if (data.symptoms.length) {
+                    await tx.healthBaselineSymptom.createMany({
+                        data: data.symptoms.map(s => ({ baselineId: baseline.id, symptom: s.symptom, count: s.count }))
+                    });
+                }
+                if (data.medications.length) {
+                    await tx.healthBaselineMedication.createMany({
+                        data: data.medications.map(m => ({ baselineId: baseline.id, ...m }))
+                    });
+                }
+                if (data.conditions.length) {
+                    await tx.healthBaselineCondition.createMany({
+                        data: data.conditions.map(c => ({ baselineId: baseline.id, ...c }))
+                    });
+                }
+
+                return baseline;
+            });
+        } catch (error) {
+            console.error('[HealthRepository] Unable to upsert health baseline:', error);
+            throw error;
+        }
     }
 
-    static async getMedicationAdherenceSummary(_elderlyProfileId: string, _days: number = 30): Promise<never> {
-        throw new Error('Not implemented — pending Phase E gold-layer design');
+    static async getHealthBaseline(elderlyProfileId: string) {
+        try {
+            return await prismaClient.healthBaseline.findUnique({
+                where: { elderlyProfileId },
+                include: {
+                    symptoms: { orderBy: { count: 'desc' } },
+                    medications: true,
+                    conditions: true,
+                }
+            });
+        } catch (error) {
+            console.error('[HealthRepository] Unable to get health baseline:', error);
+            return null;
+        }
     }
 
-    static async getConditionHistory(_elderlyProfileId: string): Promise<never> {
-        throw new Error('Not implemented — pending Phase E gold-layer design');
+    static async getWellbeingTrend(elderlyProfileId: string, days: number = 30) {
+        try {
+            const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+            const logs = await prismaClient.wellbeingLog.findMany({
+                where: { elderlyProfileId, createdAt: { gte: since } },
+                select: { createdAt: true, overallWellbeing: true, sleepQuality: true },
+                orderBy: { createdAt: 'asc' }
+            });
+            return logs.map(l => ({ date: l.createdAt, overallWellbeing: l.overallWellbeing, sleepQuality: l.sleepQuality }));
+        } catch (error) {
+            console.error('[HealthRepository] Unable to get wellbeing trend:', error);
+            throw error;
+        }
     }
 
-    static async getSymptomFrequency(_elderlyProfileId: string, _days: number = 30): Promise<never> {
-        throw new Error('Not implemented — pending Phase E gold-layer design');
+    static async getMedicationAdherenceTrend(elderlyProfileId: string, days: number = 30) {
+        try {
+            const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+            return await prismaClient.medicationLog.findMany({
+                where: { elderlyProfileId, createdAt: { gte: since } },
+                select: {
+                    createdAt: true,
+                    medicationId: true,
+                    medicationTaken: true,
+                    adherenceRating: true,
+                    adherenceContext: true,
+                    medication: { select: { name: true } }
+                },
+                orderBy: { createdAt: 'asc' }
+            });
+        } catch (error) {
+            console.error('[HealthRepository] Unable to get medication adherence trend:', error);
+            throw error;
+        }
+    }
+
+    static async getConditionHistory(elderlyProfileId: string) {
+        try {
+            const logs = await prismaClient.healthConditionLog.findMany({
+                where: { elderlyProfileId },
+                select: {
+                    conditionId: true,
+                    severity: true,
+                    changeFromBaseline: true,
+                    symptoms: true,
+                    createdAt: true,
+                    condition: { select: { condition: true } }
+                },
+                orderBy: { createdAt: 'asc' }
+            });
+
+            const byCondition = new Map<string, {
+                conditionName: string;
+                entries: Array<{ date: Date; severity: string | null; changeFromBaseline: string | null; symptoms: string[] }>;
+            }>();
+            for (const log of logs) {
+                const existing = byCondition.get(log.conditionId) ?? { conditionName: log.condition.condition, entries: [] };
+                existing.entries.push({ date: log.createdAt, severity: log.severity, changeFromBaseline: log.changeFromBaseline, symptoms: log.symptoms });
+                byCondition.set(log.conditionId, existing);
+            }
+            return Array.from(byCondition.entries()).map(([conditionId, data]) => ({
+                conditionId, conditionName: data.conditionName, entries: data.entries
+            }));
+        } catch (error) {
+            console.error('[HealthRepository] Unable to get condition history:', error);
+            throw error;
+        }
+    }
+
+    static async getSymptomFrequency(elderlyProfileId: string, days: number = 30) {
+        try {
+            const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+            const logs = await prismaClient.wellbeingLog.findMany({
+                where: { elderlyProfileId, createdAt: { gte: since } },
+                select: { physicalSymptoms: true, createdAt: true }
+            });
+
+            const symptomMap = new Map<string, { count: number; lastReported: Date }>();
+            for (const log of logs) {
+                for (const symptom of log.physicalSymptoms) {
+                    const normalized = symptom.toLowerCase().trim();
+                    if (!normalized) continue;
+                    const existing = symptomMap.get(normalized) ?? { count: 0, lastReported: log.createdAt };
+                    existing.count++;
+                    if (log.createdAt > existing.lastReported) existing.lastReported = log.createdAt;
+                    symptomMap.set(normalized, existing);
+                }
+            }
+            return Array.from(symptomMap.entries())
+                .map(([symptom, data]) => ({ symptom, count: data.count, lastReported: data.lastReported }))
+                .sort((a, b) => b.count - a.count);
+        } catch (error) {
+            console.error('[HealthRepository] Unable to get symptom frequency:', error);
+            throw error;
+        }
     }
 
     static async findHealthCheckLogsByElderlyProfileId(elderlyProfileId: string, limit: number = 10) {

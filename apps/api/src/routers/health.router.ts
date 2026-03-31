@@ -30,29 +30,33 @@ export const healthRouter = router({
             return await HealthRepository.getLastHealthCheckWithDetails(input.elderlyProfileId);
         }),
 
-    // --- Dashboard trend endpoints (Phase E — pending gold-layer aggregation design) ---
+    getHealthBaseline: caregiverProcedure
+        .input(z.object({ elderlyProfileId: z.string().uuid() }))
+        .query(async ({ input }) => {
+            return await HealthRepository.getHealthBaseline(input.elderlyProfileId);
+        }),
 
     getWellbeingTrend: caregiverProcedure
         .input(z.object({ elderlyProfileId: z.string().uuid(), days: z.number().min(1).max(365).default(30) }))
-        .query(async () => {
-            throw new Error('Not implemented');
+        .query(async ({ input }) => {
+            return await HealthRepository.getWellbeingTrend(input.elderlyProfileId, input.days);
         }),
 
-    getMedicationAdherence: caregiverProcedure
+    getMedicationAdherenceTrend: caregiverProcedure
         .input(z.object({ elderlyProfileId: z.string().uuid(), days: z.number().min(1).max(365).default(30) }))
-        .query(async () => {
-            throw new Error('Not implemented');
+        .query(async ({ input }) => {
+            return await HealthRepository.getMedicationAdherenceTrend(input.elderlyProfileId, input.days);
         }),
 
     getConditionHistory: caregiverProcedure
         .input(z.object({ elderlyProfileId: z.string().uuid() }))
-        .query(async () => {
-            throw new Error('Not implemented');
+        .query(async ({ input }) => {
+            return await HealthRepository.getConditionHistory(input.elderlyProfileId);
         }),
 
     getSymptomFrequency: caregiverProcedure
         .input(z.object({ elderlyProfileId: z.string().uuid(), days: z.number().min(1).max(365).default(30) }))
-        .query(async () => {
-            throw new Error('Not implemented');
+        .query(async ({ input }) => {
+            return await HealthRepository.getSymptomFrequency(input.elderlyProfileId, input.days);
         }),
 });

@@ -99,6 +99,7 @@ model ElderlyProfile {
   wellbeingLogs         WellbeingLog[]
   medicationLogs        MedicationLog[]
   conditionLogs         HealthConditionLog[]
+  healthBaseline        HealthBaseline?
   notifications         Notification[]
   trustedContacts       TrustedContact[]
   healthConditions      UserHealthCondition[]
@@ -165,6 +166,7 @@ model UserHealthCondition {
   updatedAt            DateTime              @updatedAt
   medicationConditions MedicationCondition[]
   conditionLogs        HealthConditionLog[]
+  baselineConditions   HealthBaselineCondition[]
   elderlyProfile       ElderlyProfile        @relation(fields: [elderlyProfileId], references: [id], onDelete: Cascade)
 
   @@unique([elderlyProfileId, condition])
@@ -186,6 +188,7 @@ model UserMedication {
   updatedAt            DateTime              @updatedAt
   medicationConditions MedicationCondition[]
   medicationLogs       MedicationLog[]
+  baselineMedications  HealthBaselineMedication[]
   elderlyProfile       ElderlyProfile        @relation(fields: [elderlyProfileId], references: [id], onDelete: Cascade)
 
   @@unique([elderlyProfileId, name])
@@ -286,6 +289,64 @@ model HealthCheckLog {
 
   @@index([elderlyProfileId, createdAt])
   @@map("health_check_logs")
+}
+
+model HealthBaseline {
+  id               String                     @id @default(uuid())
+  elderlyProfileId String                     @unique
+  callsIncluded    Int                        @default(0)
+  avgWellbeing     Float?
+  avgSleepQuality  Float?
+  computedAt       DateTime                   @default(now())
+  updatedAt        DateTime                   @updatedAt
+  elderlyProfile   ElderlyProfile             @relation(fields: [elderlyProfileId], references: [id], onDelete: Cascade)
+  symptoms         HealthBaselineSymptom[]
+  medications      HealthBaselineMedication[]
+  conditions       HealthBaselineCondition[]
+
+  @@map("health_baselines")
+}
+
+model HealthBaselineSymptom {
+  id         String        @id @default(uuid())
+  baselineId String
+  symptom    String
+  count      Int
+  baseline   HealthBaseline @relation(fields: [baselineId], references: [id], onDelete: Cascade)
+
+  @@index([baselineId])
+  @@map("health_baseline_symptoms")
+}
+
+model HealthBaselineMedication {
+  id             String         @id @default(uuid())
+  baselineId     String
+  medicationId   String
+  medicationName String
+  takenCount     Int
+  totalCount     Int
+  adherenceRate  Int
+  baseline       HealthBaseline @relation(fields: [baselineId], references: [id], onDelete: Cascade)
+  medication     UserMedication @relation(fields: [medicationId], references: [id], onDelete: Cascade)
+
+  @@unique([baselineId, medicationId])
+  @@index([baselineId])
+  @@map("health_baseline_medications")
+}
+
+model HealthBaselineCondition {
+  id             String                @id @default(uuid())
+  baselineId     String
+  conditionId    String
+  conditionName  String
+  latestSeverity ConditionSeverity?
+  latestChange   ConditionChangeStatus?
+  baseline       HealthBaseline        @relation(fields: [baselineId], references: [id], onDelete: Cascade)
+  condition      UserHealthCondition   @relation(fields: [conditionId], references: [id], onDelete: Cascade)
+
+  @@unique([baselineId, conditionId])
+  @@index([baselineId])
+  @@map("health_baseline_conditions")
 }
 
 model MedicationCondition {
@@ -558,4 +619,25 @@ enum SubmissionType {
   DRIFT_TRIGGERED
   SCHEDULED_REFRESH
   MANUAL
+}
+
+enum ConditionSeverity {
+  MILD
+  MODERATE
+  SEVERE
+  UNKNOWN
+}
+
+enum ConditionChangeStatus {
+  IMPROVED
+  STABLE
+  WORSE
+  UNKNOWN
+}
+
+enum AdherenceRating {
+  ALWAYS
+  MOSTLY
+  SOMETIMES
+  RARELY
 }

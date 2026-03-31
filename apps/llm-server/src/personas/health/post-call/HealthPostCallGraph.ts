@@ -11,6 +11,8 @@ import {
     ConditionLogEntry
 } from './HealthPostCallState.js';
 import { HealthAnswerNormalizer } from '../silver/HealthAnswerNormalizer.js';
+import type { ConditionSeverity, ConditionChangeStatus } from '../HealthTypes.js';
+
 
 export class HealthPostCallGraph {
     private normalizer: HealthAnswerNormalizer;
@@ -25,11 +27,13 @@ export class HealthPostCallGraph {
         graph.addNode('parse_answers', this.parseAnswers.bind(this));
         graph.addNode('normalize_silver', this.normalizeSilver.bind(this));
         graph.addNode('persist_structured', this.persistStructured.bind(this));
+        graph.addNode('update_baseline', this.updateBaseline.bind(this));
 
         graph.setEntryPoint('parse_answers');
         graph.addEdge('parse_answers', 'normalize_silver');
         graph.addEdge('normalize_silver', 'persist_structured');
-        graph.addEdge('persist_structured', END);
+        graph.addEdge('persist_structured', 'update_baseline');
+        graph.addEdge('update_baseline', END);
 
         this.compiledGraph = graph.compile();
     }
@@ -255,7 +259,101 @@ export class HealthPostCallGraph {
         }
     }
 
+    private async updateBaseline(state: HealthPostCallStateType) {
+        try {
+            const recentChecks = await HealthRepository.findRecentHealthChecksWithDetails(state.userId, 10);
+            if (!recentChecks.length) return {};
+
+            const wellbeingScores = recentChecks.map(c => c.wellbeingLog?.overallWellbeing).filter((v): v is number => v != null);
+            const sleepScores = recentChecks.map(c => c.wellbeingLog?.sleepQuality).filter((v): v is number => v != null);
+            const avgWellbeing = wellbeingScores.length ? wellbeingScores.reduce((a, b) => a + b, 0) / wellbeingScores.length : null;
+            const avgSleepQuality = sleepScores.length ? sleepScores.reduce((a, b) => a + b, 0) / sleepScores.length : null;
+
+            const symptomCounts = new Map<string, number>();
+            for (const check of recentChecks) {
+                for (const symptom of check.wellbeingLog?.physicalSymptoms ?? []) {
+                    const normalized = symptom.toLowerCase().trim();
+                    if (normalized) symptomCounts.set(normalized, (symptomCounts.get(normalized) ?? 0) + 1);
+                }
+            }
+            const symptoms = Array.from(symptomCounts.entries())
+                .map(([symptom, count]) => ({ symptom, count }))
+                .sort((a, b) => b.count - a.count);
+
+            const medMap = new Map<string, { name: string; taken: number; total: number }>();
+            for (const check of recentChecks) {
+                for (const ml of check.medicationLogs) {
+                    const entry = medMap.get(ml.medication.id) ?? { name: ml.medication.name, taken: 0, total: 0 };
+                    entry.total++;
+                    if (ml.adherenceContext === 'specific_date') {
+                        if (ml.medicationTaken === true) entry.taken++;
+                    } else {
+                        if (ml.adherenceRating === 'always' || ml.adherenceRating === 'mostly') entry.taken++;
+                    }
+                    medMap.set(ml.medication.id, entry);
+                }
+            }
+            const medications = Array.from(medMap.entries()).map(([medicationId, data]) => ({
+                medicationId,
+                medicationName: data.name,
+                takenCount: data.taken,
+                totalCount: data.total,
+                adherenceRate: data.total > 0 ? Math.round((data.taken / data.total) * 100) : 0
+            }));
+
+            const conditionMap = new Map<string, { name: string; severity: string | null; change: string | null }>();
+            for (const check of recentChecks) {
+                for (const cl of check.conditionLogs) {
+                    conditionMap.set(cl.condition.id, {
+                        name: cl.condition.condition,
+                        severity: cl.severity,
+                        change: cl.changeFromBaseline
+                    });
+                }
+            }
+            const conditions = Array.from(conditionMap.entries()).map(([conditionId, data]) => ({
+                conditionId,
+                conditionName: data.name,
+                latestSeverity: mapSeverity(data.severity),
+                latestChange: mapChange(data.change)
+            }));
+
+            await HealthRepository.upsertHealthBaseline(state.userId, {
+                callsIncluded: recentChecks.length,
+                avgWellbeing: avgWellbeing != null ? Math.round(avgWellbeing * 10) / 10 : null,
+                avgSleepQuality: avgSleepQuality != null ? Math.round(avgSleepQuality * 10) / 10 : null,
+                symptoms,
+                medications,
+                conditions
+            });
+
+            console.log('[HealthPostCallGraph] update_baseline complete:', {
+                userId: state.userId,
+                callsIncluded: recentChecks.length,
+                avgWellbeing,
+                avgSleepQuality
+            });
+        } catch (err: any) {
+            console.error('[HealthPostCallGraph] update_baseline failed (non-fatal):', err);
+        }
+        return {};
+    }
+
     compile() {
         return this.compiledGraph;
     }
+}
+
+function mapSeverity(s: string | null): ConditionSeverity | null {
+    if (!s) return null;
+    const upper = s.toUpperCase();
+    if (upper === 'MILD' || upper === 'MODERATE' || upper === 'SEVERE') return upper as ConditionSeverity;
+    return 'UNKNOWN';
+}
+
+function mapChange(c: string | null): ConditionChangeStatus | null {
+    if (!c) return null;
+    const upper = c.toUpperCase();
+    if (upper === 'IMPROVED' || upper === 'STABLE' || upper === 'WORSE') return upper as ConditionChangeStatus;
+    return 'UNKNOWN';
 }
