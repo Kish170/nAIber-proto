@@ -1,7 +1,7 @@
 import { StateGraph, END } from '@langchain/langgraph';
 import { ChatOpenAI } from '@langchain/openai';
 import { OpenAIClient } from '@naiber/shared-clients';
-import { HealthRepository } from '@naiber/shared-data';
+import { HealthRepository, ConversationRepository } from '@naiber/shared-data';
 import {
     HealthPostCallState,
     HealthPostCallStateType,
@@ -193,11 +193,25 @@ export class HealthPostCallGraph {
 
     private async persistStructured(state: HealthPostCallStateType) {
         try {
-            const healthCheckLog = await HealthRepository.createHealthCheckLog({
-                elderlyProfileId: state.userId,
-                conversationId: state.conversationId,
-                answers: state.answers
-            });
+            const callDate = state.callDate ? new Date(state.callDate) : new Date();
+
+            const [healthCheckLog] = await Promise.all([
+                HealthRepository.createHealthCheckLog({
+                    elderlyProfileId: state.userId,
+                    conversationId: state.conversationId,
+                    answers: state.answers
+                }),
+                ConversationRepository.createCallLog({
+                    elderlyProfileId: state.userId,
+                    elevenlabsConversationId: state.conversationId,
+                    callType: 'HEALTH_CHECK',
+                    scheduledTime: callDate,
+                    endTime: new Date(),
+                    status: 'COMPLETED',
+                    outcome: 'COMPLETED',
+                    checkInCompleted: true,
+                }),
+            ]);
 
             const logId = healthCheckLog.id;
 

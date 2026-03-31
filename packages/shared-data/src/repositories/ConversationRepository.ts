@@ -14,6 +14,7 @@ export interface CallLogData {
     elderlyProfileId: string;
     scheduledTime: Date;
     endTime?: Date;
+    callType?: 'GENERAL' | 'HEALTH_CHECK' | 'COGNITIVE';
     status?: 'PENDING' | 'QUEUED' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED';
     outcome?: 'COMPLETED' | 'NO_ANSWER' | 'BUSY' | 'FAILED' | 'USER_ENDED_EARLY';
     twilioCallSid?: string;
@@ -67,6 +68,7 @@ export class ConversationRepository {
                     elderlyProfileId: data.elderlyProfileId,
                     scheduledTime: data.scheduledTime,
                     endTime: data.endTime,
+                    callType: data.callType || 'GENERAL',
                     status: data.status || 'PENDING',
                     outcome: data.outcome,
                     twilioCallSid: data.twilioCallSid,

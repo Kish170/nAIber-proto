@@ -154,15 +154,34 @@ export class HealthCheckGraph {
         return { currentDecision: decision, ...stateUpdates };
     }
 
-    private finalize(state: HealthCheckStateType) {
+    private async finalize(state: HealthCheckStateType) {
         console.log('[HealthCheckGraph] Health check complete:', {
             userId: state.userId,
             totalAnswers: state.healthCheckAnswers.length,
             validAnswers: state.healthCheckAnswers.filter(a => a.isValid).length
         });
 
+        const lastAnswers = state.healthCheckAnswers
+            .slice(-3)
+            .filter(a => a.isValid)
+            .map(a => `Q: ${a.question.question}\nA: ${a.rawAnswer}`)
+            .join('\n');
+
+        const result = await this.llm.invoke([
+            new SystemMessage(
+                `You are ending a health check-in call with an elderly person.\n` +
+                `Last exchanges:\n${lastAnswers}\n\n` +
+                `Write a warm 1-2 sentence closing that briefly acknowledges what was just discussed, then says goodbye. ` +
+                `Maximum 30 words. No lists, no bullet points.`
+            )
+        ]);
+
+        const goodbye = typeof result.content === 'string' && result.content.trim()
+            ? result.content.trim()
+            : "Thank you for sharing today. Take good care of yourself — goodbye!";
+
         return {
-            response: "Thank you for completing your health check! All your responses have been recorded. Take care, goodbye!",
+            response: goodbye,
             isHealthCheckComplete: true
         };
     }
