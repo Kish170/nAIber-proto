@@ -12,7 +12,7 @@ export function SignupForm() {
 
   function handleGoogleSignIn() {
     setIsLoading(true)
-    signIn("google", { callbackUrl: "/onboarding" })
+    signIn("google", { callbackUrl: "/onboarding/0" })
   }
 
   return (

@@ -16,10 +16,15 @@ const medicationSchema = z.object({
     frequency: medicationScheduleSchema,
 });
 
+const optionalEmail = z.preprocess(
+    (v) => (v === '' ? undefined : v),
+    z.string().email().optional()
+);
+
 const emergencyContactSchema = z.object({
     name: z.string().min(1),
     phone: z.string().min(1),
-    email: z.string().email().optional(),
+    email: optionalEmail,
     relationship: z.string().min(1),
     notifyOnMissedCalls: z.boolean().default(true),
 });
@@ -42,7 +47,7 @@ const submitSchema = z.object({
     gender: z.enum(['female', 'male', 'nonbinary', 'prefer_not']).optional(),
     phone: z.string().min(1),
     language: z.string().optional(),
-    email: z.string().email().optional(),
+    email: optionalEmail,
 
     callTime: z.enum(['morning', 'afternoon', 'evening']),
     callFrequency: z.enum(['daily', 'weekly']),
@@ -62,7 +67,7 @@ const submitSchema = z.object({
     emergencyContact: emergencyContactSchema.optional(),
 
     grantDashboardAccess: z.enum(['yes', 'no']).optional(),
-    elderlyEmail: z.string().email().optional(),
+    elderlyEmail: optionalEmail,
 });
 
 const GENDER_MAP: Record<string, 'MALE' | 'FEMALE' | 'NON_BINARY' | 'PREFER_NOT_TO_SAY'> = {
