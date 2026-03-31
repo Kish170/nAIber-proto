@@ -266,7 +266,7 @@ export class DecisionEngine {
             question: questionText,
             type: 'text',
             category: parent.category,
-            slot: parent.slot,
+            slot: 'general_notes',
             context: `Follow-up to: ${parent.question}`,
             validation: 'Free text response',
             optional: true,
