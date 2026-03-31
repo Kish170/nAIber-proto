@@ -1,15 +1,21 @@
 "use client"
 
 import Link from "next/link"
+import { useEffect } from "react"
 import { Settings } from "lucide-react"
 import { useSession } from "next-auth/react"
 
 import { Logo } from "@/components/common/logo"
 import { SidebarNav } from "./sidebar-nav"
 import { UserSwitcher } from "./user-switcher"
+import { useActiveUserStore } from "@/stores/active-user.store"
 
 export function CaregiverShell({ children }: { children: React.ReactNode }) {
   const { data: session } = useSession()
+
+  useEffect(() => {
+    useActiveUserStore.persist.rehydrate()
+  }, [])
   const name = session?.user?.name ?? "Your account"
   const initial = name.charAt(0).toUpperCase()
 

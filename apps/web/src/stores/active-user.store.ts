@@ -40,6 +40,7 @@ export const useActiveUserStore = create<ActiveUserState>()(
         {
             name: 'naiber-active-user',
             storage: createJSONStorage(() => localStorage),
+            skipHydration: true,
         }
     )
 );
