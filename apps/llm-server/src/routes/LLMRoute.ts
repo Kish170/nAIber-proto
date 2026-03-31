@@ -14,7 +14,7 @@ import { GraphQueryRepository } from '../repositories/GraphQueryRepository.js';
 import { KGRetrievalService } from '../services/KGRetrievalService.js';
 import { HumanMessage, AIMessage, SystemMessage } from "@langchain/core/messages";
 
-const END_CALL_DELAY_MS = 5000;
+const END_CALL_DELAY_MS = 10000;
 
 async function scheduleCallEnd(conversationId: string): Promise<void> {
     setTimeout(async () => {
