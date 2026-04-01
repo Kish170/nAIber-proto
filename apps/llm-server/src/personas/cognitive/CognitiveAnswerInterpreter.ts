@@ -41,8 +41,19 @@ export class CognitiveAnswerInterpreter {
             return { intent: 'ANSWERING', intentTier: 1, taskEvaluation: null };
         }
 
-        const { intent, confidence, tier } = await this.intentClassifier.classify(state.rawAnswer);
-        console.log('[Cognitive:interpret] intent=%s tier=%d confidence=%.2f taskType=%s', intent, tier, confidence, task.taskType);
+        const wordCount = state.rawAnswer.trim().split(/\s+/).length;
+        let intent: 'ANSWERING' | 'ASKING' | 'REFUSING' = 'ANSWERING';
+        let tier: 1 | 2 = 1;
+        let confidence = 1.0;
+
+        if (wordCount > 3) {
+            const classification = await this.intentClassifier.classify(state.rawAnswer);
+            intent = classification.intent;
+            tier = classification.tier;
+            confidence = classification.confidence;
+        }
+
+        console.log('[Cognitive:interpret] intent=%s tier=%d confidence=%s taskType=%s', intent, tier, confidence.toFixed(2), task.taskType);
 
         if (intent !== 'ANSWERING') {
             return { intent, intentTier: tier, taskEvaluation: null };

@@ -92,11 +92,20 @@ export function validateWordRegistration(rawAnswer: string, targetWords: string[
 }
 
 export function validateDigitSpan(rawAnswer: string, targetSequence: number[], isReverse: boolean): boolean {
-    const responseDigits = rawAnswer.match(/\d/g)?.map(Number) ?? [];
     const expected = isReverse ? [...targetSequence].reverse() : targetSequence;
 
-    if (responseDigits.length !== expected.length) return false;
-    return responseDigits.every((digit, i) => digit === expected[i]);
+    const literalDigits = rawAnswer.match(/\d/g)?.map(Number) ?? [];
+    if (literalDigits.length === expected.length) {
+        return literalDigits.every((digit, i) => digit === expected[i]);
+    }
+
+    const doc = nlp(rawAnswer);
+    const nlpNumbers = doc.numbers().out('array')
+        .map((n: string) => parseInt(n.replace(/[^0-9]/g, ''), 10))
+        .filter((n: number) => !isNaN(n) && n >= 0 && n <= 9);
+
+    if (nlpNumbers.length !== expected.length) return false;
+    return nlpNumbers.every((digit: number, i: number) => digit === expected[i]);
 }
 
 export interface Serial7sResult {
