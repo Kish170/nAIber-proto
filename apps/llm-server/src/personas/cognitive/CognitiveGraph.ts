@@ -58,10 +58,16 @@ export class CognitiveGraph {
     private async presentTask(state: CognitiveStateType) {
         const tasks = state.tasks?.length > 0 ? state.tasks : TASK_SEQUENCE;
         const task = tasks[state.currentTaskIndex];
+
+        if (!task) {
+            console.warn('[Cognitive:present] No task at index', state.currentTaskIndex, '— marking complete');
+            return { isComplete: true };
+        }
+
         const prompt = this.contextBuilder.build(state);
         const lastUserMsg = state.messages.length > 0 ? [state.messages[state.messages.length - 1]] : [];
         const response = await this.llm.invoke([new SystemMessage(prompt), ...lastUserMsg]);
-        console.log('[CognitiveGraph] present_task:', { taskIndex: state.currentTaskIndex, taskType: task?.taskType, total: tasks.length });
+        console.log('[Cognitive:present] taskIndex=%d taskType=%s total=%d', state.currentTaskIndex, task.taskType, tasks.length);
         return { response: this.extractContent(response), taskStartTimestamp: Date.now() };
     }
 
@@ -80,7 +86,16 @@ export class CognitiveGraph {
     }
 
     private evaluateAndDecide(state: CognitiveStateType) {
-        const { decision, stateUpdates } = this.decisionEngine.evaluate(state, state.lastInterpretation!);
+        if (!state.lastInterpretation) {
+            console.warn('[Cognitive:decide] lastInterpretation is null — skipping task');
+            return {
+                currentDecision: { action: 'skip' as const, reasoning: 'No interpretation available' },
+                currentTaskIndex: state.currentTaskIndex + 1,
+                taskAttempts: 0,
+            };
+        }
+        const { decision, stateUpdates } = this.decisionEngine.evaluate(state, state.lastInterpretation);
+        console.log('[Cognitive:decide] action=%s reasoning=%s', decision.action, decision.reasoning);
         return { currentDecision: decision, ...stateUpdates };
     }
 
