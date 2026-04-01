@@ -1,5 +1,36 @@
 # Health Check Persona — Product Requirements
 
+## Implementation Status
+
+| Phase | Description | Status |
+|---|---|---|
+| A | Agent loop refactor — `HealthCheckState` + `HealthCheckGraph` durable execution | ✅ Complete |
+| B | Slot-based data model — structured answer extraction per question type | ✅ Complete |
+| C | Medication date + frequency — schedule-aware question generation | ✅ Complete |
+| D | Previous call context injection — `previousCallContext` seeded from last health check | ✅ Complete |
+| E | Dashboard + session detail — health data visible in caregiver UI | ✅ Complete |
+
+### Current State (as of March 2026)
+
+End-to-end flow is working. A health check call:
+1. Initialises with adaptive questions (wellbeing, sleep, condition-specific, medication-specific)
+2. Injects `previousCallContext` from the last completed health check
+3. Runs the interrupt/resume Q&A loop with per-type validation and follow-up logic
+4. Generates a contextual LLM goodbye that acknowledges the last discussed topic
+5. Post-call: creates both a `HealthCheckLog` (with `callLogId` linked) and a `CallLog` (`callType: HEALTH_CHECK`)
+6. Dashboard shows baseline averages, last check snapshot, and wellbeing trend chart
+7. Session detail page shows wellbeing, medications, and conditions for any health call
+
+### Known Issues
+
+| Issue | Severity | Notes |
+|---|---|---|
+| Symptom extraction on open-ended final question | Medium | Free-text answers like "knee pain" are stored in `generalNotes` but `hasSymptoms` may remain false. Would need a NER pass on `generalNotes` to populate `physicalSymptoms` correctly. |
+| Duplicate question at high request frequency | Low | Two ElevenLabs requests arriving ~1.5s apart can both hit `evaluate_and_decide` before the checkpoint updates, producing a duplicate question. An idempotency guard in `PostCallWorker` or a debounce in `LLMRoute` would fix this. |
+| Follow-up answers overwriting parent slot | Fixed | `buildFollowUpQuestion` was using `slot: parent.slot`, causing follow-up text answers to overwrite numeric scores. Fixed — follow-ups now use `slot: 'general_notes'`. |
+
+---
+
 ## Purpose
 
 The health check call is a structured data collection session. Its purpose is to gather a consistent set of health-related answers from the user across calls, and make that data available to caregivers and the user themselves via a dashboard. It is the most technically complex persona due to the interrupt/resume Q&A pattern.
@@ -41,9 +72,7 @@ An incomplete assessment (call drops mid-question, user hangs up before `finaliz
 
 ## Question Set
 
-**Current version:** Fixed set, fixed order. The same questions are asked on every health check call, regardless of user profile or previous answers.
-
-**Planned future version:** Adaptive question set — a core set of general health questions supplemented by condition- and medication-specific questions drawn from the user's health profile. Order and content would vary based on known conditions and medications.
+**Current version:** Adaptive set generated at call initialisation time from the user's health profile. A fixed core (wellbeing, sleep quality, physical symptoms, general notes) is supplemented by condition-specific and medication-specific questions drawn from `ElderlyProfile.healthConditions` and `ElderlyProfile.medications`. The question set is regenerated fresh each call.
 
 The question bank is defined in `HealthCheckHandler.initializeHealthCheck()` in `llm-server`. Three question types exist:
 
@@ -75,8 +104,9 @@ Turn 2 (resume with user's answer):
 
 Final turn:
   validate_answer → advance → finalize
+  [finalize generates a contextual LLM goodbye referencing the last 3 answers]
   [isHealthCheckComplete = true]
-  [LLMRoute schedules Twilio call end, 5s delay]
+  [LLMRoute schedules Twilio call end, 10s delay]
 ```
 
 **Thread ID:** `health_check:{userId}:{conversationId}`
@@ -146,8 +176,10 @@ Call ends (isHealthCheckComplete = true, or call drops)
   → Read checkpoint state: checkpointer.getTuple(thread_id)
   → Extract state.values.healthCheckAnswers[]
   → HealthPostCallGraph:
-      1. Persist answers to Postgres via HealthRepository
-      2. Create health check log entry
+      1. Create CallLog (callType: HEALTH_CHECK, status: COMPLETED)
+      2. Create HealthCheckLog linked via callLogId
+      3. Create WellbeingLog, MedicationLog[], ConditionLog[] as children
+      4. Upsert HealthBaseline (recomputed across last N calls)
   → Delete checkpoint thread from Redis
   → Redis cleanup: delete rag:topic:{conversationId}
   → SessionManager.deleteSession()
@@ -243,11 +275,11 @@ Post-call, adherence is stored differently depending on the question type used:
 
 ---
 
-## Previous Call Context (Phase D)
+## Previous Call Context (Phase D) ✅
 
-During each call, the agent is seeded with a `previousCallContext` string derived from the most recent completed health check log. This gives the LLM enough context to ask more relevant follow-up questions and reference prior symptoms or missed medications.
+During each call, the agent is seeded with a `previousCallContext` string derived from the most recent completed health check log. This gives the LLM context to reference prior scores, surface notable changes ("last time you said 3/10"), and ask more targeted follow-up questions.
 
-The context is formatted at call initialisation time by `HealthCheckHandler.formatPreviousCallContext()` and includes: date of last check, wellbeing/sleep scores, reported symptoms, condition change-from-baseline, and medication adherence.
+The context is formatted at call initialisation time by `HealthCheckHandler.formatPreviousCallContext()` and includes: date of last check, wellbeing/sleep scores, reported symptoms, condition change-from-baseline, and medication adherence. It is injected into the question system prompt via `QuestionContextBuilder` under `## Previous Visit Context`. The LLM is instructed to surface it when contextually relevant, not recite it in full.
 
 ### Gold Layer — Future Enhancement
 
