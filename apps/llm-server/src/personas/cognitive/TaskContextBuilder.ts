@@ -1,5 +1,6 @@
 import type { CognitiveStateType } from "./CognitiveState.js";
 import { CognitiveTaskType, TASK_SEQUENCE } from "./tasks/TaskDefinitions.js";
+import type { TaskDefinition } from "./tasks/TaskDefinitions.js";
 import { getWordList, getDigitSet, getAbstractionSet } from "./tasks/ContentRotation.js";
 
 export class TaskContextBuilder {
@@ -9,6 +10,10 @@ export class TaskContextBuilder {
 
         if (!taskDef) {
             return 'You are nAIber. Wrap up the session warmly.';
+        }
+
+        if (state.currentDecision?.action === 'clarify') {
+            return this.buildClarification(state, taskDef);
         }
 
         switch (taskDef.taskType) {
@@ -172,6 +177,15 @@ export class TaskContextBuilder {
             default:
                 return this.baseContext(state) + `Say: "${prompt}"`;
         }
+    }
+
+    private buildClarification(state: CognitiveStateType, taskDef: TaskDefinition): string {
+        return this.baseContext(state) +
+               `## CLARIFICATION NEEDED\n` +
+               `The user asked a question or seemed confused about the current task (${taskDef.taskType}).\n` +
+               `Re-explain the task warmly and simply. Do NOT repeat the exact same wording.\n` +
+               `Original instruction: "${taskDef.prompt ?? ''}"\n` +
+               `Rephrase it in simpler terms, then gently invite them to try. Keep it brief — one or two sentences.`;
     }
 
     private baseContext(state: CognitiveStateType): string {

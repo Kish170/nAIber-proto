@@ -14,6 +14,7 @@ import {
     validateRecognition,
 } from "./tasks/TaskValidation.js";
 import { getDigitSet, getAbstractionSet } from "./tasks/ContentRotation.js";
+import { IntentClassifier } from "../health/validation/IntentClassifier.js";
 
 export interface TaskEvaluationResult {
     taskType: CognitiveTaskType;
@@ -23,18 +24,31 @@ export interface TaskEvaluationResult {
 }
 
 export interface CognitiveInterpretationResult {
-    intent: 'ANSWERING';
+    intent: 'ANSWERING' | 'ASKING' | 'REFUSING';
+    intentTier: 1 | 2;
     taskEvaluation: TaskEvaluationResult | null;
 }
 
 export class CognitiveAnswerInterpreter {
-    constructor(private readonly llm: ChatOpenAI) {}
+    private readonly intentClassifier: IntentClassifier;
+
+    constructor(private readonly llm: ChatOpenAI) {
+        this.intentClassifier = new IntentClassifier(llm);
+    }
 
     async interpret(task: TaskDefinition | undefined, state: CognitiveStateType): Promise<CognitiveInterpretationResult> {
         if (!task) {
-            return { intent: 'ANSWERING', taskEvaluation: null };
+            return { intent: 'ANSWERING', intentTier: 1, taskEvaluation: null };
         }
-        return { intent: 'ANSWERING', taskEvaluation: await this.evaluateTask(task, state) };
+
+        const { intent, confidence, tier } = await this.intentClassifier.classify(state.rawAnswer);
+        console.log('[Cognitive:interpret] intent=%s tier=%d confidence=%.2f taskType=%s', intent, tier, confidence, task.taskType);
+
+        if (intent !== 'ANSWERING') {
+            return { intent, intentTier: tier, taskEvaluation: null };
+        }
+
+        return { intent, intentTier: tier, taskEvaluation: await this.evaluateTask(task, state) };
     }
 
     private async evaluateTask(task: TaskDefinition, state: CognitiveStateType): Promise<TaskEvaluationResult> {

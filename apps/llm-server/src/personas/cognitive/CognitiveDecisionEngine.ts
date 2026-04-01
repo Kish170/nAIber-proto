@@ -4,7 +4,7 @@ import { getDigitSet } from "./tasks/ContentRotation.js";
 import type { CognitiveStateType } from "./CognitiveState.js";
 import type { CognitiveInterpretationResult, TaskEvaluationResult } from "./CognitiveAnswerInterpreter.js";
 
-export type CognitiveAction = 'advance' | 'stay' | 'skip' | 'defer';
+export type CognitiveAction = 'advance' | 'stay' | 'skip' | 'defer' | 'clarify';
 
 export interface CognitiveDecision {
     action: CognitiveAction;
@@ -27,12 +27,45 @@ export class CognitiveDecisionEngine {
             return { decision: { action: 'skip', reasoning: 'No task at current index' }, stateUpdates: { isComplete: true } };
         }
 
+        if (interpretation.intent === 'REFUSING') {
+            return this.handleRefusing(state, task);
+        }
+        if (interpretation.intent === 'ASKING') {
+            return this.handleAsking(state, task);
+        }
+
         const eval_ = interpretation.taskEvaluation;
         if (!eval_) {
             return this.advance(state, task, null);
         }
 
         return this.dispatchTask(state, task, eval_);
+    }
+
+    private handleRefusing(state: CognitiveStateType, task: TaskDefinition): CognitiveDecisionResult {
+        const taskResponse: TaskResponse = {
+            taskType: task.taskType,
+            domain: task.domain,
+            rawAnswer: state.rawAnswer,
+            rawScore: 0,
+            maxScore: null,
+            skipped: true,
+        };
+        return {
+            decision: { action: 'skip', reasoning: `User refused ${task.taskType}` },
+            stateUpdates: {
+                taskResponses: [...state.taskResponses, taskResponse],
+                currentTaskIndex: state.currentTaskIndex + 1,
+                taskAttempts: 0,
+            },
+        };
+    }
+
+    private handleAsking(state: CognitiveStateType, task: TaskDefinition): CognitiveDecisionResult {
+        return {
+            decision: { action: 'clarify', reasoning: `User asked for clarification on ${task.taskType}` },
+            stateUpdates: { taskAttempts: state.taskAttempts + 1 },
+        };
     }
 
     private dispatchTask(state: CognitiveStateType, task: TaskDefinition, eval_: TaskEvaluationResult): CognitiveDecisionResult {

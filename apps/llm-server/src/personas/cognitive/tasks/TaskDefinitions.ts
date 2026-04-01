@@ -59,7 +59,8 @@ export interface TaskResponse {
     selfCorrections?: number;
     retrievalLevels?: RetrievalLevel[];
     registrationQuality?: 'complete' | 'partial';
-    usedAlternative?: boolean; // WORLD backward for serial 7s
+    usedAlternative?: boolean;
+    skipped?: boolean;
 }
 
 export interface WellbeingResponse {
