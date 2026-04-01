@@ -43,15 +43,13 @@ export class CognitiveGraph {
         this.compiledGraph = graph.compile({ checkpointer });
     }
 
-    // ── nodes ────────────────────────────────────────────────────────────────
-
     private async orchestrate(state: CognitiveStateType) {
         if (state.registrationWords?.length > 0) {
-            console.log('[CognitiveGraph] Already initialized, skipping');
+            console.log('[Cognitive:init] Already initialized, resuming at taskIndex=%d', state.currentTaskIndex);
             return {};
         }
-        console.log('[CognitiveGraph] Initializing for userId:', state.userId);
         const init = await CognitiveHandler.initializeCognitiveTest(state.userId);
+        console.log('[Cognitive:init] userId=%s sessionIndex=%d taskCount=%d', state.userId, init.sessionIndex, TASK_SEQUENCE.length);
         return { ...init, tasks: TASK_SEQUENCE, currentTaskIndex: 0 };
     }
 
@@ -112,21 +110,21 @@ export class CognitiveGraph {
             responseText = "And that's it — you're all done. That was really great of you to do this with me. Is there anything you'd like to chat about, or shall we wrap up for today?";
         }
 
-        console.log('[CognitiveGraph] Finalized:', {
-            userId: state.userId,
-            isDeferred: state.isDeferred,
-            isPartial: state.isPartial,
-            tasksCompleted: state.taskResponses.length,
-        });
+        console.log('[Cognitive:finalize] userId=%s tasksCompleted=%d isDeferred=%s isPartial=%s',
+            state.userId, state.taskResponses.length, state.isDeferred, state.isPartial);
 
         return { response: responseText, isComplete: true };
     }
 
     private routeFromDecision(state: CognitiveStateType): string {
-        if (state.isComplete || state.isDeferred) return "finalize";
-        const tasks = state.tasks?.length > 0 ? state.tasks : TASK_SEQUENCE;
-        if (state.currentTaskIndex >= tasks.length) return "finalize";
-        return "present_task";
+        let target: string;
+        if (state.isComplete || state.isDeferred) target = "finalize";
+        else {
+            const tasks = state.tasks?.length > 0 ? state.tasks : TASK_SEQUENCE;
+            target = state.currentTaskIndex >= tasks.length ? "finalize" : "present_task";
+        }
+        console.log('[Cognitive:route] → %s', target);
+        return target;
     }
 
     private extractContent(response: any): string {
