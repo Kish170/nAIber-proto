@@ -44,11 +44,8 @@ export const CognitiveState = Annotation.Root({
 
     digitSpanCurrentLength: Annotation<number>(keep<number>(3)),
     digitSpanCurrentTrial: Annotation<string>(keep<string>("A")), // 'A' | 'B'
-    digitSpanConsecutiveFailures: Annotation<number>(keep<number>(0)),
     digitSpanLongestForward: Annotation<number>(keep<number>(0)),
     digitSpanLongestReverse: Annotation<number>(keep<number>(0)),
-
-    usedWorldAlternative: Annotation<boolean>(keep<boolean>(false)),
 
     delayedRecallPhase: Annotation<string>(keep<string>("free")), // 'free' | 'cued' | 'recognition'
     delayedRecallWordIndex: Annotation<number>(keep<number>(0)),

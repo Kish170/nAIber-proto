@@ -176,7 +176,7 @@ export class CognitiveDecisionEngine {
             if (pool[nextLength]) {
                 return {
                     decision: { action: 'stay', reasoning: `Digit span correct at length ${length}, advancing to ${nextLength}` },
-                    stateUpdates: { [longestKey]: newLongest, digitSpanCurrentLength: nextLength, digitSpanCurrentTrial: 'A', digitSpanConsecutiveFailures: 0 },
+                    stateUpdates: { [longestKey]: newLongest, digitSpanCurrentLength: nextLength, digitSpanCurrentTrial: 'A' },
                 };
             }
             return this.recordDigitSpanResult({ ...state, [longestKey]: newLongest } as CognitiveStateType, task, isReverse);
@@ -213,7 +213,6 @@ export class CognitiveDecisionEngine {
                 [longestKey]: rawScore,
                 digitSpanCurrentLength: 3,
                 digitSpanCurrentTrial: 'A',
-                digitSpanConsecutiveFailures: 0,
                 currentTaskIndex: state.currentTaskIndex + 1,
                 taskAttempts: 0,
             },
