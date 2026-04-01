@@ -188,23 +188,49 @@ export class CognitivePrompt extends SystemPrompt {
         const hours = now.getHours();
         const partOfDay = hours < 12 ? "morning" : hours < 18 ? "afternoon" : "evening";
         const name = userProfile.name;
+        const isFirstCall = userProfile.isFirstCall || userProfile.lastCallAt == null;
 
-        const prompt = `
-            Generate a short, warm opening message for a cognitive wellness check call.
+        const firstCallPrompt = `
+            Generate a warm opening message for a cognitive mind exercise call.
 
             User's name: ${name}
             Time of day: ${partOfDay}
+            This is their first time doing this exercise.
+
+            Guidelines:
+            - Greet them by name and introduce yourself as nAIber
+            - Keep it to 3-5 sentences
+            - Explain what the call involves: a short mind exercise where you'll chat briefly about how they're doing, then go through some fun little tasks together — things like remembering a few words, repeating some numbers, and a bit of word play
+            - Emphasise it's NOT a test — there's no pass or fail, it's just a way to keep track of how they're doing over time
+            - Let them know it takes about 5-10 minutes
+            - Set a warm, positive, low-pressure tone — make it sound enjoyable, not clinical
+            - Do NOT start the exercise yet — just open the call and set expectations
+            - NEVER use words like "test", "assessment", "score", "cognitive", or "performance"
+
+            Example:
+            "Good ${partOfDay}, ${name}! I'm nAIber. I'm calling because we're going to do a short mind exercise together today — it's quite fun and only takes a few minutes. We'll start by having a quick chat about how you're doing, and then I'll take you through some little tasks like remembering a few words, repeating some numbers, and a bit of word play. There's absolutely no pass or fail — it's just a nice way for us to keep track of how you're going. Ready to give it a go?"
+        `.trim();
+
+        const returningCallPrompt = `
+            Generate a warm opening message for a cognitive mind exercise call.
+
+            User's name: ${name}
+            Time of day: ${partOfDay}
+            This user has done this exercise before.
 
             Guidelines:
             - Greet them by name warmly
-            - Keep it brief — one or two sentences only
-            - Frame it as a "quick mind exercise" or "brief wellness check" — NOT a test
-            - Set a positive, relaxed tone
+            - Keep it to 2-3 sentences
+            - Remind them it's the regular mind exercise — same format as before with the word tasks, numbers, and word play
+            - Keep it light and brief since they already know the format
             - Do NOT start the exercise yet — just open the call
+            - NEVER use words like "test", "assessment", "score", "cognitive", or "performance"
 
             Example:
-            "Good ${partOfDay}, ${name}! It's nAIber. I thought we could do a quick mind exercise together today — it only takes a few minutes and it's quite fun. Ready to get started?"
+            "Good ${partOfDay}, ${name}! It's nAIber — time for our regular mind exercise. Same as last time — we'll have a quick chat and then go through some word and number tasks together. Shall we get started?"
         `.trim();
+
+        const prompt = isFirstCall ? firstCallPrompt : returningCallPrompt;
 
         try {
             const response = await openAIClient.generalGPTCall({
