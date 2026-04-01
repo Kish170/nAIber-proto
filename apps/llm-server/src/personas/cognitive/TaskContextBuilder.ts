@@ -180,6 +180,22 @@ export class TaskContextBuilder {
     }
 
     private buildClarification(state: CognitiveStateType, taskDef: TaskDefinition): string {
+        if (taskDef.taskType === CognitiveTaskType.WORD_REGISTRATION) {
+            const words = state.registrationWords.join('... ');
+            return this.baseContext(state) +
+                   `## CLARIFICATION: Word Registration\n` +
+                   `The user asked to hear the words again. Read the list ONE more time clearly and warmly.\n` +
+                   `Say: "Of course — here they are: ${words}. Can you say those back to me?"`;
+        }
+
+        if (taskDef.taskType === CognitiveTaskType.DELAYED_RECALL) {
+            return this.baseContext(state) +
+                   `## CLARIFICATION: Delayed Recall\n` +
+                   `The user asked for clarification. Re-explain the task WITHOUT revealing or hinting at any of the target words.\n` +
+                   `Say something like: "Earlier in our conversation I said five words out loud. I'm just asking if any of them come to mind now — no pressure, take your time."\n` +
+                   `Do NOT say, hint at, or describe any of the words.`;
+        }
+
         return this.baseContext(state) +
                `## CLARIFICATION NEEDED\n` +
                `The user asked a question or seemed confused about the current task (${taskDef.taskType}).\n` +

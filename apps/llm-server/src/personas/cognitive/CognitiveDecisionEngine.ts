@@ -6,6 +6,8 @@ import type { CognitiveInterpretationResult, TaskEvaluationResult } from "./Cogn
 
 export type CognitiveAction = 'advance' | 'stay' | 'skip' | 'defer' | 'clarify';
 
+const MAX_CLARIFY_ATTEMPTS = 2;
+
 export interface CognitiveDecision {
     action: CognitiveAction;
     reasoning: string;
@@ -50,6 +52,7 @@ export class CognitiveDecisionEngine {
             rawScore: 0,
             maxScore: null,
             skipped: true,
+            skipReason: 'refused',
         };
         return {
             decision: { action: 'skip', reasoning: `User refused ${task.taskType}` },
@@ -62,6 +65,26 @@ export class CognitiveDecisionEngine {
     }
 
     private handleAsking(state: CognitiveStateType, task: TaskDefinition): CognitiveDecisionResult {
+        if (state.taskAttempts >= MAX_CLARIFY_ATTEMPTS) {
+            console.log('[Cognitive:decide] clarify cap reached — skipping task %s', task.taskType);
+            const taskResponse: TaskResponse = {
+                taskType: task.taskType,
+                domain: task.domain,
+                rawAnswer: state.rawAnswer,
+                rawScore: 0,
+                maxScore: null,
+                skipped: true,
+                skipReason: 'exhausted',
+            };
+            return {
+                decision: { action: 'skip', reasoning: `Clarification attempts exhausted for ${task.taskType}` },
+                stateUpdates: {
+                    taskResponses: [...state.taskResponses, taskResponse],
+                    currentTaskIndex: state.currentTaskIndex + 1,
+                    taskAttempts: 0,
+                },
+            };
+        }
         return {
             decision: { action: 'clarify', reasoning: `User asked for clarification on ${task.taskType}` },
             stateUpdates: { taskAttempts: state.taskAttempts + 1 },

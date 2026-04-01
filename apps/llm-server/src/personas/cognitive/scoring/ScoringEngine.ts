@@ -45,6 +45,7 @@ function sumByTask(responses: TaskResponse[], ...types: CognitiveTaskType[]): { 
     let max = 0;
     for (const r of responses) {
         if (types.includes(r.taskType)) {
+            if (r.skipped && r.skipReason === 'refused') continue;
             raw += r.rawScore;
             if (r.maxScore !== null) max += r.maxScore;
         }

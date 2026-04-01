@@ -13,6 +13,7 @@ export interface HealthCheckAnswer {
     attemptCount: number;
     extractionMethod: ExtractionMethod;
     confidence: number;
+    skipReason?: 'refused' | 'exhausted';
 }
 
 export interface InterpretationResult {

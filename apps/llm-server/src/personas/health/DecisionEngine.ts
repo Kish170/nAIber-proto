@@ -55,10 +55,14 @@ export class DecisionEngine {
 
     private handleRefusing(state: HealthCheckStateType, intentTier: number): DecisionResult {
         console.log('[DecisionEngine] REFUSING → skip');
-        return this.skip(state, `User refused to answer (tier ${intentTier})`);
+        return this.skip(state, `User refused to answer (tier ${intentTier})`, 'refused');
     }
 
     private handleAsking(state: HealthCheckStateType): DecisionResult {
+        if (state.questionAttempts >= MAX_RETRY_ATTEMPTS) {
+            console.log('[DecisionEngine] ASKING → clarify cap reached → skip');
+            return this.skip(state, 'Max clarification attempts reached', 'exhausted');
+        }
         console.log('[DecisionEngine] ASKING → retry with clarification');
         return {
             decision: {
@@ -94,23 +98,18 @@ export class DecisionEngine {
         return this.skip(state, 'Max retry attempts reached after extraction failure');
     }
 
-    private handleConfirmationResponse(state: HealthCheckStateType, currentQuestion: QuestionData): DecisionResult {
+    private async handleConfirmationResponse(state: HealthCheckStateType, currentQuestion: QuestionData): Promise<DecisionResult> {
         const proposedSlots = state.currentDecision!.extractedSlots;
         const proposedValue = String(Object.values(proposedSlots)[0] ?? '');
-        const isFollowUp = currentQuestion.id.startsWith('follow_up_');
         console.log('[DecisionEngine] confirmed proposed value');
-        return {
-            decision: {
-                action: 'next',
-                extractedSlots: proposedSlots,
-                confidence: 1.0,
-                reasoning: 'User confirmed the proposed value'
-            },
-            stateUpdates: {
-                ...this.recordAnswer(state, proposedValue, true, 'rule-based', 1.0),
-                currentQuestionFollowUpCount: isFollowUp ? 0 : state.currentQuestionFollowUpCount
-            }
+
+        const confirmedExtraction: ExtractionResult = {
+            value: proposedValue,
+            confidence: 1.0,
+            method: 'rule-based',
         };
+        const emptySignals: AnswerSignals = { uncertain: false, partial: false, correction: false, offTopic: false, sentiment: 'neutral', engagement: 'high' };
+        return this.handleSuccessfulExtraction(state, currentQuestion, confirmedExtraction, proposedSlots, emptySignals);
     }
 
     private handleLowConfidence(
@@ -319,7 +318,7 @@ export class DecisionEngine {
         };
     }
 
-    skipQuestion(state: HealthCheckStateType) {
+    skipQuestion(state: HealthCheckStateType, skipReason?: 'refused' | 'exhausted') {
         const currentQuestion = state.healthCheckQuestions[state.currentQuestionIndex];
         const answerRecord: HealthCheckAnswer = {
             questionIndex: state.currentQuestionIndex,
@@ -329,7 +328,8 @@ export class DecisionEngine {
             isValid: false,
             attemptCount: state.questionAttempts + 1,
             extractionMethod: 'not-extractable',
-            confidence: 0
+            confidence: 0,
+            ...(skipReason && { skipReason }),
         };
         return {
             isValid: false,
@@ -342,11 +342,11 @@ export class DecisionEngine {
         };
     }
 
-    private skip(state: HealthCheckStateType, reason: string): DecisionResult {
+    private skip(state: HealthCheckStateType, reason: string, skipReason?: 'refused' | 'exhausted'): DecisionResult {
         console.warn(`[DecisionEngine] skip — ${reason}`);
         return {
             decision: { action: 'skip', extractedSlots: {}, confidence: 0, reasoning: reason },
-            stateUpdates: this.skipQuestion(state)
+            stateUpdates: this.skipQuestion(state, skipReason)
         };
     }
 

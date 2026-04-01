@@ -61,6 +61,7 @@ export interface TaskResponse {
     registrationQuality?: 'complete' | 'partial';
     usedAlternative?: boolean;
     skipped?: boolean;
+    skipReason?: 'refused' | 'exhausted';
 }
 
 export interface WellbeingResponse {
