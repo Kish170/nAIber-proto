@@ -128,6 +128,54 @@ export class HealthRepository {
         }
     }
 
+    static async getHealthCheckByCallLogId(callLogId: string) {
+        try {
+            const callLog = await prismaClient.callLog.findUnique({
+                where: { id: callLogId },
+                select: { id: true, elevenlabsConversationId: true },
+            });
+            if (!callLog) return null;
+
+            return await prismaClient.healthCheckLog.findFirst({
+                where: {
+                    OR: [
+                        { callLogId },
+                        ...(callLog.elevenlabsConversationId ? [{ conversationId: callLog.elevenlabsConversationId }] : []),
+                    ],
+                },
+                include: {
+                    wellbeingLog: {
+                        select: {
+                            overallWellbeing: true,
+                            sleepQuality: true,
+                            physicalSymptoms: true,
+                            generalNotes: true,
+                        }
+                    },
+                    medicationLogs: {
+                        select: {
+                            medicationTaken: true,
+                            adherenceRating: true,
+                            adherenceContext: true,
+                            medication: { select: { name: true } }
+                        }
+                    },
+                    conditionLogs: {
+                        select: {
+                            severity: true,
+                            changeFromBaseline: true,
+                            notableFlags: true,
+                            condition: { select: { condition: true } }
+                        }
+                    }
+                }
+            });
+        } catch (error) {
+            console.error('[HealthRepository] Unable to get health check by call log id:', error);
+            return null;
+        }
+    }
+
     static async getLastHealthCheckWithDetails(elderlyProfileId: string) {
         try {
             return await prismaClient.healthCheckLog.findFirst({

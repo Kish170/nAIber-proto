@@ -15,6 +15,7 @@ app.use(cors({
 
 app.use(express.json());
 app.use(cookieParser());
+app.use((req, _res, next) => { console.log(`[API] ${req.method} ${req.path}`); next(); });
 
 app.use(
     '/trpc',

@@ -195,23 +195,23 @@ export class HealthPostCallGraph {
         try {
             const callDate = state.callDate ? new Date(state.callDate) : new Date();
 
-            const [healthCheckLog] = await Promise.all([
-                HealthRepository.createHealthCheckLog({
-                    elderlyProfileId: state.userId,
-                    conversationId: state.conversationId,
-                    answers: state.answers
-                }),
-                ConversationRepository.createCallLog({
-                    elderlyProfileId: state.userId,
-                    elevenlabsConversationId: state.conversationId,
-                    callType: 'HEALTH_CHECK',
-                    scheduledTime: callDate,
-                    endTime: new Date(),
-                    status: 'COMPLETED',
-                    outcome: 'COMPLETED',
-                    checkInCompleted: true,
-                }),
-            ]);
+            const callLog = await ConversationRepository.createCallLog({
+                elderlyProfileId: state.userId,
+                elevenlabsConversationId: state.conversationId,
+                callType: 'HEALTH_CHECK',
+                scheduledTime: callDate,
+                endTime: new Date(),
+                status: 'COMPLETED',
+                outcome: 'COMPLETED',
+                checkInCompleted: true,
+            });
+
+            const healthCheckLog = await HealthRepository.createHealthCheckLog({
+                elderlyProfileId: state.userId,
+                conversationId: state.conversationId,
+                callLogId: callLog.id,
+                answers: state.answers
+            });
 
             const logId = healthCheckLog.id;
 

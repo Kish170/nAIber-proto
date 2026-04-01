@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { Users, BarChart2, Calendar, Flag, PhoneCall } from "lucide-react"
+import { Users, BarChart2, Calendar, Flag, PhoneCall, Heart } from "lucide-react"
 
 import { EmptyState } from "@/components/common/empty-state"
 import { Badge } from "@/components/ui/badge"
@@ -53,6 +53,21 @@ export default function DashboardPage() {
 
   const { data: cogTrends } = trpc.cognitive.getTrends.useQuery(
     { elderlyProfileId: elderlyId!, count: 10 },
+    { enabled: !!elderlyId }
+  )
+
+  const { data: healthBaseline } = trpc.health.getHealthBaseline.useQuery(
+    { elderlyProfileId: elderlyId! },
+    { enabled: !!elderlyId }
+  )
+
+  const { data: lastHealthCheck } = trpc.health.getLastHealthCheckDetails.useQuery(
+    { elderlyProfileId: elderlyId! },
+    { enabled: !!elderlyId }
+  )
+
+  const { data: wellbeingTrend } = trpc.health.getWellbeingTrend.useQuery(
+    { elderlyProfileId: elderlyId!, days: 30 },
     { enabled: !!elderlyId }
   )
 
@@ -181,6 +196,88 @@ export default function DashboardPage() {
               description="Sessions will appear here after nAIber begins calling."
               compact
             />
+          )}
+        </SectionCard>
+
+        <SectionCard>
+          <SectionHeading>Health overview</SectionHeading>
+          {!healthBaseline && !lastHealthCheck ? (
+            <div className="h-32 bg-ivory rounded-xl border-2 border-dashed border-warm-300 flex flex-col items-center justify-center gap-2">
+              <Heart size={28} className="text-warm-300" strokeWidth={1.5} />
+              <p className="text-sm text-warm-500">Health data will appear after the first check-in call</p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-5">
+              {healthBaseline && (
+                <div className="flex flex-col gap-1">
+                  <p className="text-xs text-warm-500 uppercase tracking-widest font-medium mb-2">Baseline averages</p>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="bg-ivory rounded-xl p-3">
+                      <p className="text-xs text-warm-500 mb-1">Wellbeing</p>
+                      <p className="text-lg font-display font-medium text-warm-900">
+                        {healthBaseline.avgWellbeing != null ? `${healthBaseline.avgWellbeing.toFixed(1)}/10` : "—"}
+                      </p>
+                    </div>
+                    <div className="bg-ivory rounded-xl p-3">
+                      <p className="text-xs text-warm-500 mb-1">Sleep</p>
+                      <p className="text-lg font-display font-medium text-warm-900">
+                        {healthBaseline.avgSleepQuality != null ? `${healthBaseline.avgSleepQuality.toFixed(1)}/10` : "—"}
+                      </p>
+                    </div>
+                    <div className="bg-ivory rounded-xl p-3">
+                      <p className="text-xs text-warm-500 mb-1">Med. adherence</p>
+                      <p className="text-lg font-display font-medium text-warm-900">
+                        {healthBaseline.medications?.length
+                          ? `${Math.round(healthBaseline.medications.filter((m: any) => m.adherenceRate != null).reduce((sum: number, m: any) => sum + (m.adherenceRate ?? 0), 0) / Math.max(healthBaseline.medications.filter((m: any) => m.adherenceRate != null).length, 1))}%`
+                          : "—"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {lastHealthCheck && (() => {
+                const wb = lastHealthCheck.wellbeingLog as any
+                return (
+                  <div>
+                    <p className="text-xs text-warm-500 uppercase tracking-widest font-medium mb-2">
+                      Last check-in — {formatDate(lastHealthCheck.createdAt)}
+                    </p>
+                    <div className="flex gap-4 mb-2">
+                      {wb?.overallWellbeing != null && (
+                        <span className="text-sm text-warm-700">Wellbeing: <span className="font-medium text-warm-900">{wb.overallWellbeing}/10</span></span>
+                      )}
+                      {wb?.sleepQuality != null && (
+                        <span className="text-sm text-warm-700">Sleep: <span className="font-medium text-warm-900">{wb.sleepQuality}/10</span></span>
+                      )}
+                    </div>
+                    {wb?.concerns?.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mt-1">
+                        {wb.concerns.map((c: string, i: number) => (
+                          <span key={i} className="text-xs bg-red-50 text-red-600 px-2 py-0.5 rounded-full">{c}</span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
+
+              {wellbeingTrend && wellbeingTrend.length >= 2 && (
+                <div>
+                  <p className="text-xs text-warm-500 uppercase tracking-widest font-medium mb-2">Wellbeing trend (30 days)</p>
+                  <div className="flex gap-1 items-end h-16">
+                    {wellbeingTrend.map((entry: any, i: number) => (
+                      <div
+                        key={i}
+                        className="flex-1 bg-teal/20 rounded-t"
+                        style={{ height: `${((entry.overallWellbeing ?? 0) / 10) * 100}%`, minHeight: "4px" }}
+                        title={`${formatDate(entry.date)}: ${entry.overallWellbeing ?? "—"}/10`}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           )}
         </SectionCard>
 

@@ -3,6 +3,12 @@ import { caregiverProcedure, router } from '../trpc/init.js';
 import { HealthRepository } from '@naiber/shared-data';
 
 export const healthRouter = router({
+    getHealthCheckBySession: caregiverProcedure
+        .input(z.object({ callLogId: z.string().uuid() }))
+        .query(async ({ input }) => {
+            return await HealthRepository.getHealthCheckByCallLogId(input.callLogId);
+        }),
+
     getHealthCheckLogs: caregiverProcedure
         .input(z.object({
             elderlyProfileId: z.string().uuid(),

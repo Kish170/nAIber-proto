@@ -64,6 +64,11 @@ export default function SessionDetailPage() {
     { enabled: call?.callType === "COGNITIVE" }
   )
 
+  const { data: healthSession } = trpc.health.getHealthCheckBySession.useQuery(
+    { callLogId: params.sessionId },
+    { enabled: call?.callType === "HEALTH_CHECK" }
+  )
+
   if (isLoading) {
     return (
       <div className="p-8 min-h-screen bg-ivory">
@@ -91,6 +96,7 @@ export default function SessionDetailPage() {
 
   const cogData = cogSession as any
   const domainScores = cogData?.domainScores as Record<string, number> | undefined
+  const healthData = healthSession as any
 
   return (
     <div className="p-8 min-h-screen bg-ivory">
@@ -168,7 +174,67 @@ export default function SessionDetailPage() {
           </SectionCard>
         )}
 
-        {!domainScores && !call.conversationSummary && (
+        {healthData?.wellbeingLog && (
+          <SectionCard heading="Wellbeing">
+            {healthData.wellbeingLog.overallWellbeing != null && (
+              <KVRow label="Overall wellbeing" value={`${healthData.wellbeingLog.overallWellbeing}/10`} />
+            )}
+            {healthData.wellbeingLog.sleepQuality != null && (
+              <KVRow label="Sleep quality" value={`${healthData.wellbeingLog.sleepQuality}/10`} />
+            )}
+            {healthData.wellbeingLog.physicalSymptoms && (
+              <KVRow label="Physical symptoms" value={healthData.wellbeingLog.physicalSymptoms} />
+            )}
+            {healthData.wellbeingLog.generalNotes && (
+              <div className="py-2.5 border-b border-border last:border-0">
+                <p className="text-sm text-warm-500 mb-1">Notes</p>
+                <p className="text-sm text-warm-900">{healthData.wellbeingLog.generalNotes}</p>
+              </div>
+            )}
+          </SectionCard>
+        )}
+
+        {healthData?.medicationLogs?.length > 0 && (
+          <SectionCard heading="Medications">
+            <div className="flex flex-col divide-y divide-border">
+              {healthData.medicationLogs.map((log: any, i: number) => (
+                <div key={i} className="flex items-center justify-between py-2.5">
+                  <div>
+                    <p className="text-sm text-warm-900 font-medium">{log.medication?.name ?? "—"}</p>
+                    {log.adherenceContext && (
+                      <p className="text-xs text-warm-500 mt-0.5">{log.adherenceContext}</p>
+                    )}
+                  </div>
+                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${log.medicationTaken ? "bg-teal/10 text-teal" : "bg-red-50 text-red-600"}`}>
+                    {log.medicationTaken ? "Taken" : "Missed"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </SectionCard>
+        )}
+
+        {healthData?.conditionLogs?.length > 0 && (
+          <SectionCard heading="Conditions">
+            <div className="flex flex-col divide-y divide-border">
+              {healthData.conditionLogs.map((log: any, i: number) => (
+                <div key={i} className="py-2.5">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-warm-900 font-medium">{log.condition?.condition ?? "—"}</p>
+                    {log.severity && (
+                      <span className="text-xs text-warm-500 capitalize">{log.severity.toLowerCase()}</span>
+                    )}
+                  </div>
+                  {log.changeFromBaseline && (
+                    <p className="text-xs text-warm-500 mt-0.5 capitalize">{log.changeFromBaseline.toLowerCase().replace(/_/g, " ")}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </SectionCard>
+        )}
+
+        {!domainScores && !call.conversationSummary && !healthData && (
           <SectionCard heading="Details">
             <EmptyState
               icon={AlertTriangle}
