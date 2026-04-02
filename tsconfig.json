@@ -10,5 +10,12 @@
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true
-  }
+  },
+  "references": [
+    { "path": "packages/shared-core" },
+    { "path": "packages/shared-clients" },
+    { "path": "packages/shared-data" },
+    { "path": "packages/shared-services" },
+    { "path": "apps/mcp-server" }
+  ]
 }
