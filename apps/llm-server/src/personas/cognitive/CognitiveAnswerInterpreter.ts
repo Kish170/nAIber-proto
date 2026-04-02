@@ -24,7 +24,7 @@ export interface TaskEvaluationResult {
 }
 
 export interface CognitiveInterpretationResult {
-    intent: 'ANSWERING' | 'ASKING' | 'REFUSING';
+    intent: 'ANSWERING' | 'ASKING' | 'REFUSING' | 'CONFIRMING';
     intentTier: 1 | 2;
     taskEvaluation: TaskEvaluationResult | null;
 }
@@ -40,7 +40,7 @@ export class CognitiveAnswerInterpreter {
         if (!task) {
             return { intent: 'ANSWERING', intentTier: 1, taskEvaluation: null };
         }
-        
+
         const NUMERIC_TASKS: CognitiveTaskType[] = [
             CognitiveTaskType.DIGIT_SPAN_FORWARD,
             CognitiveTaskType.DIGIT_SPAN_REVERSE,
@@ -48,20 +48,37 @@ export class CognitiveAnswerInterpreter {
             CognitiveTaskType.ORIENTATION,
         ];
 
-        let intent: 'ANSWERING' | 'ASKING' | 'REFUSING' = 'ANSWERING';
+        if (state.currentDecision?.action === 'clarify') {
+            if (this.intentClassifier.isConfirmingResponse(state.rawAnswer)) {
+                console.log('[Cognitive:interpret] intent=CONFIRMING tier=1 confidence=1.00 taskType=%s (post-clarify rules)', task.taskType);
+                return { intent: 'CONFIRMING', intentTier: 1, taskEvaluation: null };
+            }
+            if (!NUMERIC_TASKS.includes(task.taskType)) {
+                const wordCount = state.rawAnswer.trim().split(/\s+/).length;
+                if (wordCount > 3) {
+                    const classification = await this.intentClassifier.classify(state.rawAnswer, state.response);
+                    if (classification.intent === 'CONFIRMING' || classification.intent === 'ASKING') {
+                        console.log('[Cognitive:interpret] intent=%s tier=%d confidence=%s taskType=%s (post-clarify LLM)', classification.intent, classification.tier, classification.confidence.toFixed(2), task.taskType);
+                        return { intent: classification.intent as 'CONFIRMING' | 'ASKING', intentTier: classification.tier, taskEvaluation: null };
+                    }
+                }
+            }
+        }
+
+        let intent: 'ANSWERING' | 'ASKING' | 'REFUSING' | 'CONFIRMING' = 'ANSWERING';
         let tier: 1 | 2 = 1;
         let confidence = 1.0;
 
         if (NUMERIC_TASKS.includes(task.taskType)) {
             const classification = this.intentClassifier.classifyRulesOnly(state.rawAnswer);
-            intent = classification.intent;
+            intent = classification.intent as typeof intent;
             tier = classification.tier;
             confidence = classification.confidence;
         } else {
             const wordCount = state.rawAnswer.trim().split(/\s+/).length;
             if (wordCount > 3) {
                 const classification = await this.intentClassifier.classify(state.rawAnswer);
-                intent = classification.intent;
+                intent = classification.intent as typeof intent;
                 tier = classification.tier;
                 confidence = classification.confidence;
             }

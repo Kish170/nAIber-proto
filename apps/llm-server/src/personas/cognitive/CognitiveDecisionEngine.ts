@@ -7,7 +7,6 @@ import type { CognitiveInterpretationResult, TaskEvaluationResult } from "./Cogn
 
 export type CognitiveAction = 'advance' | 'stay' | 'skip' | 'defer' | 'clarify' | 'continue';
 
-const MAX_CLARIFY_ATTEMPTS = 2;
 
 export interface CognitiveDecision {
     action: CognitiveAction;
@@ -33,6 +32,9 @@ export class CognitiveDecisionEngine {
 
         if (interpretation.intent === 'REFUSING') {
             return this.handleRefusing(state, task);
+        }
+        if (interpretation.intent === 'CONFIRMING') {
+            return this.handleConfirming(state);
         }
         if (interpretation.intent === 'ASKING') {
             return this.handleAsking(state, task);
@@ -66,30 +68,18 @@ export class CognitiveDecisionEngine {
         };
     }
 
+    private handleConfirming(_state: CognitiveStateType): CognitiveDecisionResult {
+        console.log('[Cognitive:decide] post-clarify confirmation — re-presenting task without consuming attempt');
+        return {
+            decision: { action: 'clarify', reasoning: 'Post-clarify confirmation — re-presenting task' },
+            stateUpdates: { accumulatedAnswer: '' },
+        };
+    }
+
     private handleAsking(state: CognitiveStateType, task: TaskDefinition): CognitiveDecisionResult {
-        if (state.taskAttempts >= MAX_CLARIFY_ATTEMPTS) {
-            console.log('[Cognitive:decide] clarify cap reached — skipping task %s', task.taskType);
-            const taskResponse: TaskResponse = {
-                taskType: task.taskType,
-                domain: task.domain,
-                rawAnswer: state.rawAnswer,
-                rawScore: 0,
-                maxScore: null,
-                skipped: true,
-                skipReason: 'exhausted',
-            };
-            return {
-                decision: { action: 'skip', reasoning: `Clarification attempts exhausted for ${task.taskType}` },
-                stateUpdates: {
-                    taskResponses: [...state.taskResponses, taskResponse],
-                    currentTaskIndex: state.currentTaskIndex + 1,
-                    taskAttempts: 0,
-                },
-            };
-        }
         return {
             decision: { action: 'clarify', reasoning: `User asked for clarification on ${task.taskType}` },
-            stateUpdates: { taskAttempts: state.taskAttempts + 1 },
+            stateUpdates: { taskAttempts: state.taskAttempts + 1, accumulatedAnswer: '' },
         };
     }
 

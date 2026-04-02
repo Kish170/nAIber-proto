@@ -15,8 +15,8 @@ export const BooleanExtractionSchema = z.object({
 });
 
 export const IntentSchema = z.object({
-    intent: z.enum(['ANSWERING', 'ASKING', 'REFUSING']).describe(
-        'ANSWERING = attempting to give an answer; ASKING = asking a question back; REFUSING = declining to answer'
+    intent: z.enum(['ANSWERING', 'ASKING', 'REFUSING', 'CONFIRMING']).describe(
+        'ANSWERING = attempting to give an answer; ASKING = asking a question back; REFUSING = declining to answer; CONFIRMING = acknowledging they understood and are ready to try (e.g. "yes", "ok", "sure", "I\'ll try")'
     ),
     confidence: z.number().min(0).max(1),
 });
