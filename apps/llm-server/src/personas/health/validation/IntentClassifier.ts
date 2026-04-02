@@ -13,6 +13,24 @@ export class IntentClassifier {
         this.structuredLLM = chatModel.withStructuredOutput(IntentSchema);
     }
 
+    classifyRulesOnly(rawAnswer: string): IntentClassification {
+        const trimmed = rawAnswer.trim();
+
+        if (REFUSING_PATTERN.test(trimmed)) {
+            console.log('[IntentClassifier] tier:1 REFUSING (rules-only)');
+            return { intent: 'REFUSING', confidence: 1.0, tier: 1 };
+        }
+
+        const doc = nlp(trimmed);
+        if (doc.sentences().isQuestion().length > 0) {
+            console.log('[IntentClassifier] tier:1 ASKING (rules-only)');
+            return { intent: 'ASKING', confidence: 0.9, tier: 1 };
+        }
+
+        console.log('[IntentClassifier] tier:1 ANSWERING (rules-only)');
+        return { intent: 'ANSWERING', confidence: 1.0, tier: 1 };
+    }
+
     async classify(rawAnswer: string): Promise<IntentClassification> {
         const trimmed = rawAnswer.trim();
 

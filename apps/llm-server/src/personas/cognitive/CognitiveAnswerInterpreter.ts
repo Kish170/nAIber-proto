@@ -40,17 +40,31 @@ export class CognitiveAnswerInterpreter {
         if (!task) {
             return { intent: 'ANSWERING', intentTier: 1, taskEvaluation: null };
         }
+        
+        const NUMERIC_TASKS: CognitiveTaskType[] = [
+            CognitiveTaskType.DIGIT_SPAN_FORWARD,
+            CognitiveTaskType.DIGIT_SPAN_REVERSE,
+            CognitiveTaskType.SERIAL_7S,
+            CognitiveTaskType.ORIENTATION,
+        ];
 
-        const wordCount = state.rawAnswer.trim().split(/\s+/).length;
         let intent: 'ANSWERING' | 'ASKING' | 'REFUSING' = 'ANSWERING';
         let tier: 1 | 2 = 1;
         let confidence = 1.0;
 
-        if (wordCount > 3) {
-            const classification = await this.intentClassifier.classify(state.rawAnswer);
+        if (NUMERIC_TASKS.includes(task.taskType)) {
+            const classification = this.intentClassifier.classifyRulesOnly(state.rawAnswer);
             intent = classification.intent;
             tier = classification.tier;
             confidence = classification.confidence;
+        } else {
+            const wordCount = state.rawAnswer.trim().split(/\s+/).length;
+            if (wordCount > 3) {
+                const classification = await this.intentClassifier.classify(state.rawAnswer);
+                intent = classification.intent;
+                tier = classification.tier;
+                confidence = classification.confidence;
+            }
         }
 
         console.log('[Cognitive:interpret] intent=%s tier=%d confidence=%s taskType=%s', intent, tier, confidence.toFixed(2), task.taskType);
