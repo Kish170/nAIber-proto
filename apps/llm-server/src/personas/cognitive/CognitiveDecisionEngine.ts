@@ -337,22 +337,20 @@ export class CognitiveDecisionEngine {
     }
 
     private decideDelayedRecallFree(state: CognitiveStateType, task: TaskDefinition, eval_: TaskEvaluationResult): CognitiveDecisionResult {
-        const { recalled, missed, intrusions } = eval_.metadata as { recalled: string[]; missed: string[]; intrusions: string[] };
-        const retrievalLevels: RetrievalLevel[] = recalled.map(word => ({ word, level: 'free' as const, score: 2 }));
+        const { recalled, intrusions } = eval_.metadata as { recalled: string[]; missed: string[]; intrusions: string[] };
 
-        if (missed.length === 0) {
-            return this.recordDelayedRecallResult(state, task, retrievalLevels, intrusions);
+        const answerWordCount = state.rawAnswer.trim().split(/\s+/).length;
+        if (!hasCompletionSignal(state.rawAnswer) && answerWordCount < 4) {
+            console.log('[Cognitive:decide] DelayedRecall free recall partial (%d words) — waiting for completion signal', answerWordCount);
+            return {
+                decision: { action: 'continue', reasoning: 'Partial free recall — waiting for completion signal', shouldAccumulateAnswer: true },
+                stateUpdates: {},
+            };
         }
 
-        return {
-            decision: { action: 'stay', reasoning: `${missed.length} words missed in free recall — starting cued phase` },
-            stateUpdates: {
-                delayedRecallResults: retrievalLevels,
-                delayedRecallMissedWords: missed,
-                delayedRecallPhase: 'cued',
-                delayedRecallWordIndex: 0,
-            },
-        };
+        const retrievalLevels: RetrievalLevel[] = recalled.map(word => ({ word, level: 'free' as const, score: 2 }));
+
+        return this.recordDelayedRecallResult(state, task, retrievalLevels, intrusions);
     }
 
     private decideDelayedRecallCued(state: CognitiveStateType, task: TaskDefinition, eval_: TaskEvaluationResult): CognitiveDecisionResult {
