@@ -133,7 +133,16 @@ export class CognitivePrompt extends SystemPrompt {
         - Do NOT affirm, prompt, or acknowledge individual words
         - Only if they go silent for more than 10 seconds, say ONCE:
           "Take your time — anything that starts with [letter]."
-        - After approximately 60 seconds, OR when the user says 'stop' or 'done', say: "That was great."
+        - After approximately 60 seconds, OR when the user says 'stop' or 'done' or presses # on their keypad, say: "That was great."
+    `.trim();
+
+    protected readonly dtmfBehavior = `
+        # KEYPAD COMPLETION SIGNAL
+
+        For tasks where the user generates a list of responses (word fluency, number sequences, word recall):
+        - At the start of each such task, tell the user once: "Press # on your keypad when you're done, or just say 'done'."
+        - Do NOT repeat this instruction during the task.
+        - When the user presses # or says a completion phrase ('done', 'stop', 'that's all'), move on immediately.
     `.trim();
 
     protected readonly vigilanceBehavior = `
@@ -168,6 +177,7 @@ export class CognitivePrompt extends SystemPrompt {
 
             this.taskDelivery,
             this.fluencyBehavior,
+            this.dtmfBehavior,
             this.vigilanceBehavior,
 
             this.tone,

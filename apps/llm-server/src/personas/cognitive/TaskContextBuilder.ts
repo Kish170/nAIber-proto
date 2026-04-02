@@ -3,7 +3,24 @@ import { CognitiveTaskType, TASK_SEQUENCE } from "./tasks/TaskDefinitions.js";
 import type { TaskDefinition } from "./tasks/TaskDefinitions.js";
 import { getWordList, getDigitSet, getAbstractionSet } from "./tasks/ContentRotation.js";
 
+const READINESS_TASKS: CognitiveTaskType[] = [
+    CognitiveTaskType.WORD_REGISTRATION,
+    CognitiveTaskType.DIGIT_SPAN_FORWARD,
+    CognitiveTaskType.DIGIT_SPAN_REVERSE,
+    CognitiveTaskType.SERIAL_7S,
+    CognitiveTaskType.LETTER_FLUENCY,
+    CognitiveTaskType.ABSTRACTION,
+    CognitiveTaskType.DELAYED_RECALL,
+];
+
 export class TaskContextBuilder {
+    needsReadinessCheck(taskType: CognitiveTaskType, state: CognitiveStateType): boolean {
+        if (!READINESS_TASKS.includes(taskType)) return false;
+        if (taskType === CognitiveTaskType.DELAYED_RECALL && state.delayedRecallPhase !== 'free') return false;
+        if (taskType === CognitiveTaskType.ABSTRACTION && state.abstractionPairIndex > 0) return false;
+        return true;
+    }
+
     build(state: CognitiveStateType): string {
         const tasks = state.tasks?.length > 0 ? state.tasks : TASK_SEQUENCE;
         const taskDef = tasks[state.currentTaskIndex];
@@ -14,10 +31,6 @@ export class TaskContextBuilder {
 
         if (state.currentDecision?.action === 'clarify') {
             return this.buildClarification(state, taskDef);
-        }
-
-        if (state.currentDecision?.action === 'continue') {
-            return this.buildContinuation(state, taskDef);
         }
 
         switch (taskDef.taskType) {
@@ -32,6 +45,63 @@ export class TaskContextBuilder {
             case CognitiveTaskType.DELAYED_RECALL:     return this.buildDelayedRecall(state, taskDef.prompt ?? '');
             default:
                 return this.baseContext(state) + `Say: "${taskDef.prompt}"`;
+        }
+    }
+
+    buildIntro(state: CognitiveStateType, taskDef: TaskDefinition): string {
+        const base = this.baseContext(state);
+        switch (taskDef.taskType) {
+            case CognitiveTaskType.WORD_REGISTRATION:
+                return base +
+                    `## READINESS CHECK: Word Registration\n` +
+                    `This is a NEW task. Acknowledge the previous task briefly, then introduce this one.\n` +
+                    `Say: "I'm going to say five words out loud. When I'm done, I'd like you to repeat them back to me — no need to remember them just yet, just repeat them back. Ready?"\n` +
+                    `Wait for their confirmation before saying any words.`;
+
+            case CognitiveTaskType.DIGIT_SPAN_FORWARD:
+                return base +
+                    `## READINESS CHECK: Digit Span Forward\n` +
+                    `This is a NEW task. Acknowledge the previous task briefly, then introduce this one.\n` +
+                    `Say: "Now for a number exercise. I'll read some digits out loud and when I'm done, I'd like you to repeat them back in the same order. Ready?"\n` +
+                    `Wait for their confirmation before giving any digits.`;
+
+            case CognitiveTaskType.DIGIT_SPAN_REVERSE:
+                return base +
+                    `## READINESS CHECK: Digit Span Reverse\n` +
+                    `We are done with forward digits. Introduce the reverse task.\n` +
+                    `Say: "Good. Now a slightly different version — this time when I read the digits, I'd like you to say them back in reverse order. So if I said 1, 2 — you'd say 2, 1. Ready to give it a try?"\n` +
+                    `Wait for their confirmation before giving any digits.`;
+
+            case CognitiveTaskType.SERIAL_7S:
+                return base +
+                    `## READINESS CHECK: Serial 7s\n` +
+                    `We are done with digit sequences. Introduce the counting task.\n` +
+                    `Say: "Good. Now for a bit of counting. I'll give you a starting number and I'd like you to keep subtracting 7 each time. Are you ready?"\n` +
+                    `Wait for their confirmation before giving the starting number.`;
+
+            case CognitiveTaskType.LETTER_FLUENCY:
+                return base +
+                    `## READINESS CHECK: Letter Fluency\n` +
+                    `We are done with the previous task. Introduce the word task.\n` +
+                    `Say: "Now for a word task. I'll give you a letter and I'd like you to say as many words as you can that start with that letter — everyday words, no names of people or places. Ready to hear the letter?"\n` +
+                    `Wait for their confirmation before revealing the letter.`;
+
+            case CognitiveTaskType.ABSTRACTION:
+                return base +
+                    `## READINESS CHECK: Abstraction\n` +
+                    `This is a NEW task. Acknowledge the previous task briefly, then introduce this one.\n` +
+                    `Say: "Now I'm going to name two things, and I'd like you to tell me what they have in common — how they're alike. Ready?"\n` +
+                    `Wait for their confirmation before naming any pair.`;
+
+            case CognitiveTaskType.DELAYED_RECALL:
+                return base +
+                    `## READINESS CHECK: Delayed Recall\n` +
+                    `We are nearly done. Introduce the recall task.\n` +
+                    `Say: "We're almost at the end. I'd like to see if you can remember some words I said at the very beginning of our session. Ready?"\n` +
+                    `Wait for their confirmation before prompting recall.`;
+
+            default:
+                return this.build(state);
         }
     }
 
@@ -55,7 +125,7 @@ export class TaskContextBuilder {
                `Deliver it naturally — you can paraphrase slightly but cover all four: date, month, year, season.`;
     }
 
-    private buildWordRegistration(state: CognitiveStateType, prompt: string): string {
+    private buildWordRegistration(state: CognitiveStateType, _prompt: string): string {
         const words = state.registrationWords.join('... ');
 
         if (state.registrationAttempts > 0) {
@@ -67,12 +137,12 @@ export class TaskContextBuilder {
 
         return this.baseContext(state) +
                `## CURRENT TASK: Word Registration\n` +
-               `Say: "${prompt}"\n` +
+               `The user has confirmed they're ready. Say: "Here are the five words — repeat them back when I'm done:"\n` +
                `Then read clearly, one per second: ${words}\n` +
                `Then say: "Can you say those back to me?"`;
     }
 
-    private buildDigitSpanForward(state: CognitiveStateType, prompt: string): string {
+    private buildDigitSpanForward(state: CognitiveStateType, _prompt: string): string {
         const digitSet = getDigitSet(state.selectedDigitSet);
         const length = state.digitSpanCurrentLength;
         const trial = state.digitSpanCurrentTrial as 'A' | 'B';
@@ -87,12 +157,14 @@ export class TaskContextBuilder {
 
         return this.baseContext(state) +
                `## CURRENT TASK: Digit Span Forward (${length}-digit, trial ${trial})\n` +
-               (isFirstTrial ? `This is a NEW task. Say: "${prompt} Here we go:"\n` : `Say: "Good. Let's try another set:"\n`) +
+               (isFirstTrial
+                   ? `The user just confirmed they're ready. Say: "Great! Here we go:"\n`
+                   : `Say: "Good. Let's try another set:"\n`) +
                `Then read EXACTLY these digits, one per second: ${digits}\n` +
                `Say ONLY these digits — do NOT make up different numbers. Wait for their response.`;
     }
 
-    private buildDigitSpanReverse(state: CognitiveStateType, prompt: string): string {
+    private buildDigitSpanReverse(state: CognitiveStateType, _prompt: string): string {
         const digitSet = getDigitSet(state.selectedDigitSet);
         const length = state.digitSpanCurrentLength;
         const trial = state.digitSpanCurrentTrial as 'A' | 'B';
@@ -108,8 +180,7 @@ export class TaskContextBuilder {
         return this.baseContext(state) +
                `## CURRENT TASK: Digit Span Reverse (${length}-digit, trial ${trial})\n` +
                (isFirstTrial
-                   ? `This is a NEW task — we are done with forward digits.\n` +
-                     `Say: "Good, now let's try a slightly different version. ${prompt} So if I said 1, 2 — you'd say 2, 1. Let's give it a try:"\n`
+                   ? `The user just confirmed they're ready for reverse digits. Say: "Great! Here we go:"\n`
                    : `Say: "Good. Here's another set:"\n`) +
                `Then read EXACTLY these digits, one per second: ${digits}\n` +
                `Say ONLY these digits — do NOT make up different numbers. Wait for their response.`;
@@ -118,20 +189,18 @@ export class TaskContextBuilder {
     private buildSerial7s(state: CognitiveStateType, prompt: string): string {
         return this.baseContext(state) +
                `## CURRENT TASK: Serial 7s\n` +
-               `This is a NEW task — we are done with digit sequences.\n` +
-               `Briefly acknowledge their effort on the previous task, then say: "${prompt}"\n` +
-               `Tell them: "I only need 5 answers from you — just say 'done' when you've finished."`;
+               `The user has confirmed they're ready. Say: "${prompt}"\n` +
+               `Tell them: "I only need 5 answers from you — press # on your keypad or say 'done' when you've finished."`;
     }
 
     private buildLetterFluency(state: CognitiveStateType, prompt: string): string {
         return this.baseContext(state) +
                `## CURRENT TASK: Letter Fluency\n` +
-               `This is a NEW task — we are done with the previous task.\n` +
-               `Acknowledge their previous answer, then say: "${prompt} The letter is ${state.selectedLetter}."\n` +
-               `Tell them: "You have about 60 seconds — just say 'stop' when you're done. Ready? Go ahead."`;
+               `The user has confirmed they're ready. Say: "${prompt} The letter is ${state.selectedLetter}."\n` +
+               `Tell them: "You have about 60 seconds — press # on your keypad or say 'stop' when you're done. Go ahead."`;
     }
 
-    private buildAbstraction(state: CognitiveStateType, prompt: string): string {
+    private buildAbstraction(state: CognitiveStateType, _prompt: string): string {
         const abstractionSet = getAbstractionSet(state.selectedAbstractionSet);
         const pairIndex = state.abstractionPairIndex;
         const pair = abstractionSet.pairs[pairIndex];
@@ -141,7 +210,7 @@ export class TaskContextBuilder {
         }
 
         const intro = pairIndex === 0
-            ? `This is a NEW task — we are done with word fluency.\nSay: "${prompt}"\n`
+            ? `The user has confirmed they're ready. Say: "Great!"\n`
             : `Say: "Good. Here's another pair:"\n`;
 
         return this.baseContext(state) +
@@ -156,10 +225,8 @@ export class TaskContextBuilder {
             case 'free':
                 return this.baseContext(state) +
                        `## CURRENT TASK: Delayed Recall (Free)\n` +
-                       `This is a NEW task — we are done with similarities.\n` +
-                       `Say: "Almost done. ${prompt}"\n` +
-                       `Then say: "Take your time — when you've recalled everything you can, just say 'that's all I can remember'."`;
-
+                       `The user has confirmed they're ready. Say: "${prompt}"\n` +
+                       `Then say: "Take your time — press # on your keypad or say 'that's all' when you've recalled everything you can."`;
 
             case 'cued': {
                 const wordList = getWordList(state.sessionIndex);
@@ -187,31 +254,6 @@ export class TaskContextBuilder {
         }
     }
 
-    private buildContinuation(state: CognitiveStateType, taskDef: TaskDefinition): string {
-        switch (taskDef.taskType) {
-            case CognitiveTaskType.SERIAL_7S:
-                return `You are nAIber conducting a brief mind exercise.\n` +
-                       `The user is mid-way through the number subtraction task. They haven't finished yet.\n` +
-                       `Say ONLY: "Keep going — take your time with the numbers."\n` +
-                       `Do NOT repeat the task instruction. Do NOT say anything else.`;
-
-            case CognitiveTaskType.LETTER_FLUENCY:
-                return `You are nAIber conducting a brief mind exercise.\n` +
-                       `The user is mid-way through the word fluency task. They haven't said 'stop' yet.\n` +
-                       `Say ONLY: "Keep going — any more words starting with ${state.selectedLetter}?"\n` +
-                       `Do NOT repeat the task instruction. Do NOT say anything else.`;
-
-            case CognitiveTaskType.DELAYED_RECALL:
-                return `You are nAIber conducting a brief mind exercise.\n` +
-                       `The user is recalling words from earlier. They haven't finished yet.\n` +
-                       `Say ONLY: "Take your time — anything else you can remember?"\n` +
-                       `Do NOT hint at or reveal any of the words. Do NOT say anything else.`;
-
-            default:
-                return `You are nAIber. Say ONLY: "Go ahead whenever you're ready." Do NOT say anything else.`;
-        }
-    }
-
     private buildClarification(state: CognitiveStateType, taskDef: TaskDefinition): string {
         if (taskDef.taskType === CognitiveTaskType.WORD_REGISTRATION) {
             const words = state.registrationWords.join('... ');
@@ -227,6 +269,55 @@ export class TaskContextBuilder {
                    `The user asked for clarification. Re-explain the task WITHOUT revealing or hinting at any of the target words.\n` +
                    `Say something like: "Earlier in our conversation I said five words out loud. I'm just asking if any of them come to mind now — no pressure, take your time."\n` +
                    `Do NOT say, hint at, or describe any of the words.`;
+        }
+
+        if (taskDef.taskType === CognitiveTaskType.LETTER_FLUENCY) {
+            if (state.taskReadinessConfirmed) {
+                return this.baseContext(state) +
+                       `## CLARIFICATION: Letter Fluency (execute)\n` +
+                       `The user asked a question during the word task. Re-explain clearly.\n` +
+                       `Say: "The letter is ${state.selectedLetter}. Just say as many everyday words as you can that start with that letter — no names of people or places. Press # or say 'stop' when you're done."\n` +
+                       `Do NOT change the letter. The letter is ${state.selectedLetter}.`;
+            }
+            return this.baseContext(state) +
+                   `## CLARIFICATION: Letter Fluency (intro)\n` +
+                   `The user asked a question about the upcoming word task. Explain warmly without revealing the letter yet.\n` +
+                   `Say: "No problem — I'll give you a letter, and you just say as many everyday words as you can think of that start with it. No names of people or places. I'll tell you the letter once you're ready."`;
+        }
+
+        if (taskDef.taskType === CognitiveTaskType.DIGIT_SPAN_FORWARD && state.taskReadinessConfirmed) {
+            const digitSet = getDigitSet(state.selectedDigitSet);
+            const length = state.digitSpanCurrentLength;
+            const trial = state.digitSpanCurrentTrial as 'A' | 'B';
+            const lengthData = digitSet.forward[length];
+            if (lengthData) {
+                const digits = (trial === 'A' ? lengthData.trialA : lengthData.trialB).join('... ');
+                return this.baseContext(state) +
+                       `## CLARIFICATION: Digit Span Forward\n` +
+                       `The user asked to hear the digits again. Read them once more.\n` +
+                       `Say: "Of course — here they are: ${digits}. Can you repeat those back to me?"`;
+            }
+        }
+
+        if (taskDef.taskType === CognitiveTaskType.DIGIT_SPAN_REVERSE && state.taskReadinessConfirmed) {
+            const digitSet = getDigitSet(state.selectedDigitSet);
+            const length = state.digitSpanCurrentLength;
+            const trial = state.digitSpanCurrentTrial as 'A' | 'B';
+            const lengthData = digitSet.reverse[length];
+            if (lengthData) {
+                const digits = (trial === 'A' ? lengthData.trialA : lengthData.trialB).join('... ');
+                return this.baseContext(state) +
+                       `## CLARIFICATION: Digit Span Reverse\n` +
+                       `The user asked to hear the digits again. Remind them to say them in reverse order.\n` +
+                       `Say: "Of course — here they are: ${digits}. Remember to say them back in reverse order. Can you give it a try?"`;
+            }
+        }
+
+        if (taskDef.taskType === CognitiveTaskType.SERIAL_7S && state.taskReadinessConfirmed) {
+            return this.baseContext(state) +
+                   `## CLARIFICATION: Serial 7s\n` +
+                   `The user asked for clarification. Re-explain the counting task simply.\n` +
+                   `Say: "Start at 100 and keep taking away 7 each time. So 100, then 93, then 86, and so on. Just give me 5 answers — press # or say 'done' when you're finished."`;
         }
 
         return this.baseContext(state) +

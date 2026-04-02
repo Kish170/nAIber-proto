@@ -1,6 +1,7 @@
 import { CognitiveTaskType, TASK_SEQUENCE } from "./tasks/TaskDefinitions.js";
 import { hasCompletionSignal } from "./tasks/TaskValidation.js";
 import type { TaskDefinition, TaskResponse, RetrievalLevel, WellbeingResponse } from "./tasks/TaskDefinitions.js";
+import { TaskContextBuilder } from "./TaskContextBuilder.js";
 import { getDigitSet } from "./tasks/ContentRotation.js";
 import type { CognitiveStateType } from "./CognitiveState.js";
 import type { CognitiveInterpretationResult, TaskEvaluationResult } from "./CognitiveAnswerInterpreter.js";
@@ -20,6 +21,12 @@ export interface CognitiveDecisionResult {
 }
 
 export class CognitiveDecisionEngine {
+    private readonly contextBuilder = new TaskContextBuilder();
+
+    private needsReadinessCheck(task: TaskDefinition, state: CognitiveStateType): boolean {
+        return this.contextBuilder.needsReadinessCheck(task.taskType, state);
+    }
+
     evaluate(state: CognitiveStateType, interpretation: CognitiveInterpretationResult): CognitiveDecisionResult {
         if (state.isDeferred) {
             return { decision: { action: 'defer', reasoning: 'Already deferred' }, stateUpdates: {} };
@@ -30,11 +37,16 @@ export class CognitiveDecisionEngine {
             return { decision: { action: 'skip', reasoning: 'No task at current index' }, stateUpdates: { isComplete: true } };
         }
 
+        if (state.dtmfCompletionSignal) {
+            console.log('[Cognitive:decide] DTMF completion signal — advancing task %s', task.taskType);
+            return this.handleDtmfCompletion(state, task);
+        }
+
         if (interpretation.intent === 'REFUSING') {
             return this.handleRefusing(state, task);
         }
         if (interpretation.intent === 'CONFIRMING') {
-            return this.handleConfirming(state);
+            return this.handleConfirming(state, task);
         }
         if (interpretation.intent === 'ASKING') {
             return this.handleAsking(state, task);
@@ -64,14 +76,35 @@ export class CognitiveDecisionEngine {
                 taskResponses: [...state.taskResponses, taskResponse],
                 currentTaskIndex: state.currentTaskIndex + 1,
                 taskAttempts: 0,
+                taskReadinessConfirmed: false,
             },
         };
     }
 
-    private handleConfirming(_state: CognitiveStateType): CognitiveDecisionResult {
-        console.log('[Cognitive:decide] post-clarify confirmation — re-presenting task without consuming attempt');
+    private handleDtmfCompletion(state: CognitiveStateType, task: TaskDefinition): CognitiveDecisionResult {
+        const realEval = state.lastInterpretation?.taskEvaluation;
+        const eval_: TaskEvaluationResult = realEval
+            ? { ...realEval, metadata: { ...realEval.metadata, completionSignalPresent: true, dtmfForced: true } }
+            : { taskType: task.taskType, rawScore: 0, maxScore: null, metadata: { completionSignalPresent: true, dtmfForced: true } };
+
+        const result = this.dispatchTask(state, task, eval_);
         return {
-            decision: { action: 'clarify', reasoning: 'Post-clarify confirmation — re-presenting task' },
+            decision: result.decision,
+            stateUpdates: { ...result.stateUpdates, dtmfCompletionSignal: false },
+        };
+    }
+
+    private handleConfirming(state: CognitiveStateType, task: TaskDefinition): CognitiveDecisionResult {
+        if (!state.taskReadinessConfirmed && this.needsReadinessCheck(task, state)) {
+            console.log('[Cognitive:decide] readiness confirmed — advancing to execute phase for %s', task.taskType);
+            return {
+                decision: { action: 'stay', reasoning: 'Readiness confirmed — presenting execute phase' },
+                stateUpdates: { taskReadinessConfirmed: true, accumulatedAnswer: '' },
+            };
+        }
+        console.log('[Cognitive:decide] post-clarify confirmation — re-presenting task directly');
+        return {
+            decision: { action: 'stay', reasoning: 'Post-clarify confirmation — presenting task directly' },
             stateUpdates: { accumulatedAnswer: '' },
         };
     }
@@ -167,6 +200,7 @@ export class CognitiveDecisionEngine {
                 registrationAttempts: 0,
                 currentTaskIndex: state.currentTaskIndex + 1,
                 taskAttempts: 0,
+                taskReadinessConfirmed: false,
             },
         };
     }
@@ -230,18 +264,19 @@ export class CognitiveDecisionEngine {
                 digitSpanCurrentTrial: 'A',
                 currentTaskIndex: state.currentTaskIndex + 1,
                 taskAttempts: 0,
+                taskReadinessConfirmed: false,
             },
         };
     }
 
     private decideSerial7s(state: CognitiveStateType, task: TaskDefinition, eval_: TaskEvaluationResult): CognitiveDecisionResult {
-        const { completionSignalPresent } = eval_.metadata as { completionSignalPresent: boolean };
+        const completionSignalPresent = (eval_.metadata as { completionSignalPresent?: boolean }).completionSignalPresent ?? hasCompletionSignal(state.rawAnswer);
         const score = eval_.rawScore as number;
 
-        if (!completionSignalPresent && score < 2) {
-            console.log('[Cognitive:decide] Serial7s partial answer (score=%d) — waiting for completion signal', score);
+        if (!completionSignalPresent) {
+            console.log('[Cognitive:decide] Serial7s no completion signal (score=%d) — waiting for # or "done"', score);
             return {
-                decision: { action: 'continue', reasoning: 'Partial Serial 7s answer — waiting for completion signal', shouldAccumulateAnswer: true },
+                decision: { action: 'continue', reasoning: 'Serial 7s — waiting for DTMF # or voice completion signal', shouldAccumulateAnswer: true },
                 stateUpdates: {},
             };
         }
@@ -258,13 +293,13 @@ export class CognitiveDecisionEngine {
     }
 
     private decideLetterFluency(state: CognitiveStateType, task: TaskDefinition, eval_: TaskEvaluationResult): CognitiveDecisionResult {
-        const { completionSignalPresent } = eval_.metadata as { completionSignalPresent: boolean };
+        const completionSignalPresent = (eval_.metadata as { completionSignalPresent?: boolean }).completionSignalPresent ?? hasCompletionSignal(state.rawAnswer);
         const score = eval_.rawScore as number;
 
-        if (!completionSignalPresent && score < 5) {
-            console.log('[Cognitive:decide] LetterFluency partial answer (score=%d) — waiting for completion signal', score);
+        if (!completionSignalPresent) {
+            console.log('[Cognitive:decide] LetterFluency no completion signal (score=%d) — waiting for # or "done"', score);
             return {
-                decision: { action: 'continue', reasoning: 'Partial fluency answer — waiting for completion signal', shouldAccumulateAnswer: true },
+                decision: { action: 'continue', reasoning: 'Letter fluency — waiting for DTMF # or voice completion signal', shouldAccumulateAnswer: true },
                 stateUpdates: {},
             };
         }
@@ -311,6 +346,7 @@ export class CognitiveDecisionEngine {
                 abstractionPairIndex: 0,
                 taskAttempts: 0,
                 currentTaskIndex: state.currentTaskIndex + 1,
+                taskReadinessConfirmed: false,
             },
         };
     }
@@ -327,13 +363,13 @@ export class CognitiveDecisionEngine {
     }
 
     private decideDelayedRecallFree(state: CognitiveStateType, task: TaskDefinition, eval_: TaskEvaluationResult): CognitiveDecisionResult {
-        const { recalled, intrusions } = eval_.metadata as { recalled: string[]; missed: string[]; intrusions: string[] };
+        const { recalled, intrusions, dtmfForced } = eval_.metadata as { recalled: string[]; missed: string[]; intrusions: string[]; dtmfForced?: boolean };
 
-        const answerWordCount = state.rawAnswer.trim().split(/\s+/).length;
-        if (!hasCompletionSignal(state.rawAnswer) && answerWordCount < 4) {
-            console.log('[Cognitive:decide] DelayedRecall free recall partial (%d words) — waiting for completion signal', answerWordCount);
+        const completionSignalPresent = hasCompletionSignal(state.rawAnswer) || !!dtmfForced;
+        if (!completionSignalPresent) {
+            console.log('[Cognitive:decide] DelayedRecall free recall — waiting for # or "that\'s all"');
             return {
-                decision: { action: 'continue', reasoning: 'Partial free recall — waiting for completion signal', shouldAccumulateAnswer: true },
+                decision: { action: 'continue', reasoning: 'Free recall — waiting for DTMF # or voice completion signal', shouldAccumulateAnswer: true },
                 stateUpdates: {},
             };
         }
@@ -417,6 +453,7 @@ export class CognitiveDecisionEngine {
                 delayedRecallMissedWords: [],
                 currentTaskIndex: state.currentTaskIndex + 1,
                 taskAttempts: 0,
+                taskReadinessConfirmed: false,
             },
         };
     }
@@ -425,6 +462,7 @@ export class CognitiveDecisionEngine {
         const stateUpdates: Record<string, unknown> = {
             currentTaskIndex: state.currentTaskIndex + 1,
             taskAttempts: 0,
+            taskReadinessConfirmed: false,
         };
         if (taskResponse) {
             stateUpdates.taskResponses = [...state.taskResponses, taskResponse];

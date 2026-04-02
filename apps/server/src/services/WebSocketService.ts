@@ -56,6 +56,9 @@ export class WebSocketService {
                 case "stop":
                     this.manageStopEvent(data);
                     break;
+                case "dtmf":
+                    await this.manageDtmfEvent(data);
+                    break;
                 case "mark":
                     this.manageMarkEvent(data);
                     break;
@@ -164,6 +167,18 @@ export class WebSocketService {
 
     private manageMarkEvent(data: any): void {
         console.log('[TwilioClient] Mark event:', data);
+    }
+
+    private async manageDtmfEvent(data: any): Promise<void> {
+        const digit = data.dtmf?.digit ?? data.digit;
+        console.log('[WebSocketService] DTMF digit "%s" received, conversationId=%s', digit, this.conversationId);
+        if (this.conversationId) {
+            const redisClient = RedisClient.getInstance();
+            await redisClient.set(`dtmf:${this.conversationId}`, '1', { EX: 30 });
+            console.log('[WebSocketService] DTMF signal stored in Redis for conversationId=%s', this.conversationId);
+        } else {
+            console.warn('[WebSocketService] DTMF received but conversationId not yet set — signal dropped');
+        }
     }
 
     private sendAudioToElevenLabs(audioPayload: string): void {

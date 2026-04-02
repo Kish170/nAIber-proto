@@ -39,7 +39,7 @@ export class SupervisorGraph {
         ).compile();
 
         this.healthCheckGraph = new HealthCheckGraph(openAIClient, checkpointer);
-        this.cognitiveGraph = new CognitiveGraph(openAIClient, checkpointer);
+        this.cognitiveGraph = new CognitiveGraph(openAIClient, checkpointer, redisClient);
 
         const graph: any = new StateGraph(SupervisorState);
 

@@ -17,7 +17,7 @@ export interface HealthCheckAnswer {
 }
 
 export interface InterpretationResult {
-    intent: 'ANSWERING' | 'ASKING' | 'REFUSING';
+    intent: 'ANSWERING' | 'ASKING' | 'REFUSING' | 'CONFIRMING';
     intentTier: 1 | 2;
     extraction?: ExtractionResult;
     signals: AnswerSignals;

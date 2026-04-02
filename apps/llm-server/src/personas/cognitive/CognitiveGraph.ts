@@ -8,7 +8,7 @@ import { TASK_SEQUENCE } from "./tasks/TaskDefinitions.js";
 import { CognitiveAnswerInterpreter } from "./CognitiveAnswerInterpreter.js";
 import { CognitiveDecisionEngine } from "./CognitiveDecisionEngine.js";
 import { TaskContextBuilder } from "./TaskContextBuilder.js";
-import { OpenAIClient } from "@naiber/shared-clients";
+import { OpenAIClient, RedisClient } from "@naiber/shared-clients";
 
 export class CognitiveGraph {
     private llm: ChatOpenAI;
@@ -16,16 +16,19 @@ export class CognitiveGraph {
     private readonly answerInterpreter: CognitiveAnswerInterpreter;
     private readonly decisionEngine: CognitiveDecisionEngine;
     private readonly contextBuilder: TaskContextBuilder;
+    private readonly redisClient: RedisClient;
 
-    constructor(openAIClient: OpenAIClient, checkpointer: BaseCheckpointSaver) {
+    constructor(openAIClient: OpenAIClient, checkpointer: BaseCheckpointSaver, redisClient: RedisClient) {
         this.llm = openAIClient.returnChatModel() as any;
         this.answerInterpreter = new CognitiveAnswerInterpreter(this.llm);
         this.decisionEngine = new CognitiveDecisionEngine();
         this.contextBuilder = new TaskContextBuilder();
+        this.redisClient = redisClient;
 
         const graph: any = new StateGraph(CognitiveState);
 
         graph.addNode("orchestrator", this.orchestrate.bind(this));
+        graph.addNode("present_readiness", this.presentReadiness.bind(this));
         graph.addNode("present_task", this.presentTask.bind(this));
         graph.addNode("wait_for_input", this.waitForInput.bind(this));
         graph.addNode("interpret_answer", this.interpretAnswer.bind(this));
@@ -33,7 +36,8 @@ export class CognitiveGraph {
         graph.addNode("finalize", this.finalize.bind(this));
 
         graph.setEntryPoint("orchestrator");
-        graph.addEdge("orchestrator", "present_task");
+        graph.addConditionalEdges("orchestrator", this.routeFromDecision.bind(this));
+        graph.addEdge("present_readiness", "wait_for_input");
         graph.addEdge("present_task", "wait_for_input");
         graph.addEdge("wait_for_input", "interpret_answer");
         graph.addEdge("interpret_answer", "evaluate_and_decide");
@@ -53,6 +57,22 @@ export class CognitiveGraph {
         return { ...init, tasks: TASK_SEQUENCE, currentTaskIndex: 0 };
     }
 
+    private async presentReadiness(state: CognitiveStateType) {
+        const tasks = state.tasks?.length > 0 ? state.tasks : TASK_SEQUENCE;
+        const task = tasks[state.currentTaskIndex];
+
+        if (!task) {
+            console.warn('[Cognitive:readiness] No task at index', state.currentTaskIndex);
+            return { isComplete: true };
+        }
+
+        const prompt = this.contextBuilder.buildIntro(state, task);
+        const lastUserMsg = state.messages.length > 0 ? [state.messages[state.messages.length - 1]] : [];
+        const response = await this.llm.invoke([new SystemMessage(prompt), ...lastUserMsg]);
+        console.log('[Cognitive:readiness] taskIndex=%d taskType=%s — presenting readiness check', state.currentTaskIndex, task.taskType);
+        return { response: this.extractContent(response), taskStartTimestamp: Date.now() };
+    }
+
     private async presentTask(state: CognitiveStateType) {
         const tasks = state.tasks?.length > 0 ? state.tasks : TASK_SEQUENCE;
         const task = tasks[state.currentTaskIndex];
@@ -62,6 +82,11 @@ export class CognitiveGraph {
             return { isComplete: true };
         }
 
+        if (state.currentDecision?.action === 'continue') {
+            console.log('[Cognitive:present] taskIndex=%d taskType=%s — silent accumulation (continue)', state.currentTaskIndex, task.taskType);
+            return { response: '' };
+        }
+
         const prompt = this.contextBuilder.build(state);
         const lastUserMsg = state.messages.length > 0 ? [state.messages[state.messages.length - 1]] : [];
         const response = await this.llm.invoke([new SystemMessage(prompt), ...lastUserMsg]);
@@ -69,9 +94,23 @@ export class CognitiveGraph {
         return { response: this.extractContent(response), taskStartTimestamp: Date.now() };
     }
 
-    private waitForInput(state: CognitiveStateType) {
+    private async waitForInput(state: CognitiveStateType) {
         const tasks = state.tasks?.length > 0 ? state.tasks : TASK_SEQUENCE;
         const task = tasks[state.currentTaskIndex];
+
+        if (state.conversationId) {
+            const dtmfKey = `dtmf:${state.conversationId}`;
+            const dtmfPending = await this.redisClient.get(dtmfKey);
+            if (dtmfPending) {
+                await this.redisClient.delete(dtmfKey);
+                const finalAnswer = state.accumulatedAnswer || state.rawAnswer;
+                console.log('[Cognitive:waitForInput] DTMF signal detected — using accumulated answer (len=%d)', finalAnswer.length);
+                return { rawAnswer: finalAnswer, accumulatedAnswer: '', dtmfCompletionSignal: true };
+            }
+        } else {
+            console.warn('[Cognitive:waitForInput] conversationId not set — DTMF lookup skipped');
+        }
+
         const userAnswer = interrupt({ taskIndex: state.currentTaskIndex, taskType: task?.taskType, response: state.response });
 
         const raw = String(userAnswer);
@@ -83,6 +122,7 @@ export class CognitiveGraph {
         return {
             rawAnswer: combined,
             accumulatedAnswer: shouldAccumulate ? combined : '',
+            dtmfCompletionSignal: false,
         };
     }
 
@@ -117,7 +157,7 @@ export class CognitiveGraph {
         } else if (state.isPartial) {
             responseText = "That's alright — we'll pick up from here next time. Thank you for what you've done today. Take care!";
         } else {
-            responseText = "And that's it — you're all done. That was really great of you to do this with me. Is there anything you'd like to chat about, or shall we wrap up for today?";
+            responseText = "And that's it — you've done a wonderful job today. Thank you so much for doing these exercises with me. Take care of yourself, and I'll talk to you again soon. Goodbye!";
         }
 
         console.log('[Cognitive:finalize] userId=%s tasksCompleted=%d isDeferred=%s isPartial=%s',
@@ -128,10 +168,19 @@ export class CognitiveGraph {
 
     private routeFromDecision(state: CognitiveStateType): string {
         let target: string;
-        if (state.isComplete || state.isDeferred) target = "finalize";
-        else {
+        if (state.isComplete || state.isDeferred) {
+            target = "finalize";
+        } else {
             const tasks = state.tasks?.length > 0 ? state.tasks : TASK_SEQUENCE;
-            target = state.currentTaskIndex >= tasks.length ? "finalize" : "present_task";
+            if (state.currentTaskIndex >= tasks.length) {
+                target = "finalize";
+            } else {
+                const task = tasks[state.currentTaskIndex];
+                const needsReadiness = this.contextBuilder.needsReadinessCheck(task.taskType, state);
+                target = (needsReadiness && !state.taskReadinessConfirmed)
+                    ? "present_readiness"
+                    : "present_task";
+            }
         }
         console.log('[Cognitive:route] → %s', target);
         return target;

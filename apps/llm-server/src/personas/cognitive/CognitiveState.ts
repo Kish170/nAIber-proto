@@ -67,6 +67,9 @@ export const CognitiveState = Annotation.Root({
     isPartial: Annotation<boolean>(keep<boolean>(false)),
 
     taskStartTimestamp: Annotation<number>(keep<number>(0)),
+
+    dtmfCompletionSignal: Annotation<boolean>(keep<boolean>(false)),
+    taskReadinessConfirmed: Annotation<boolean>(keep<boolean>(false)),
 });
 
 export type CognitiveStateType = typeof CognitiveState.State;

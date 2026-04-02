@@ -15,6 +15,7 @@ import {
 } from "./tasks/TaskValidation.js";
 import { getDigitSet, getAbstractionSet } from "./tasks/ContentRotation.js";
 import { IntentClassifier } from "../health/validation/IntentClassifier.js";
+import { TaskContextBuilder } from "./TaskContextBuilder.js";
 
 export interface TaskEvaluationResult {
     taskType: CognitiveTaskType;
@@ -31,9 +32,11 @@ export interface CognitiveInterpretationResult {
 
 export class CognitiveAnswerInterpreter {
     private readonly intentClassifier: IntentClassifier;
+    private readonly contextBuilder: TaskContextBuilder;
 
     constructor(private readonly llm: ChatOpenAI) {
         this.intentClassifier = new IntentClassifier(llm);
+        this.contextBuilder = new TaskContextBuilder();
     }
 
     async interpret(task: TaskDefinition | undefined, state: CognitiveStateType): Promise<CognitiveInterpretationResult> {
@@ -48,9 +51,13 @@ export class CognitiveAnswerInterpreter {
             CognitiveTaskType.ORIENTATION,
         ];
 
-        if (state.currentDecision?.action === 'clarify') {
+        const isPostClarify = state.currentDecision?.action === 'clarify';
+        const isInIntroPhase = !state.taskReadinessConfirmed && this.contextBuilder.needsReadinessCheck(task.taskType, state);
+
+        if (isPostClarify || isInIntroPhase) {
             if (this.intentClassifier.isConfirmingResponse(state.rawAnswer)) {
-                console.log('[Cognitive:interpret] intent=CONFIRMING tier=1 confidence=1.00 taskType=%s (post-clarify rules)', task.taskType);
+                const source = isInIntroPhase ? 'readiness' : 'post-clarify';
+                console.log('[Cognitive:interpret] intent=CONFIRMING tier=1 confidence=1.00 taskType=%s (%s rules)', task.taskType, source);
                 return { intent: 'CONFIRMING', intentTier: 1, taskEvaluation: null };
             }
             if (!NUMERIC_TASKS.includes(task.taskType)) {
@@ -58,7 +65,8 @@ export class CognitiveAnswerInterpreter {
                 if (wordCount > 3) {
                     const classification = await this.intentClassifier.classify(state.rawAnswer, state.response);
                     if (classification.intent === 'CONFIRMING' || classification.intent === 'ASKING') {
-                        console.log('[Cognitive:interpret] intent=%s tier=%d confidence=%s taskType=%s (post-clarify LLM)', classification.intent, classification.tier, classification.confidence.toFixed(2), task.taskType);
+                        const source = isInIntroPhase ? 'readiness' : 'post-clarify';
+                        console.log('[Cognitive:interpret] intent=%s tier=%d confidence=%s taskType=%s (%s LLM)', classification.intent, classification.tier, classification.confidence.toFixed(2), task.taskType, source);
                         return { intent: classification.intent as 'CONFIRMING' | 'ASKING', intentTier: classification.tier, taskEvaluation: null };
                     }
                 }
@@ -77,7 +85,7 @@ export class CognitiveAnswerInterpreter {
         } else {
             const wordCount = state.rawAnswer.trim().split(/\s+/).length;
             if (wordCount > 3) {
-                const classification = await this.intentClassifier.classify(state.rawAnswer);
+                const classification = await this.intentClassifier.classify(state.rawAnswer, state.response);
                 intent = classification.intent as typeof intent;
                 tier = classification.tier;
                 confidence = classification.confidence;
