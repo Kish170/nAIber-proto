@@ -35,7 +35,11 @@ let checkpointer: FixedShallowRedisSaver | null = null;
 redisClient.connect().then(async () => {
   console.log('[LLM Server] Redis connected');
 
-  await neo4jClient.verifyConnectivity();
+  try {
+    await neo4jClient.verifyConnectivity();
+  } catch (error) {
+    console.warn('[LLM Server] Neo4j unavailable — KG features disabled for this session:', error instanceof Error ? error.message : error);
+  }
 
   checkpointer = await FixedShallowRedisSaver.create(REDIS_URL);
   console.log('[LLM Server] FixedShallowRedisSaver checkpointer initialized');
