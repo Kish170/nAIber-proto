@@ -286,7 +286,7 @@ export class CognitiveDecisionEngine {
         if (pairIndex === 0) {
             return {
                 decision: { action: 'stay', reasoning: 'First abstraction pair done, presenting second' },
-                stateUpdates: { taskAttempts: 1, taskResponses: [...state.taskResponses, taskResponse] },
+                stateUpdates: { abstractionPairIndex: 1, taskResponses: [...state.taskResponses, taskResponse] },
             };
         }
 
@@ -294,6 +294,7 @@ export class CognitiveDecisionEngine {
             decision: { action: 'advance', reasoning: 'Both abstraction pairs done' },
             stateUpdates: {
                 taskResponses: [...state.taskResponses, taskResponse],
+                abstractionPairIndex: 0,
                 taskAttempts: 0,
                 currentTaskIndex: state.currentTaskIndex + 1,
             },

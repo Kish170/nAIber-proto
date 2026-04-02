@@ -53,6 +53,7 @@ export const CognitiveState = Annotation.Root({
     delayedRecallMissedWords: Annotation<string[]>(keep<string[]>([])),
 
     taskAttempts: Annotation<number>(keep<number>(0)),
+    abstractionPairIndex: Annotation<number>(keep<number>(0)),
 
     tasks: Annotation<TaskDefinition[]>(keep<TaskDefinition[]>([])),
     lastInterpretation: Annotation<CognitiveInterpretationResult | null>(keep<CognitiveInterpretationResult | null>(null)),

@@ -130,7 +130,7 @@ export class CognitiveAnswerInterpreter {
 
     private async interpretAbstraction(state: CognitiveStateType): Promise<TaskEvaluationResult> {
         const abstractionSet = getAbstractionSet(state.selectedAbstractionSet);
-        const pairIndex = state.taskAttempts;
+        const pairIndex = state.abstractionPairIndex;
         const pair = abstractionSet.pairs[pairIndex];
 
         if (!pair) {

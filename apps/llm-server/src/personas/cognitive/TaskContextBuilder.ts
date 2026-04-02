@@ -127,7 +127,7 @@ export class TaskContextBuilder {
 
     private buildAbstraction(state: CognitiveStateType, prompt: string): string {
         const abstractionSet = getAbstractionSet(state.selectedAbstractionSet);
-        const pairIndex = state.taskAttempts;
+        const pairIndex = state.abstractionPairIndex;
         const pair = abstractionSet.pairs[pairIndex];
 
         if (!pair) {
