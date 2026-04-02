@@ -26,7 +26,7 @@ export interface InterpretationResult {
 export interface AgentDecision {
     extractedSlots: Record<string, string | number | boolean | null>;
     confidence: number;
-    action: 'next' | 'followup' | 'confirm' | 'retry' | 'skip';
+    action: 'next' | 'followup' | 'confirm' | 'retry' | 'skip' | 'wrap_up';
     followupQuestion?: string;
     confirmQuestion?: string;
     reasoning: string;

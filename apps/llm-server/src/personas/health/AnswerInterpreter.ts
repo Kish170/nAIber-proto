@@ -14,8 +14,8 @@ export class AnswerInterpreter {
         this.answerExtractor = new AnswerExtractor(chatModel);
     }
 
-    async interpret(question: QuestionData | undefined, rawAnswer: string): Promise<InterpretationResult> {
-        const { intent, confidence: _intentConfidence, tier } = await this.intentClassifier.classify(rawAnswer);
+    async interpret(question: QuestionData | undefined, rawAnswer: string, priorAiResponse?: string): Promise<InterpretationResult> {
+        const { intent, confidence: _intentConfidence, tier } = await this.intentClassifier.classify(rawAnswer, priorAiResponse);
         const signals = detectSignals(rawAnswer);
 
         console.log('[AnswerInterpreter]', {

@@ -52,17 +52,20 @@ export class QuestionContextBuilder {
                 return this.buildConfirmContext(state, decision);
             case 'retry':
                 return this.buildRetryContext(question, state);
+            case 'wrap_up':
+                return this.buildWrapUpContext(question, state);
         }
     }
 
     private buildNextContext(question: QuestionData, state: HealthCheckStateType): string {
-        let ctx = '';
         const lastValid = [...state.healthCheckAnswers].reverse().find(a => a.isValid);
-        if (lastValid) {
-            ctx += `## Transition\n`;
-            ctx += `Briefly acknowledge the patient's last answer in one warm sentence before continuing.\n`;
-            ctx += `Last answer: "${lastValid.question.question}" → "${lastValid.validatedAnswer}"\n\n`;
+
+        if (!lastValid || lastValid.question.type !== 'boolean') {
+            return this.buildStandardQuestion(question);
         }
+
+        let ctx = `## Transition\n`;
+        ctx += `Briefly and warmly acknowledge their answer in one short phrase (e.g., "Good to know" / "Got it"), then ask:\n\n`;
         ctx += this.buildStandardQuestion(question);
         return ctx;
     }
@@ -125,6 +128,22 @@ export class QuestionContextBuilder {
         );
     }
 
+    private buildWrapUpContext(question: QuestionData, state: HealthCheckStateType): string {
+        const patientSaid = state.rawAnswer;
+
+        let ctx = `## Wrap-up Check\n`;
+        if (patientSaid) {
+            ctx += `The patient was just asked: "${question.question}"\n`;
+            ctx += `They said: "${patientSaid}"\n\n`;
+        } else {
+            ctx += `The patient has been discussing "${question.question}".\n\n`;
+        }
+        ctx += `Gently check if they have anything to add before moving on.\n`;
+        ctx += `Ask in one warm, brief sentence — for example: "Is there anything else you'd like to share about that, or shall we move on?"\n`;
+        ctx += `Do not re-ask the original question. Keep it natural and unhurried.\n`;
+        return ctx;
+    }
+
     // aint this the same as buildNext in a way or I guess for the first wuestin idk will revisit
     private buildStandardQuestion(question: QuestionData): string {
         let ctx = `## Current Question\n`;
@@ -166,7 +185,7 @@ export class QuestionContextBuilder {
             return Math.min(4 + questionAttempts * 2, 12);
         }
 
-        if (decision.action === 'followup') {
+        if (decision.action === 'followup' || decision.action === 'wrap_up') {
             return Math.min(6 + questionAttempts * 2, 12);
         }
         return 4;

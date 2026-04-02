@@ -10,8 +10,8 @@ import { QuestionData } from "./questions/index.js";
 import type { AnswerSignals } from "./validation/SignalDetector.js";
 import type { ExtractionResult } from "./validation/AnswerExtractor.js";
 
-const MAX_RETRY_ATTEMPTS = 2;
-const NEGATIVE_CONDITION_TERMS = /\b(worse|pain|bad|terrible|difficult|struggle|struggling|hard|concerning|deteriorating|flaring)\b/i;
+const NEGATIVE_CONDITION_TERMS = /\b(worse|worsening|pain|painful|bad|terrible|difficult|struggle|struggling|hard|concerning|deteriorating|flaring|elevated|higher|increased|going up|gone up|not great|not good|off)\b/i;
+const POSITIVE_CONDITION_TERMS = /\b(fine|good|great|stable|normal|okay|ok|better|same as usual|no change|unchanged|under control|managed)\b/i;
 const AFFIRMATIVE_CONFIRM = /\b(yes|yeah|yep|correct|right|exactly|that's right|uh-huh|sure)\b/i;
 
 export interface DecisionResult {
@@ -32,6 +32,18 @@ export class DecisionEngine {
 
         const { intent, intentTier, extraction, signals } = interpretation;
 
+        if (state.currentDecision?.action === 'wrap_up') {
+            return this.handleWrapUpResponse(state, interpretation);
+        }
+
+        if (intent === 'CONFIRMING' && state.currentDecision?.action === 'retry') {
+            console.log('[DecisionEngine] Post-retry CONFIRMING — re-asking question');
+            return {
+                decision: { action: 'retry', extractedSlots: {}, confidence: 0, reasoning: 'Post-retry confirmation — re-presenting question' },
+                stateUpdates: { pendingClarification: false, clarificationContext: '' },
+            };
+        }
+
         if (intent === 'REFUSING') return this.handleRefusing(state, intentTier);
         if (intent === 'ASKING')   return this.handleAsking(state);
 
@@ -44,6 +56,19 @@ export class DecisionEngine {
 
         if (this.isConfirmationResponse(state, extraction)) {
             return this.handleConfirmationResponse(state, currentQuestion);
+        }
+
+        if (
+            currentQuestion.type === 'scale' &&
+            state.currentDecision?.action !== 'confirm' &&
+            this.lacksExplicitNumber(state.rawAnswer) &&
+            state.questionAttempts < 2
+        ) {
+            console.log('[DecisionEngine] Scale question — no explicit number → retry');
+            return {
+                decision: { action: 'retry', extractedSlots: {}, confidence: 0, reasoning: 'Scale question — patient did not give an explicit number' },
+                stateUpdates: { questionAttempts: state.questionAttempts + 1, pendingClarification: false }
+            };
         }
 
         if (this.shouldConfirm(state, extraction)) {
@@ -59,10 +84,6 @@ export class DecisionEngine {
     }
 
     private handleAsking(state: HealthCheckStateType): DecisionResult {
-        if (state.questionAttempts >= MAX_RETRY_ATTEMPTS) {
-            console.log('[DecisionEngine] ASKING → clarify cap reached → skip');
-            return this.skip(state, 'Max clarification attempts reached', 'exhausted');
-        }
         console.log('[DecisionEngine] ASKING → retry with clarification');
         return {
             decision: {
@@ -80,14 +101,14 @@ export class DecisionEngine {
     }
 
     private handleExtractionFailed(state: HealthCheckStateType): DecisionResult {
-        if (state.questionAttempts < MAX_RETRY_ATTEMPTS - 1) {
-            console.log(`[DecisionEngine] not-extractable → retry ${state.questionAttempts + 1}/${MAX_RETRY_ATTEMPTS}`);
+        if (state.questionAttempts < 2) {
+            console.log(`[DecisionEngine] not-extractable → retry (attempt ${state.questionAttempts + 1}/2)`);
             return {
                 decision: {
                     action: 'retry',
                     extractedSlots: {},
                     confidence: 0,
-                    reasoning: `Could not extract a valid answer. Retry ${state.questionAttempts + 1}/${MAX_RETRY_ATTEMPTS}`
+                    reasoning: `Could not extract a valid answer. Retry attempt ${state.questionAttempts + 1}/2`
                 },
                 stateUpdates: {
                     questionAttempts: state.questionAttempts + 1,
@@ -95,7 +116,7 @@ export class DecisionEngine {
                 }
             };
         }
-        return this.skip(state, 'Max retry attempts reached after extraction failure');
+        return this.skip(state, 'Could not extract a valid answer after 2 retries');
     }
 
     private async handleConfirmationResponse(state: HealthCheckStateType, currentQuestion: QuestionData): Promise<DecisionResult> {
@@ -108,8 +129,8 @@ export class DecisionEngine {
             confidence: 1.0,
             method: 'rule-based',
         };
-        const emptySignals: AnswerSignals = { uncertain: false, partial: false, correction: false, offTopic: false, sentiment: 'neutral', engagement: 'high' };
-        return this.handleSuccessfulExtraction(state, currentQuestion, confirmedExtraction, proposedSlots, emptySignals);
+        const signals = state.lastInterpretation?.signals ?? { uncertain: false, partial: false, correction: false, offTopic: false, sentiment: 'neutral', engagement: 'high' };
+        return this.handleSuccessfulExtraction(state, currentQuestion, confirmedExtraction, proposedSlots, signals);
     }
 
     private handleLowConfidence(
@@ -147,8 +168,16 @@ export class DecisionEngine {
         if (canFollowUp) {
             const followupReason = this.detectFollowUpTrigger(currentQuestion.slot ?? currentQuestion.category, extraction.value, signals);
             if (followupReason) {
-                return this.buildFollowUpResult(state, currentQuestion, extraction, extractedSlots, followupReason);
+                if (state.currentQuestionFollowUpCount === 0) {
+                    return this.buildFollowUpResult(state, currentQuestion, extraction, extractedSlots, followupReason);
+                } else {
+                    return this.buildWrapUpResult(state, extraction, extractedSlots, followupReason, true);
+                }
             }
+        }
+
+        if (!isFollowUpQuestion && currentQuestion.type !== 'boolean') {
+            return this.buildWrapUpResult(state, extraction, extractedSlots, 'transition check', false);
         }
 
         console.log(`[DecisionEngine] next (${extraction.method}, confidence: ${extraction.confidence.toFixed(2)})`);
@@ -171,7 +200,7 @@ export class DecisionEngine {
         const alreadyHasFollowUp = state.healthCheckQuestions.some(
             q => q.id.startsWith(`follow_up_${state.currentQuestionIndex}_`)
         );
-        return !alreadyHasFollowUp && state.currentQuestionFollowUpCount < 1;
+        return !alreadyHasFollowUp;
     }
 
     private detectFollowUpTrigger(slot: string, value: string, signals: AnswerSignals): string | null {
@@ -180,11 +209,17 @@ export class DecisionEngine {
 
         if (slot === 'wellbeing_score' || slot === 'sleep_score') {
             const n = parseInt(value, 10);
-            if (!isNaN(n) && n <= 4) return `low ${slot.replace('_', ' ')} (${n}/10)`;
+            if (!isNaN(n) && n <= 5) return `low ${slot.replace('_score', '').replace('_', ' ')} score (${n}/10)`;
         }
 
-        if (slot === 'condition_status' && NEGATIVE_CONDITION_TERMS.test(value)) {
-            return 'negative condition indicators reported';
+        if (slot === 'condition_status') {
+            if (NEGATIVE_CONDITION_TERMS.test(value)) return 'negative condition indicators reported';
+            if (!POSITIVE_CONDITION_TERMS.test(value)) return 'condition status may need more detail';
+        }
+
+        if (slot === 'physical_symptoms') {
+            const noSymptoms = /\b(none|nothing|no symptoms?|all good|feeling fine|feeling good|nothing to report)\b/i;
+            if (!noSymptoms.test(value)) return 'physical symptoms reported';
         }
 
         if (slot === 'medication_adherence' && value === 'no') {
@@ -238,6 +273,60 @@ export class DecisionEngine {
                 healthCheckQuestions: newQuestions,
                 currentQuestionFollowUpCount: state.currentQuestionFollowUpCount + 1
             }
+        };
+    }
+
+    private buildWrapUpResult(
+        state: HealthCheckStateType,
+        extraction: ExtractionResult,
+        extractedSlots: Record<string, string | number | boolean | null>,
+        reason: string,
+        incrementCount: boolean = true
+    ): DecisionResult {
+        console.log(`[DecisionEngine] wrap_up → ${reason}`);
+        return {
+            decision: {
+                action: 'wrap_up',
+                extractedSlots,
+                confidence: extraction.confidence,
+                reasoning: reason
+            },
+            stateUpdates: {
+                currentQuestionFollowUpCount: incrementCount
+                    ? state.currentQuestionFollowUpCount + 1
+                    : state.currentQuestionFollowUpCount,
+            },
+        };
+    }
+
+    private async handleWrapUpResponse(state: HealthCheckStateType, interpretation: InterpretationResult): Promise<DecisionResult> {
+        const { intent, signals } = interpretation;
+        const currentQuestion = state.healthCheckQuestions[state.currentQuestionIndex];
+        const proposedSlots = state.currentDecision?.extractedSlots ?? {};
+        const proposedValue = String(Object.values(proposedSlots)[0] ?? '');
+
+        const isDone = intent === 'REFUSING' || intent === 'CONFIRMING' || intent === 'ASKING' ||
+            (intent === 'ANSWERING' && signals.engagement === 'low');
+
+        if (!isDone && intent === 'ANSWERING' && currentQuestion) {
+            const followupText = await this.generateFollowUpText(currentQuestion, state.rawAnswer, 'user continued sharing after wrap-up');
+            if (followupText) {
+                const recordedState = this.recordAnswer(state, proposedValue, true, 'rule-based', 1.0);
+                const followUpData = this.buildFollowUpQuestion(currentQuestion, followupText, state.currentQuestionIndex);
+                const newQuestions = [...state.healthCheckQuestions];
+                newQuestions.splice(recordedState.currentQuestionIndex, 0, followUpData);
+                console.log('[DecisionEngine] wrap_up → user has more to say, generating follow-up');
+                return {
+                    decision: { action: 'followup', extractedSlots: proposedSlots, confidence: 1.0, followupQuestion: followupText, reasoning: 'User continued sharing after wrap-up' },
+                    stateUpdates: { ...recordedState, healthCheckQuestions: newQuestions, currentQuestionFollowUpCount: state.currentQuestionFollowUpCount + 1 },
+                };
+            }
+        }
+
+        console.log('[DecisionEngine] wrap_up resolved — advancing to next question');
+        return {
+            decision: { action: 'next', extractedSlots: proposedSlots, confidence: 1.0, reasoning: 'User indicated they are done with this topic' },
+            stateUpdates: { ...this.recordAnswer(state, proposedValue, true, 'rule-based', 1.0), currentQuestionFollowUpCount: 0 },
         };
     }
 
@@ -361,5 +450,9 @@ export class DecisionEngine {
             return null;
         }
         return rawValue || null;
+    }
+
+    private lacksExplicitNumber(rawAnswer: string): boolean {
+        return !/\b([1-9]|10)\b/.test(rawAnswer);
     }
 }

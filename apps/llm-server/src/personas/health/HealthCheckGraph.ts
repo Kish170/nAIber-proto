@@ -142,7 +142,7 @@ export class HealthCheckGraph {
 
     private async interpretAnswer(state: HealthCheckStateType) {
         const question = state.healthCheckQuestions[state.currentQuestionIndex];
-        const interpretation = await this.answerInterpreter.interpret(question, state.rawAnswer);
+        const interpretation = await this.answerInterpreter.interpret(question, state.rawAnswer, state.response);
         return { lastInterpretation: interpretation };
     }
 
