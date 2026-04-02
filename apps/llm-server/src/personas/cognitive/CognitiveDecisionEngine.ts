@@ -1,16 +1,18 @@
 import { CognitiveTaskType, TASK_SEQUENCE } from "./tasks/TaskDefinitions.js";
+import { hasCompletionSignal } from "./tasks/TaskValidation.js";
 import type { TaskDefinition, TaskResponse, RetrievalLevel, WellbeingResponse } from "./tasks/TaskDefinitions.js";
 import { getDigitSet } from "./tasks/ContentRotation.js";
 import type { CognitiveStateType } from "./CognitiveState.js";
 import type { CognitiveInterpretationResult, TaskEvaluationResult } from "./CognitiveAnswerInterpreter.js";
 
-export type CognitiveAction = 'advance' | 'stay' | 'skip' | 'defer' | 'clarify';
+export type CognitiveAction = 'advance' | 'stay' | 'skip' | 'defer' | 'clarify' | 'continue';
 
 const MAX_CLARIFY_ATTEMPTS = 2;
 
 export interface CognitiveDecision {
     action: CognitiveAction;
     reasoning: string;
+    shouldAccumulateAnswer?: boolean;
 }
 
 export interface CognitiveDecisionResult {
@@ -243,11 +245,22 @@ export class CognitiveDecisionEngine {
     }
 
     private decideSerial7s(state: CognitiveStateType, task: TaskDefinition, eval_: TaskEvaluationResult): CognitiveDecisionResult {
+        const { completionSignalPresent } = eval_.metadata as { completionSignalPresent: boolean };
+        const score = eval_.rawScore as number;
+
+        if (!completionSignalPresent && score < 2) {
+            console.log('[Cognitive:decide] Serial7s partial answer (score=%d) — waiting for completion signal', score);
+            return {
+                decision: { action: 'continue', reasoning: 'Partial Serial 7s answer — waiting for completion signal', shouldAccumulateAnswer: true },
+                stateUpdates: {},
+            };
+        }
+
         const taskResponse: TaskResponse = {
             taskType: CognitiveTaskType.SERIAL_7S,
             domain: task.domain,
             rawAnswer: state.rawAnswer,
-            rawScore: eval_.rawScore as number,
+            rawScore: score,
             maxScore: 5,
             latencyMs: this.latency(state),
         };
@@ -255,11 +268,22 @@ export class CognitiveDecisionEngine {
     }
 
     private decideLetterFluency(state: CognitiveStateType, task: TaskDefinition, eval_: TaskEvaluationResult): CognitiveDecisionResult {
+        const { completionSignalPresent } = eval_.metadata as { completionSignalPresent: boolean };
+        const score = eval_.rawScore as number;
+
+        if (!completionSignalPresent && score < 5) {
+            console.log('[Cognitive:decide] LetterFluency partial answer (score=%d) — waiting for completion signal', score);
+            return {
+                decision: { action: 'continue', reasoning: 'Partial fluency answer — waiting for completion signal', shouldAccumulateAnswer: true },
+                stateUpdates: {},
+            };
+        }
+
         const taskResponse: TaskResponse = {
             taskType: CognitiveTaskType.LETTER_FLUENCY,
             domain: task.domain,
             rawAnswer: state.rawAnswer,
-            rawScore: eval_.rawScore as number,
+            rawScore: score,
             maxScore: null,
             latencyMs: this.latency(state),
             perseverationSignals: eval_.metadata.perseverationSignals as any,

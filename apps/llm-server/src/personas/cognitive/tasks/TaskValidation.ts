@@ -108,11 +108,18 @@ export function validateDigitSpan(rawAnswer: string, targetSequence: number[], i
     return nlpNumbers.every((digit: number, i: number) => digit === expected[i]);
 }
 
+const COMPLETION_SIGNAL = /\b(done|finished|that'?s all|stop|can'?t think|no more|that'?s it|i'?m done|nothing else|that'?s everything)\b/i;
+
+export function hasCompletionSignal(rawAnswer: string): boolean {
+    return COMPLETION_SIGNAL.test(rawAnswer);
+}
+
 export interface Serial7sResult {
     score: number;
     maxScore: 5;
     responses: number[];
     correctFlags: boolean[];
+    completionSignalPresent: boolean;
 }
 
 export function validateSerial7s(rawAnswer: string): Serial7sResult {
@@ -147,7 +154,7 @@ export function validateSerial7s(rawAnswer: string): Serial7sResult {
     }
 
     const score = correctFlags.filter(Boolean).length;
-    return { score, maxScore: 5, responses: numbers.slice(0, 5), correctFlags };
+    return { score, maxScore: 5, responses: numbers.slice(0, 5), correctFlags, completionSignalPresent: hasCompletionSignal(rawAnswer) };
 }
 
 export interface WorldBackwardResult {
@@ -218,6 +225,7 @@ export interface FluencyResult {
     properNouns: string[];
     totalProduced: number;
     perseverationSignals: PerseverationSignals;
+    completionSignalPresent: boolean;
 }
 
 export function validateLetterFluency(rawAnswer: string, letter: string): FluencyResult {
@@ -292,6 +300,7 @@ export function validateLetterFluency(rawAnswer: string, letter: string): Fluenc
         properNouns,
         totalProduced: allWords.length,
         perseverationSignals,
+        completionSignalPresent: hasCompletionSignal(rawAnswer),
     };
 }
 

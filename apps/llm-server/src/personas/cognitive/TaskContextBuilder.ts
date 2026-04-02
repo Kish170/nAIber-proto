@@ -16,6 +16,10 @@ export class TaskContextBuilder {
             return this.buildClarification(state, taskDef);
         }
 
+        if (state.currentDecision?.action === 'continue') {
+            return this.buildContinuation(state, taskDef);
+        }
+
         switch (taskDef.taskType) {
             case CognitiveTaskType.WELLBEING:          return this.buildWellbeing(state, taskDef.prompt ?? '');
             case CognitiveTaskType.ORIENTATION:        return this.buildOrientation(state, taskDef.prompt ?? '');
@@ -115,14 +119,16 @@ export class TaskContextBuilder {
         return this.baseContext(state) +
                `## CURRENT TASK: Serial 7s\n` +
                `This is a NEW task — we are done with digit sequences.\n` +
-               `Briefly acknowledge their effort on the previous task, then say: "${prompt}"`;
+               `Briefly acknowledge their effort on the previous task, then say: "${prompt}"\n` +
+               `Tell them: "I only need 5 answers from you — just say 'done' when you've finished."`;
     }
 
     private buildLetterFluency(state: CognitiveStateType, prompt: string): string {
         return this.baseContext(state) +
                `## CURRENT TASK: Letter Fluency\n` +
                `This is a NEW task — we are done with the previous task.\n` +
-               `Acknowledge their previous answer, then say: "${prompt} The letter is ${state.selectedLetter}. Ready? Go ahead."`;
+               `Acknowledge their previous answer, then say: "${prompt} The letter is ${state.selectedLetter}."\n` +
+               `Tell them: "You have about 60 seconds — just say 'stop' when you're done. Ready? Go ahead."`;
     }
 
     private buildAbstraction(state: CognitiveStateType, prompt: string): string {
@@ -151,7 +157,9 @@ export class TaskContextBuilder {
                 return this.baseContext(state) +
                        `## CURRENT TASK: Delayed Recall (Free)\n` +
                        `This is a NEW task — we are done with similarities.\n` +
-                       `Say: "Almost done. ${prompt} Take as much time as you need."`;
+                       `Say: "Almost done. ${prompt}"\n` +
+                       `Then say: "Take your time — when you've recalled everything you can, just say 'that's all I can remember'."`;
+
 
             case 'cued': {
                 const wordList = getWordList(state.sessionIndex);
@@ -176,6 +184,31 @@ export class TaskContextBuilder {
 
             default:
                 return this.baseContext(state) + `Say: "${prompt}"`;
+        }
+    }
+
+    private buildContinuation(state: CognitiveStateType, taskDef: TaskDefinition): string {
+        switch (taskDef.taskType) {
+            case CognitiveTaskType.SERIAL_7S:
+                return `You are nAIber conducting a brief mind exercise.\n` +
+                       `The user is mid-way through the number subtraction task. They haven't finished yet.\n` +
+                       `Say ONLY: "Keep going — take your time with the numbers."\n` +
+                       `Do NOT repeat the task instruction. Do NOT say anything else.`;
+
+            case CognitiveTaskType.LETTER_FLUENCY:
+                return `You are nAIber conducting a brief mind exercise.\n` +
+                       `The user is mid-way through the word fluency task. They haven't said 'stop' yet.\n` +
+                       `Say ONLY: "Keep going — any more words starting with ${state.selectedLetter}?"\n` +
+                       `Do NOT repeat the task instruction. Do NOT say anything else.`;
+
+            case CognitiveTaskType.DELAYED_RECALL:
+                return `You are nAIber conducting a brief mind exercise.\n` +
+                       `The user is recalling words from earlier. They haven't finished yet.\n` +
+                       `Say ONLY: "Take your time — anything else you can remember?"\n` +
+                       `Do NOT hint at or reveal any of the words. Do NOT say anything else.`;
+
+            default:
+                return `You are nAIber. Say ONLY: "Go ahead whenever you're ready." Do NOT say anything else.`;
         }
     }
 

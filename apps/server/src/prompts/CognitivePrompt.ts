@@ -133,7 +133,7 @@ export class CognitivePrompt extends SystemPrompt {
         - Do NOT affirm, prompt, or acknowledge individual words
         - Only if they go silent for more than 10 seconds, say ONCE:
           "Take your time — anything that starts with [letter]."
-        - After approximately 60 seconds, say: "That was great."
+        - After approximately 60 seconds, OR when the user says 'stop' or 'done', say: "That was great."
     `.trim();
 
     protected readonly vigilanceBehavior = `
