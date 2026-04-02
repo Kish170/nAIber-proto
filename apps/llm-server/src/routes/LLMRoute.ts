@@ -34,7 +34,7 @@ async function scheduleCallEnd(conversationId: string): Promise<void> {
 
             const result = await twilioClient.endCall(callSid);
             if (result.success) {
-                console.log('[LLM Route] Health check call ended via Twilio');
+                console.log('[LLM Route] Call ended via Twilio for conversation:', conversationId);
             } else {
                 console.error('[LLM Route] Failed to end call:', result.error);
             }
@@ -213,7 +213,7 @@ export function LLMRouter(checkpointer: BaseCheckpointSaver): Router {
                 }
             }
 
-            if (!result.response || typeof result.response !== 'string') {
+            if (result.response === undefined || result.response === null || typeof result.response !== 'string') {
                 console.error('[LLM Route] Invalid response from ConversationGraph:', result);
                 res.status(500).json({
                     error: {
