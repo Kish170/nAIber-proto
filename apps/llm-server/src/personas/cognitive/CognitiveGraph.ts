@@ -73,7 +73,17 @@ export class CognitiveGraph {
         const tasks = state.tasks?.length > 0 ? state.tasks : TASK_SEQUENCE;
         const task = tasks[state.currentTaskIndex];
         const userAnswer = interrupt({ taskIndex: state.currentTaskIndex, taskType: task?.taskType, response: state.response });
-        return { rawAnswer: String(userAnswer) };
+
+        const raw = String(userAnswer);
+        const shouldAccumulate = state.currentDecision?.shouldAccumulateAnswer === true;
+        const combined = shouldAccumulate && state.accumulatedAnswer
+            ? (state.accumulatedAnswer + ' ' + raw).trim()
+            : raw;
+
+        return {
+            rawAnswer: combined,
+            accumulatedAnswer: shouldAccumulate ? combined : '',
+        };
     }
 
     private async interpretAnswer(state: CognitiveStateType) {

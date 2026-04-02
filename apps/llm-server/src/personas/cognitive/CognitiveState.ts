@@ -24,6 +24,7 @@ export const CognitiveState = Annotation.Root({
     }),
     response: Annotation<string>(keep<string>("")),
     rawAnswer: Annotation<string>(keep<string>("")),
+    accumulatedAnswer: Annotation<string>(keep<string>("")),
 
     currentTaskIndex: Annotation<number>(keep<number>(0)),
 
