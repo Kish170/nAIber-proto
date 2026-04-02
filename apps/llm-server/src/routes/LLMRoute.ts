@@ -80,8 +80,7 @@ export function LLMRouter(checkpointer: BaseCheckpointSaver): Router {
         kgRetrievalService
     );
 
-    // Debug: track request patterns per conversation to diagnose double-response
-    const requestTracker = new Map<string, { count: number; lastTimestamp: number }>();
+    const requestTracker = new Map<string, { count: number; lastTimestamp: number; lastResponse?: string; lastMessageCount?: number }>();
     setInterval(() => {
         const now = Date.now();
         for (const [key, val] of requestTracker) {
@@ -162,6 +161,30 @@ export function LLMRouter(checkpointer: BaseCheckpointSaver): Router {
                 return;
             }
 
+            const dedupTracker = requestTracker.get(conversation.conversationId);
+            if (
+                dedupTracker?.lastResponse &&
+                dedupTracker.lastMessageCount === request.messages.length &&
+                Date.now() - dedupTracker.lastTimestamp < 500
+            ) {
+                console.warn('[LLM Route] Duplicate request detected — returning cached response for:', conversation.conversationId);
+                const cachedResult = { response: dedupTracker.lastResponse, isHealthCheckComplete: false, isCognitiveComplete: false };
+                if (request.stream === true) {
+                    const completionId = `chatcmpl-${Date.now()}`;
+                    const created = Math.floor(Date.now() / 1000);
+                    res.setHeader('Content-Type', 'text/event-stream');
+                    res.setHeader('Cache-Control', 'no-cache');
+                    res.setHeader('Connection', 'keep-alive');
+                    res.write(`data: ${JSON.stringify({ id: completionId, object: 'chat.completion.chunk', created, model: request.model, choices: [{ index: 0, delta: { content: cachedResult.response }, finish_reason: null }] })}\n\n`);
+                    res.write(`data: ${JSON.stringify({ id: completionId, object: 'chat.completion.chunk', created, model: request.model, choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] })}\n\n`);
+                    res.write('data: [DONE]\n\n');
+                    res.end();
+                } else {
+                    res.status(200).json({ id: `chatcmpl-${Date.now()}`, object: 'chat.completion', created: Math.floor(Date.now() / 1000), model: request.model, choices: [{ index: 0, message: { role: 'assistant', content: cachedResult.response }, finish_reason: 'stop' }] });
+                }
+                return;
+            }
+
             const langchainMessages = request.messages.map(msg => {
                 const content = typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content);
                 if (msg.role === 'system') return new SystemMessage(content);
@@ -181,6 +204,14 @@ export function LLMRouter(checkpointer: BaseCheckpointSaver): Router {
                 responseLength: result.response?.length,
                 responsePreview: result.response?.substring(0, 100)
             });
+
+            if (conversation) {
+                const tracker = requestTracker.get(conversation.conversationId);
+                if (tracker) {
+                    tracker.lastResponse = result.response;
+                    tracker.lastMessageCount = request.messages.length;
+                }
+            }
 
             if (!result.response || typeof result.response !== 'string') {
                 console.error('[LLM Route] Invalid response from ConversationGraph:', result);
