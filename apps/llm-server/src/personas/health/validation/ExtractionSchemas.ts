@@ -49,9 +49,20 @@ export const GeneralNotesSchema = z.object({
     no_additional_notes: z.boolean().describe('True if the user had nothing further to add'),
 });
 
+export const FollowUpEvaluationSchema = z.object({
+    should_follow_up: z.boolean().describe(
+        'True if the answer warrants a brief neutral follow-up question to capture more useful health detail'
+    ),
+    follow_up_question: z.string().nullable().describe(
+        'An example of the type of follow-up question to ask but support it with the context of the previous answer, or null if should_follow_up is false'
+    ),
+    reason: z.string().describe('One-line reason for this decision — used for logging only'),
+});
+
 export type ScaleExtractionResult = z.infer<typeof ScaleExtractionSchema>;
 export type BooleanExtractionResult = z.infer<typeof BooleanExtractionSchema>;
 export type IntentResult = z.infer<typeof IntentSchema>;
 export type ConditionNormalisationResult = z.infer<typeof ConditionNormalisationSchema>;
 export type SymptomNormalisationResult = z.infer<typeof SymptomNormalisationSchema>;
 export type GeneralNotesResult = z.infer<typeof GeneralNotesSchema>;
+export type FollowUpEvaluationResult = z.infer<typeof FollowUpEvaluationSchema>;

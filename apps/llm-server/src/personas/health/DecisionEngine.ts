@@ -1,5 +1,3 @@
-import { ChatOpenAI } from "@langchain/openai";
-import { SystemMessage } from "@langchain/core/messages";
 import {
     HealthCheckStateType,
     HealthCheckAnswer,
@@ -7,11 +5,9 @@ import {
     AgentDecision
 } from "./HealthCheckState.js";
 import { QuestionData } from "./questions/index.js";
-import type { AnswerSignals } from "./validation/SignalDetector.js";
 import type { ExtractionResult } from "./validation/AnswerExtractor.js";
+import type { AnswerSignals } from "./validation/SignalDetector.js";
 
-const NEGATIVE_CONDITION_TERMS = /\b(worse|worsening|pain|painful|bad|terrible|difficult|struggle|struggling|hard|concerning|deteriorating|flaring|elevated|higher|increased|going up|gone up|not great|not good|off)\b/i;
-const POSITIVE_CONDITION_TERMS = /\b(fine|good|great|stable|normal|okay|ok|better|same as usual|no change|unchanged|under control|managed)\b/i;
 const AFFIRMATIVE_CONFIRM = /\b(yes|yeah|yep|correct|right|exactly|that's right|uh-huh|sure)\b/i;
 
 export interface DecisionResult {
@@ -20,17 +16,12 @@ export interface DecisionResult {
 }
 
 export class DecisionEngine {
-    private llm: ChatOpenAI;
-
-    constructor(chatModel: ChatOpenAI) {
-        this.llm = chatModel;
-    }
 
     async evaluate(state: HealthCheckStateType, interpretation: InterpretationResult): Promise<DecisionResult> {
         const currentQuestion = state.healthCheckQuestions[state.currentQuestionIndex];
         if (!currentQuestion) return this.skip(state, 'No current question');
 
-        const { intent, intentTier, extraction, signals } = interpretation;
+        const { intent, intentTier, extraction, signals, followUp } = interpretation;
 
         if (state.currentDecision?.action === 'wrap_up') {
             return this.handleWrapUpResponse(state, interpretation);
@@ -55,16 +46,16 @@ export class DecisionEngine {
         const extractedSlots = { [slot]: this.parseSlotValue(slot, extraction.value) };
 
         if (this.isConfirmationResponse(state, extraction)) {
-            return this.handleConfirmationResponse(state, currentQuestion);
+            return this.handleConfirmationResponse(state, currentQuestion, interpretation);
         }
-
         if (
             currentQuestion.type === 'scale' &&
             state.currentDecision?.action !== 'confirm' &&
+            extraction.method !== 'rule-based' &&
             this.lacksExplicitNumber(state.rawAnswer) &&
             state.questionAttempts < 2
         ) {
-            console.log('[DecisionEngine] Scale question — no explicit number → retry');
+            console.log('[DecisionEngine] Scale question — no explicit number, LLM-extracted only → retry');
             return {
                 decision: { action: 'retry', extractedSlots: {}, confidence: 0, reasoning: 'Scale question — patient did not give an explicit number' },
                 stateUpdates: { questionAttempts: state.questionAttempts + 1, pendingClarification: false }
@@ -75,7 +66,7 @@ export class DecisionEngine {
             return this.handleLowConfidence(state, extraction, extractedSlots);
         }
 
-        return this.handleSuccessfulExtraction(state, currentQuestion, extraction, extractedSlots, signals);
+        return this.handleSuccessfulExtraction(state, currentQuestion, extraction, extractedSlots, followUp ?? null);
     }
 
     private handleRefusing(state: HealthCheckStateType, intentTier: number): DecisionResult {
@@ -119,7 +110,11 @@ export class DecisionEngine {
         return this.skip(state, 'Could not extract a valid answer after 2 retries');
     }
 
-    private async handleConfirmationResponse(state: HealthCheckStateType, currentQuestion: QuestionData): Promise<DecisionResult> {
+    private async handleConfirmationResponse(
+        state: HealthCheckStateType,
+        currentQuestion: QuestionData,
+        interpretation: InterpretationResult
+    ): Promise<DecisionResult> {
         const proposedSlots = state.currentDecision!.extractedSlots;
         const proposedValue = String(Object.values(proposedSlots)[0] ?? '');
         console.log('[DecisionEngine] confirmed proposed value');
@@ -129,8 +124,7 @@ export class DecisionEngine {
             confidence: 1.0,
             method: 'rule-based',
         };
-        const signals = state.lastInterpretation?.signals ?? { uncertain: false, partial: false, correction: false, offTopic: false, sentiment: 'neutral', engagement: 'high' };
-        return this.handleSuccessfulExtraction(state, currentQuestion, confirmedExtraction, proposedSlots, signals);
+        return this.handleSuccessfulExtraction(state, currentQuestion, confirmedExtraction, proposedSlots, interpretation.followUp ?? null);
     }
 
     private handleLowConfidence(
@@ -155,28 +149,28 @@ export class DecisionEngine {
         };
     }
 
-    private async handleSuccessfulExtraction(
+    private handleSuccessfulExtraction(
         state: HealthCheckStateType,
         currentQuestion: QuestionData,
         extraction: ExtractionResult,
         extractedSlots: Record<string, string | number | boolean | null>,
-        signals: AnswerSignals
-    ): Promise<DecisionResult> {
+        followUp: InterpretationResult['followUp'] | null
+    ): DecisionResult {
         const isFollowUpQuestion = currentQuestion.id.startsWith('follow_up_');
         const canFollowUp = this.canFollowUp(state, isFollowUpQuestion);
 
-        if (canFollowUp) {
-            const followupReason = this.detectFollowUpTrigger(currentQuestion.slot ?? currentQuestion.category, extraction.value, signals);
-            if (followupReason) {
-                if (state.currentQuestionFollowUpCount === 0) {
-                    return this.buildFollowUpResult(state, currentQuestion, extraction, extractedSlots, followupReason);
-                } else {
-                    return this.buildWrapUpResult(state, extraction, extractedSlots, followupReason, true);
-                }
+        if (canFollowUp && followUp) {
+            if (state.currentQuestionFollowUpCount === 0) {
+                return this.buildFollowUpResult(state, currentQuestion, extraction, extractedSlots, followUp.question, followUp.reason);
+            } else {
+                return this.buildWrapUpResult(state, extraction, extractedSlots, followUp.reason, true);
             }
         }
 
-        if (!isFollowUpQuestion && currentQuestion.type !== 'boolean') {
+        // Boolean questions advance directly — a yes/no doesn't need "anything to add?".
+        // All other questions (including follow-up text questions) go through a brief wrap-up
+        // beat, giving the patient a natural moment to add more before moving to the next topic.
+        if (currentQuestion.type !== 'boolean') {
             return this.buildWrapUpResult(state, extraction, extractedSlots, 'transition check', false);
         }
 
@@ -203,58 +197,16 @@ export class DecisionEngine {
         return !alreadyHasFollowUp;
     }
 
-    private detectFollowUpTrigger(slot: string, value: string, signals: AnswerSignals): string | null {
-        if (signals.uncertain) return 'uncertain signal detected';
-        if (signals.partial)   return 'partial answer detected';
-
-        if (slot === 'wellbeing_score' || slot === 'sleep_score') {
-            const n = parseInt(value, 10);
-            if (!isNaN(n) && n <= 5) return `low ${slot.replace('_score', '').replace('_', ' ')} score (${n}/10)`;
-        }
-
-        if (slot === 'condition_status') {
-            if (NEGATIVE_CONDITION_TERMS.test(value)) return 'negative condition indicators reported';
-            if (!POSITIVE_CONDITION_TERMS.test(value)) return 'condition status may need more detail';
-        }
-
-        if (slot === 'physical_symptoms') {
-            const noSymptoms = /\b(none|nothing|no symptoms?|all good|feeling fine|feeling good|nothing to report)\b/i;
-            if (!noSymptoms.test(value)) return 'physical symptoms reported';
-        }
-
-        if (slot === 'medication_adherence' && value === 'no') {
-            return 'medication not taken today';
-        }
-
-        return null;
-    }
-
-    private async buildFollowUpResult(
+    private buildFollowUpResult(
         state: HealthCheckStateType,
         currentQuestion: QuestionData,
         extraction: ExtractionResult,
         extractedSlots: Record<string, string | number | boolean | null>,
+        followUpText: string,
         reason: string
-    ): Promise<DecisionResult> {
-        const followupText = await this.generateFollowUpText(currentQuestion, extraction.value, reason);
-        if (!followupText) {
-            console.warn('[DecisionEngine] follow-up generation failed — proceeding to next');
-            return {
-                decision: {
-                    action: 'next',
-                    extractedSlots,
-                    confidence: extraction.confidence,
-                    reasoning: `Follow-up generation failed for: ${reason}. Proceeding.`
-                },
-                stateUpdates: {
-                    ...this.recordAnswer(state, extraction.value, true, extraction.method, extraction.confidence),
-                    currentQuestionFollowUpCount: state.currentQuestionFollowUpCount
-                }
-            };
-        }
-
+    ): DecisionResult {
         const recordedState = this.recordAnswer(state, extraction.value, true, extraction.method, extraction.confidence);
-        const followUpData = this.buildFollowUpQuestion(currentQuestion, followupText, state.currentQuestionIndex);
+        const followUpData = this.buildFollowUpQuestion(currentQuestion, followUpText, state.currentQuestionIndex);
 
         const newQuestions = [...state.healthCheckQuestions];
         newQuestions.splice(recordedState.currentQuestionIndex, 0, followUpData);
@@ -265,7 +217,7 @@ export class DecisionEngine {
                 action: 'followup',
                 extractedSlots,
                 confidence: extraction.confidence,
-                followupQuestion: followupText,
+                followupQuestion: followUpText,
                 reasoning: `Follow-up triggered: ${reason}`
             },
             stateUpdates: {
@@ -299,8 +251,8 @@ export class DecisionEngine {
         };
     }
 
-    private async handleWrapUpResponse(state: HealthCheckStateType, interpretation: InterpretationResult): Promise<DecisionResult> {
-        const { intent, signals } = interpretation;
+    private handleWrapUpResponse(state: HealthCheckStateType, interpretation: InterpretationResult): DecisionResult {
+        const { intent, signals, followUp } = interpretation;
         const currentQuestion = state.healthCheckQuestions[state.currentQuestionIndex];
         const proposedSlots = state.currentDecision?.extractedSlots ?? {};
         const proposedValue = String(Object.values(proposedSlots)[0] ?? '');
@@ -308,19 +260,16 @@ export class DecisionEngine {
         const isDone = intent === 'REFUSING' || intent === 'CONFIRMING' || intent === 'ASKING' ||
             (intent === 'ANSWERING' && signals.engagement === 'low');
 
-        if (!isDone && intent === 'ANSWERING' && currentQuestion) {
-            const followupText = await this.generateFollowUpText(currentQuestion, state.rawAnswer, 'user continued sharing after wrap-up');
-            if (followupText) {
-                const recordedState = this.recordAnswer(state, proposedValue, true, 'rule-based', 1.0);
-                const followUpData = this.buildFollowUpQuestion(currentQuestion, followupText, state.currentQuestionIndex);
-                const newQuestions = [...state.healthCheckQuestions];
-                newQuestions.splice(recordedState.currentQuestionIndex, 0, followUpData);
-                console.log('[DecisionEngine] wrap_up → user has more to say, generating follow-up');
-                return {
-                    decision: { action: 'followup', extractedSlots: proposedSlots, confidence: 1.0, followupQuestion: followupText, reasoning: 'User continued sharing after wrap-up' },
-                    stateUpdates: { ...recordedState, healthCheckQuestions: newQuestions, currentQuestionFollowUpCount: state.currentQuestionFollowUpCount + 1 },
-                };
-            }
+        if (!isDone && intent === 'ANSWERING' && currentQuestion && followUp) {
+            const recordedState = this.recordAnswer(state, proposedValue, true, 'rule-based', 1.0);
+            const followUpData = this.buildFollowUpQuestion(currentQuestion, followUp.question, state.currentQuestionIndex);
+            const newQuestions = [...state.healthCheckQuestions];
+            newQuestions.splice(recordedState.currentQuestionIndex, 0, followUpData);
+            console.log('[DecisionEngine] wrap_up → user has more to say, inserting follow-up');
+            return {
+                decision: { action: 'followup', extractedSlots: proposedSlots, confidence: 1.0, followupQuestion: followUp.question, reasoning: followUp.reason },
+                stateUpdates: { ...recordedState, healthCheckQuestions: newQuestions, currentQuestionFollowUpCount: state.currentQuestionFollowUpCount + 1 },
+            };
         }
 
         console.log('[DecisionEngine] wrap_up resolved — advancing to next question');
@@ -328,24 +277,6 @@ export class DecisionEngine {
             decision: { action: 'next', extractedSlots: proposedSlots, confidence: 1.0, reasoning: 'User indicated they are done with this topic' },
             stateUpdates: { ...this.recordAnswer(state, proposedValue, true, 'rule-based', 1.0), currentQuestionFollowUpCount: 0 },
         };
-    }
-
-    private async generateFollowUpText(question: QuestionData, answer: string, reason: string): Promise<string | undefined> {
-        try {
-            const response = await this.llm.invoke([
-                new SystemMessage(
-                    `You are conducting a health check-in with an elderly patient.\n` +
-                    `The question was: "${question.question}"\n` +
-                    `The patient answered: "${answer}"\n` +
-                    `Reason for follow-up: ${reason}\n\n` +
-                    `Generate one brief, empathetic follow-up question to gather more useful health context.\n` +
-                    `Keep it under 20 words. Return ONLY the question text — no explanation, no quotes.`
-                )
-            ]);
-            return String(response.content).trim() || undefined;
-        } catch {
-            return undefined;
-        }
     }
 
     private buildFollowUpQuestion(parent: QuestionData, questionText: string, parentIndex: number): QuestionData {

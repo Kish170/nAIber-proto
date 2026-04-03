@@ -16,11 +16,17 @@ export interface HealthCheckAnswer {
     skipReason?: 'refused' | 'exhausted';
 }
 
+export interface FollowUpEvaluation {
+    question: string;
+    reason: string;
+}
+
 export interface InterpretationResult {
     intent: 'ANSWERING' | 'ASKING' | 'REFUSING' | 'CONFIRMING';
     intentTier: 1 | 2;
     extraction?: ExtractionResult;
     signals: AnswerSignals;
+    followUp?: FollowUpEvaluation;
 }
 
 export interface AgentDecision {

@@ -22,7 +22,7 @@ export class HealthCheckGraph {
         const chatModel = openAIClient.returnChatModel() as ChatOpenAI;
         this.llm = chatModel;
         this.answerInterpreter = new AnswerInterpreter(chatModel);
-        this.decisionEngine = new DecisionEngine(chatModel);
+        this.decisionEngine = new DecisionEngine();
         this.contextBuilder = new QuestionContextBuilder();
         this.initialQuestions = initialQuestions;
 

@@ -144,7 +144,6 @@ export class QuestionContextBuilder {
         return ctx;
     }
 
-    // aint this the same as buildNext in a way or I guess for the first wuestin idk will revisit
     private buildStandardQuestion(question: QuestionData): string {
         let ctx = `## Current Question\n`;
         ctx += `Type: ${question.type}\n`;
@@ -154,7 +153,13 @@ export class QuestionContextBuilder {
             ctx += `Scale range: ${(question as any).min ?? 1}–${(question as any).max ?? 10}\n`;
         }
 
-        ctx += `\nAsk the following question in a warm, conversational way:\n`;
+        if (question.type === 'boolean' || question.category === 'medication') {
+            ctx += `\nAsk EXACTLY the following question. Do not add context about other medications,`;
+            ctx += ` combine it with other questions, or introduce any new health topics:\n`;
+        } else {
+            ctx += `\nAsk the following question in a warm, conversational way:\n`;
+        }
+
         ctx += `"${question.question}"\n`;
         return ctx;
     }

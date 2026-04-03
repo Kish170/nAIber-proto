@@ -2,16 +2,19 @@ import { ChatOpenAI } from "@langchain/openai";
 import { QuestionData } from "./questions/index.js";
 import { IntentClassifier } from "./validation/IntentClassifier.js";
 import { AnswerExtractor } from "./validation/AnswerExtractor.js";
+import { FollowUpEvaluator } from "./validation/FollowUpEvaluator.js";
 import { detectSignals } from "./validation/SignalDetector.js";
 import { InterpretationResult } from "./HealthCheckState.js";
 
 export class AnswerInterpreter {
     private intentClassifier: IntentClassifier;
     private answerExtractor: AnswerExtractor;
+    private followUpEvaluator: FollowUpEvaluator;
 
     constructor(chatModel: ChatOpenAI) {
         this.intentClassifier = new IntentClassifier(chatModel);
         this.answerExtractor = new AnswerExtractor(chatModel);
+        this.followUpEvaluator = new FollowUpEvaluator(chatModel);
     }
 
     async interpret(question: QuestionData | undefined, rawAnswer: string, priorAiResponse?: string): Promise<InterpretationResult> {
@@ -40,6 +43,14 @@ export class AnswerInterpreter {
             value: extraction.value.substring(0, 60)
         });
 
-        return { intent, intentTier: tier, extraction, signals };
+        const isFollowUpQuestion = question.id.startsWith('follow_up_');
+        let followUp: InterpretationResult['followUp'];
+
+        if (!isFollowUpQuestion && extraction.method !== 'not-extractable') {
+            const result = await this.followUpEvaluator.evaluate(question, rawAnswer, extraction.value, signals);
+            if (result) followUp = result;
+        }
+
+        return { intent, intentTier: tier, extraction, signals, ...(followUp ? { followUp } : {}) };
     }
 }

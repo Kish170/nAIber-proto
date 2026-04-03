@@ -28,6 +28,9 @@ End-to-end flow is working. A health check call:
 | Symptom extraction on open-ended final question | Medium | Free-text answers like "knee pain" are stored in `generalNotes` but `hasSymptoms` may remain false. Would need a NER pass on `generalNotes` to populate `physicalSymptoms` correctly. |
 | Duplicate question at high request frequency | Low | Two ElevenLabs requests arriving ~1.5s apart can both hit `evaluate_and_decide` before the checkpoint updates, producing a duplicate question. An idempotency guard in `PostCallWorker` or a debounce in `LLMRoute` would fix this. |
 | Follow-up answers overwriting parent slot | Fixed | `buildFollowUpQuestion` was using `slot: parent.slot`, causing follow-up text answers to overwrite numeric scores. Fixed — follow-ups now use `slot: 'general_notes'`. |
+| Low scale scores not triggering follow-up | Fixed | Word-form numbers ("three") were blocked by the `lacksExplicitNumber` guard even when `AnswerExtractor` had already produced a rule-based match. Guard now skips for rule-based extractions. Follow-up decisions are now made by `FollowUpEvaluator` (LLM-based, in `validation/FollowUpEvaluator.ts`) rather than hardcoded regex thresholds — the LLM understands context and generates the follow-up question in one call. |
+| Generic medication question appearing mid-call | Fixed | `HealthPrompt` "proactively ask about medications" wording was overriding the per-turn instruction, causing the model to generate a combined adherence question. Prompt now states the per-turn instruction is authoritative; `QuestionContextBuilder` enforces verbatim delivery for medication and boolean turns. |
+| Multiple `general_notes` follow-ups overwriting each other | Fixed | `HealthPostCallGraph.parseAnswers` was assigning rather than concatenating for `general_notes` slot. Multiple follow-up answers are now joined with a newline. |
 
 ---
 

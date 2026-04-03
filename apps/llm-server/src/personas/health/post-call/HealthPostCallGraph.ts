@@ -69,7 +69,9 @@ export class HealthPostCallGraph {
                     break;
 
                 case 'general_notes':
-                    wellbeingData.generalNotes = a.answer;
+                    wellbeingData.generalNotes = wellbeingData.generalNotes
+                        ? `${wellbeingData.generalNotes}\n${a.answer}`
+                        : a.answer;
                     break;
 
                 case 'medication_adherence':
