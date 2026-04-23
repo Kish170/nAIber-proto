@@ -2,16 +2,9 @@ import { Router, Request, Response } from 'express';
 import { LLMController } from '../controllers/LLMController.js';
 import type { ChatCompletionRequest } from '@naiber/shared-clients';
 import { RedisClient, OpenAIClient, TwilioClient } from '@naiber/shared-clients';
-import { EmbeddingService } from '@naiber/shared-services';
-import { RedisEmbeddingStore } from '@naiber/shared-data';
 import { BaseCheckpointSaver } from '@langchain/langgraph-checkpoint';
 import { ConversationResolver } from '../services/ConversationResolver.js';
-import { TopicManager } from '../services/TopicManager.js';
-import { MemoryRetriever } from '../services/MemoryRetriever.js';
 import { SupervisorGraph } from '../graphs/SupervisorGraph.js';
-import { VectorStoreClient } from '../clients/VectorStoreClient.js';
-import { GraphQueryRepository } from '../repositories/GraphQueryRepository.js';
-import { KGRetrievalService } from '../services/KGRetrievalService.js';
 import { HumanMessage, AIMessage, SystemMessage } from "@langchain/core/messages";
 
 const END_CALL_DELAY_MS = 10000;
@@ -53,31 +46,12 @@ export function LLMRouter(checkpointer: BaseCheckpointSaver): Router {
         baseUrl: process.env.OPENAI_BASE_URL
     });
 
-    const embeddingModel = openAIClient.returnEmbeddingModel();
-
-    const vectorStore = new VectorStoreClient({
-        baseUrl: process.env.QDRANT_URL!,
-        apiKey: process.env.QDRANT_API_KEY!,
-        collectionName: process.env.QDRANT_COLLECTION!
-    }, embeddingModel);
-
-    const redisEmbeddingStore = new RedisEmbeddingStore(redisClient);
-    const embeddingService = new EmbeddingService(openAIClient, undefined, redisEmbeddingStore);
-    const memoryRetriever = new MemoryRetriever(vectorStore);
-    const topicManager = new TopicManager(redisClient);
     const conversationResolver = new ConversationResolver(redisClient);
-    const graphQueryRepository = new GraphQueryRepository();
-    const kgRetrievalService = new KGRetrievalService(graphQueryRepository);
 
     const supervisorGraph = new SupervisorGraph(
         openAIClient,
-        embeddingService,
-        memoryRetriever,
-        topicManager,
         redisClient,
-        process.env.OPENAI_API_KEY!,
-        checkpointer,
-        kgRetrievalService
+        checkpointer
     );
 
     const requestTracker = new Map<string, { count: number; lastTimestamp: number; lastResponse?: string; lastMessageCount?: number }>();
@@ -198,7 +172,7 @@ export function LLMRouter(checkpointer: BaseCheckpointSaver): Router {
                 conversationId: conversation.conversationId
             });
 
-            console.log('[LLM Route] ConversationGraph result:', {
+            console.log('[LLM Route] SupervisorGraph result:', {
                 hasResponse: !!result.response,
                 responseType: typeof result.response,
                 responseLength: result.response?.length,
@@ -213,8 +187,8 @@ export function LLMRouter(checkpointer: BaseCheckpointSaver): Router {
                 }
             }
 
-            if (result.response === undefined || result.response === null || typeof result.response !== 'string') {
-                console.error('[LLM Route] Invalid response from ConversationGraph:', result);
+            if (!result.response || typeof result.response !== 'string') {
+                console.error('[LLM Route] Invalid response from SupervisorGraph:', result);
                 res.status(500).json({
                     error: {
                         message: 'Failed to generate valid response',

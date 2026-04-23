@@ -54,9 +54,10 @@ export class ElevenLabsClient {
         }
     }
 
-    async getSignedURL(): Promise<string> {
+    async getSignedURL(agentId?: string): Promise<string> {
         try {
-            const response = await this.client.get(`/v1/convai/conversation/get_signed_url?agent_id=${this.configs.agentID}`)
+            const id = agentId ?? this.configs.agentID;
+            const response = await this.client.get(`/v1/convai/conversation/get_signed_url?agent_id=${id}`)
             return response.data.signed_url
         } catch (error) {
             console.error('[ElevenLabsClient] Failed to get signed URL:', error);

@@ -257,18 +257,37 @@ export class WebSocketService {
             }
         }, 30000);
 
+        const agentOverride: Record<string, unknown> = {
+            prompt: {
+                prompt: systemPrompt
+            },
+            first_message: firstMessage,
+            language: 'en',
+            auto_start_conversation: true
+        };
+
+        const customLlmUrl = process.env.ELEVENLABS_CUSTOM_LLM_URL;
+        if (this.callType === 'health_check' || this.callType === 'cognitive') {
+            if (customLlmUrl) {
+                agentOverride.llm = {
+                    type: 'custom_llm',
+                    url: customLlmUrl,
+                    ...(process.env.ELEVENLABS_MODEL_ID
+                        ? { model_id: process.env.ELEVENLABS_MODEL_ID }
+                        : {})
+                };
+            } else {
+                console.warn(
+                    '[WebSocketService] ELEVENLABS_CUSTOM_LLM_URL is unset — health/cognitive may not reach llm-server'
+                );
+            }
+        }
+
         const initMessage = {
             type: 'conversation_initiation_client_data',
             custom_llm_extra_body: { user_id: this.userProfile!.id },
             conversation_config_override: {
-                agent: {
-                    prompt: {
-                        prompt: systemPrompt
-                    },
-                    first_message: firstMessage,
-                    language: 'en',
-                    auto_start_conversation: true
-                },
+                agent: agentOverride,
                 tts: {
                     voice_id: process.env.ELEVENLABS_VOICE_ID
                 },

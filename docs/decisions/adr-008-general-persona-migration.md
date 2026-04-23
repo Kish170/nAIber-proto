@@ -1,6 +1,6 @@
 # ADR-008: Migrate General Persona to ElevenLabs Native LLM with RAG Tool
 
-**Status:** Proposed (post-batch migration)
+**Status:** Accepted (implemented 2026-04-02)
 **Date:** 2026-03-24
 
 ## Context
@@ -13,7 +13,7 @@ Meanwhile, ElevenLabs supports MCP tool use — their built-in LLM can call exte
 
 ## Decision
 
-**Proposed: Split orchestration by persona**
+**Accepted: Split orchestration by persona**
 
 - **General calls** → ElevenLabs native LLM + MCP tool for RAG retrieval
 - **Health check calls** → continue routing to llm-server for deterministic LangGraph flow
@@ -69,7 +69,15 @@ Post-call processing unchanged for all personas:
 - Health: HealthPostCallGraph (checkpoint → persist answers → delete thread)
 - Cognitive: CognitivePostCallGraph (checkpoint → score → persist → delete thread)
 
-Post-call is triggered by ElevenLabs webhook or MCP tool, not by WebSocket close event (since we'd be using the built-in Twilio integration per ADR-005 future plan).
+In the current WebSocket bridge, post-call is still triggered on WebSocket close (unchanged).
+
+## Implementation notes (2026-04-02)
+
+- **`apps/server/src/services/WebSocketService.ts`** — For `health_check` and `cognitive` only, `conversation_config_override.agent.llm` sets `type: "custom_llm"`, `url` from `ELEVENLABS_CUSTOM_LLM_URL`, and optional `model_id` from `ELEVENLABS_MODEL_ID`. General calls omit `llm` so the agent uses ElevenLabs’ built-in model.
+- **`apps/llm-server`** — `SupervisorGraph` no longer compiles `ConversationGraph`; it handles health and cognitive only. If a `general` session incorrectly hits llm-server, `general_misrouted` logs a warning and returns a safe fallback message. `LLMRoute` no longer constructs general inline-RAG dependencies (vector store, `MemoryRetriever`, `TopicManager`, `KGRetrievalService`); live RAG for general is via **mcp-server** (`retrieveMemories`). Post-call (`GeneralPostCallGraph`, embeddings, KG) is unchanged.
+- **`docker-compose.yml`** — `server` service passes `ELEVENLABS_CUSTOM_LLM_URL` (public URL to llm-server OpenAI-compatible endpoint, e.g. ngrok base + path as required by ElevenLabs).
+- **ElevenLabs agent** — Dashboard (or Agents API): native LLM as default; MCP server URL pointing at **mcp-server** `/mcp` for tools such as `getUserProfile` / `retrieveMemories`. Custom LLM URL should match what is sent in the override for health/cognitive.
+- **Topic drift** — Per-turn topic tracking removed with `ConversationGraph`; topic work remains in post-call extraction (per open questions above, we accept this tradeoff for now).
 
 ## MCP RAG Tool Design
 
@@ -148,11 +156,11 @@ ElevenLabs supports multiple LLM providers (GPT-4o, Claude, Gemini). We'd need t
 
 - **ADR-005 (WebSocket Bridge):** This migration would happen alongside the telephony simplification. Built-in Twilio integration + native LLM for general + custom endpoint for health/cognitive.
 - **ADR-001 (LangGraph):** LangGraph remains justified for health/cognitive. This ADR narrows its scope to structured flows only.
-- **ADR-002 (ElevenLabs Routing):** Currently ElevenLabs routes all LLM calls to our endpoint. Post-migration, only health/cognitive calls route to us.
+- **ADR-002 (ElevenLabs Routing):** Health/cognitive calls route to llm-server via per-call `conversation_config_override`; general calls use ElevenLabs native LLM.
 
 ## When to Implement
 
-After all current batches are complete and the prototype is functionally stable. This is a post-batch migration alongside the telephony changes described in ADR-005.
+Shipped 2026-04-02 (see Implementation notes). Telephony simplification in ADR-005 remains a separate future effort.
 
 ## References
 
