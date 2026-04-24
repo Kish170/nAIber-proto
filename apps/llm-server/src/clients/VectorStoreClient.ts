@@ -52,6 +52,23 @@ export class VectorStoreClient {
             entries.map(e => ({ pageContent: e.text, metadata: { ...metadata, qdrantPointId: e.id } })),
             { ids: entries.map(e => e.id) }
         );
+
+        const ids = entries.map(e => e.id);
+        const vs = this.vectorStore as any;
+        const retrieved: { id: string }[] = await vs.client.retrieve(vs.collectionName, {
+            ids,
+            with_payload: false,
+            with_vector: false,
+        });
+        const storedIds = new Set(retrieved.map(p => p.id));
+        const missing = ids.filter(id => !storedIds.has(id));
+        if (missing.length > 0) {
+            throw new Error(
+                `[VectorStoreClient] ${missing.length}/${ids.length} points missing after upsert` +
+                ` — ids: ${missing.join(', ')}`
+            );
+        }
+        console.log(`[VectorStoreClient] addMemoriesWithIds: verified ${ids.length}/${ids.length} points in Qdrant`);
     }
 
     async searchByEmbedding(embedding: number[], userId: string, k: number = 5) {
