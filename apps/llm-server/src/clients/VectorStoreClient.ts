@@ -15,6 +15,7 @@ export interface HighlightEntry {
 
 export class VectorStoreClient {
     private vectorStore: QdrantVectorStore;
+    private payloadIndexEnsured = false;
 
     constructor(config: VectorStoreConfigs, embeddingModel: OpenAIEmbeddings) {
         this.vectorStore = new QdrantVectorStore(embeddingModel, {
@@ -23,8 +24,26 @@ export class VectorStoreClient {
             collectionName: config.collectionName
         });
     }
+    private async ensurePayloadIndex(): Promise<void> {
+        if (this.payloadIndexEnsured) return;
+        const vs = this.vectorStore as any;
+        try {
+            await vs.client.createPayloadIndex(vs.collectionName, {
+                field_name: 'metadata.userId',
+                field_schema: 'keyword',
+                wait: true,
+            });
+            console.log('[VectorStoreClient] payload index on metadata.userId ready');
+        } catch (err: any) {
+            if (!err?.message?.toLowerCase().includes('already exist')) {
+                throw err;
+            }
+        }
+        this.payloadIndexEnsured = true;
+    }
 
     async searchMemories(query: string, userId: string, k: number = 5) {
+        await this.ensurePayloadIndex();
         const retriever = this.vectorStore.asRetriever({
             k,
             filter: { must: [{ key: "metadata.userId", match: { value: userId } }] },
@@ -47,6 +66,7 @@ export class VectorStoreClient {
         entries: HighlightEntry[],
         metadata: { userId: string; conversationId: string; createdAt?: string; summaryId?: string }
     ): Promise<void> {
+        await this.ensurePayloadIndex();
         await this.vectorStore.addVectors(
             entries.map(e => e.embedding),
             entries.map(e => ({ pageContent: e.text, metadata: { ...metadata, qdrantPointId: e.id } })),
@@ -72,6 +92,7 @@ export class VectorStoreClient {
     }
 
     async searchByEmbedding(embedding: number[], userId: string, k: number = 5) {
+        await this.ensurePayloadIndex();
         const results = await this.vectorStore.similaritySearchVectorWithScore(
             embedding,
             k,

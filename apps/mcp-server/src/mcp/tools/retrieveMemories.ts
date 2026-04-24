@@ -54,40 +54,45 @@ export const retrieveMemoriesHandler = traceable(
         const { query, userId } = args;
         const { embeddingService: emb, vectorStoreClient: vs, kgRetrievalService: kg } = getServices();
 
-        const { embedding } = await emb.generateEmbedding(query);
+        try {
+            const { embedding } = await emb.generateEmbedding(query);
 
-        const rawDocs = await vs.searchByEmbedding(embedding, userId, 5);
-        const filteredDocs = rawDocs.filter(d => d.score > SIMILARITY_THRESHOLD);
+            const rawDocs = await vs.searchByEmbedding(embedding, userId, 5);
+            const filteredDocs = rawDocs.filter(d => d.score > SIMILARITY_THRESHOLD);
 
-        console.log(`[retrieveMemories] query="${query}" userId=${userId} rawDocs=${rawDocs.length} filteredDocs=${filteredDocs.length} threshold=${SIMILARITY_THRESHOLD}`);
-        console.log(`[retrieveMemories] raw scores: [${rawDocs.map(d => d.score.toFixed(4)).join(', ')}]`);
+            console.log(`[retrieveMemories] query="${query}" userId=${userId} rawDocs=${rawDocs.length} filteredDocs=${filteredDocs.length} threshold=${SIMILARITY_THRESHOLD}`);
+            console.log(`[retrieveMemories] raw scores: [${rawDocs.map(d => d.score.toFixed(4)).join(', ')}]`);
 
-        const result = await kg.retrieve(userId, embedding, filteredDocs);
+            const result = await kg.retrieve(userId, embedding, filteredDocs);
 
-        const sourceBreakdown = {
-            fromQdrant: result.enrichedMemories.filter(m => m.source === 'qdrant').length,
-            fromKG: result.enrichedMemories.filter(m => m.source === 'kg_discovery').length,
-            fromBoth: result.enrichedMemories.filter(m => m.source === 'both').length,
-        };
+            const sourceBreakdown = {
+                fromQdrant: result.enrichedMemories.filter(m => m.source === 'qdrant').length,
+                fromKG: result.enrichedMemories.filter(m => m.source === 'kg_discovery').length,
+                fromBoth: result.enrichedMemories.filter(m => m.source === 'both').length,
+            };
 
-        console.log(`[retrieveMemories] results=${result.enrichedMemories.length} sources: qdrant=${sourceBreakdown.fromQdrant} kg=${sourceBreakdown.fromKG} both=${sourceBreakdown.fromBoth}`);
+            console.log(`[retrieveMemories] results=${result.enrichedMemories.length} sources: qdrant=${sourceBreakdown.fromQdrant} kg=${sourceBreakdown.fromKG} both=${sourceBreakdown.fromBoth}`);
 
-        return {
-            highlights: result.enrichedMemories.map(m => ({
-                text: m.text,
-                topic: m.topicLabels.join(', '),
-                similarity: m.finalScore,
-                source: m.source,
-            })),
-            relatedTopics: result.relatedTopics.map(t => ({
-                name: t.label,
-                mentionCount: t.coOccurrenceCount,
-            })),
-            persons: result.personsContext.map(p => ({
-                name: p.name,
-                relationship: p.role ?? '',
-            })),
-        };
+            return {
+                highlights: result.enrichedMemories.map(m => ({
+                    text: m.text,
+                    topic: m.topicLabels.join(', '),
+                    similarity: m.finalScore,
+                    source: m.source,
+                })),
+                relatedTopics: result.relatedTopics.map(t => ({
+                    name: t.label,
+                    mentionCount: t.coOccurrenceCount,
+                })),
+                persons: result.personsContext.map(p => ({
+                    name: p.name,
+                    relationship: p.role ?? '',
+                })),
+            };
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            throw new Error(`retrieveMemories failed for query "${query}": ${message}`);
+        }
     },
     {
         name: 'retrieveMemories',

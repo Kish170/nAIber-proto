@@ -11,6 +11,7 @@ export interface VectorStoreConfigs {
 
 export class VectorStoreClient {
     private vectorStore: QdrantVectorStore;
+    private payloadIndexEnsured = false;
 
     constructor(config: VectorStoreConfigs, embeddingModel: OpenAIEmbeddings) {
         this.vectorStore = new QdrantVectorStore(embeddingModel, {
@@ -19,9 +20,28 @@ export class VectorStoreClient {
             collectionName: config.collectionName,
         });
     }
+    private async ensurePayloadIndex(): Promise<void> {
+        if (this.payloadIndexEnsured) return;
+        const vs = this.vectorStore as any;
+        try {
+            await vs.client.createPayloadIndex(vs.collectionName, {
+                field_name: 'metadata.userId',
+                field_schema: 'keyword',
+                wait: true,
+            });
+            console.log('[VectorStoreClient] payload index on metadata.userId ready');
+        } catch (err: any) {
+            if (!err?.message?.toLowerCase().includes('already exist')) {
+                throw err;
+            }
+        }
+        this.payloadIndexEnsured = true;
+    }
 
     searchByEmbedding = traceable(
         async (embedding: number[], userId: string, k: number = 5): Promise<MemoryDocument[]> => {
+            await this.ensurePayloadIndex();
+
             const results = await this.vectorStore.similaritySearchVectorWithScore(
                 embedding,
                 k,
