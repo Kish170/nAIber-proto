@@ -29,6 +29,7 @@ Three call types exist: **general conversation** (companionship), **health check
 |---|---|---|
 | `@naiber/server` | 3000 | Twilio webhooks, ElevenLabs WSS sessions, BullMQ dispatch |
 | `@naiber/llm-server` | 3001 | LangGraph, SupervisorGraph → persona graphs, PostCallWorker |
+| `@naiber/mcp-server` | 3002 | MCP tools for ElevenLabs native LLM (getUserProfile, retrieveMemories) |
 | `@naiber/scheduler-server` | — | Cron call scheduling (scaffold — not yet active) |
 | `@naiber/shared-core` | — | Prisma-derived types, BullMQ queue contracts |
 | `@naiber/shared-clients` | — | OpenAI, Twilio, ElevenLabs, Redis, Prisma, Qdrant clients |
@@ -67,7 +68,7 @@ sequenceDiagram
     SRV->>EL: GET signed WSS URL
     SRV->>EL: WSS connect + inject system prompt + first message
     EL-->>SRV: conversation_initiation_metadata (conversationId)
-    SRV->>Redis: SET session:{conversationId}, rag:user:{userId}, rag:phone:{phone}
+    SRV->>Redis: SET session:{conversationId}, rag:user:{userId}
 
     loop Audio streaming
         TWI-->>SRV: Twilio media (mulaw audio)
@@ -96,24 +97,20 @@ flowchart LR
     EL[ElevenLabs] -->|POST /v1/chat/completions| LLMRoute
 
     subgraph llm-server:3001
-        LLMRoute --> ConvResolver[ConversationResolver]
-        ConvResolver -->|reads rag:user or rag:phone| Redis
-        ConvResolver --> SupervisorGraph
-
+        LLMRoute -->|userId from body.user + conversationId from Redis| SupervisorGraph
         SupervisorGraph -->|reads session:conversationId| Redis
-        SupervisorGraph -->|callType = general| ConvGraph[ConversationGraph]
         SupervisorGraph -->|callType = health_check| HealthGraph[HealthCheckGraph]
 
-        ConvGraph --> IntentClassifier
-        IntentClassifier -->|needs RAG| TopicManager
-        TopicManager --> MemoryRetriever
-        MemoryRetriever -->|vector search| Qdrant[(Qdrant)]
-        MemoryRetriever --> LLMCall[OpenAI GPT-4o]
-
         HealthGraph -->|durable execution| Checkpointer[(Redis Checkpoint)]
-        HealthGraph --> LLMCall2[OpenAI GPT-4o]
+        HealthGraph --> LLMCall[OpenAI GPT-4o]
     end
 
+    subgraph mcp-server:3002
+        MCP[MCP Tools] -->|getUserProfile| Postgres[(Postgres)]
+        MCP -->|retrieveMemories| Qdrant[(Qdrant)]
+    end
+
+    EL -->|tool calls| MCP
     LLMRoute -->|SSE stream| EL
 ```
 
@@ -121,12 +118,11 @@ flowchart LR
 
 `SupervisorGraph` reads `callType` from the Redis session (`session:{conversationId}`) and dispatches accordingly. It does not make an LLM call for routing — the call type is known at session creation time.
 
-### General Call — ConversationGraph
+`LLMRoute` reads `userId` from `body.elevenlabs_extra_body.user_id` and `conversationId` from `body.conversation_id` directly — no Redis lookup needed.
 
-1. **Classify intent** — Skip RAG for short/filler messages (e.g. "yeah", "ok")
-2. **Manage topic state** — Embed the user's message, compare cosine similarity to cached topic centroid to detect topic change
-3. **Retrieve memories** — If topic changed or cache stale: top-5 vector search via Qdrant
-4. **Generate response** — GPT-4o with system prompt + injected memory context
+### General Call — ElevenLabs Native LLM + MCP
+
+General calls are handled by ElevenLabs native LLM. The agent calls `getUserProfile` and `retrieveMemories` tools from `apps/mcp-server` as needed. llm-server is not involved in live general call turns.
 
 ### Health Check — HealthCheckGraph
 
@@ -172,8 +168,7 @@ flowchart TD
 |---|---|---|---|---|
 | `call_type:{callSid}` | 60s | `'general'` \| `'health_check'` | server | Passes call type to WebSocket handler |
 | `session:{conversationId}` | 1h | `{ callSid, userId, phone, streamSid, startedAt, callType }` | server | Active call session |
-| `rag:user:{userId}` | 1h | `conversationId` | server | Maps user → active conversation |
-| `rag:phone:{phone}` | 1h | `conversationId` | server | Maps phone → active conversation (fallback lookup) |
+| `rag:user:{userId}` | 1h | `conversationId` | server | Maps userId → active conversationId (ElevenLabs omits conversationId from custom LLM POST body) |
 | `health_check:{userId}:{conversationId}` | checkpoint-managed | LangGraph state blob | llm-server | Durable health check execution |
 | `rag:topic:{conversationId}` | variable | Topic centroid + highlights cache | llm-server | Avoids redundant vector searches mid-call |
 

@@ -129,7 +129,7 @@ export class KGPopulationService {
             }
 
             for (const topic of topics) {
-                const isDiscussed = state.topicMatchResults.some(m =>
+                const isDiscussed = state.topicMatchResults.some((m: { matchedExisting: boolean; existingTopicId?: string; topic: string }) =>
                     m.matchedExisting ? m.existingTopicId === topic.id : m.topic === topic.topicName
                 );
                 if (!isDiscussed) continue;
@@ -142,8 +142,8 @@ export class KGPopulationService {
                 });
             }
 
-            const discussedTopics = topics.filter(t =>
-                state.topicMatchResults.some(m =>
+            const discussedTopics = topics.filter((t: { id: string; topicName: string }) =>
+                state.topicMatchResults.some((m: { matchedExisting: boolean; existingTopicId?: string; topic: string }) =>
                     m.matchedExisting ? m.existingTopicId === t.id : m.topic === t.topicName
                 )
             );

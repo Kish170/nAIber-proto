@@ -98,13 +98,15 @@ Outstanding implementation work across the codebase.
 - [ ] Update test specs and tests for new architecture
 - [ ] See [ADR-005](../decisions/adr-005-websocket-bridge.md) for full context
 
-## Post-Batch: General Persona Migration (after all batches, before deployment)
-- [ ] Migrate general persona to ElevenLabs native LLM (remove ConversationGraph for general calls)
-- [ ] Expose RAG as MCP tool: `retrieveMemories(query)` → Qdrant + KG enriched results
-- [ ] Route general calls to ElevenLabs native LLM (no `llm.url` override)
-- [ ] Route health/cognitive calls to llm-server via `llm.url` in `conversation_config_override`
-- [ ] Decide on topic tracking approach: post-call only vs `trackTopic` MCP tool
-- [ ] Verify MCP tool call latency is acceptable for conversational flow
-- [ ] Remove ConversationGraph, IntentClassifier, general call path from SupervisorGraph
-- [ ] GeneralPostCallGraph unchanged — still processes transcripts after call
+## Post-Batch: General Persona Migration — COMPLETE
+- [x] ~~Migrate general persona to ElevenLabs native LLM (remove ConversationGraph for general calls)~~
+- [x] ~~Expose RAG as MCP tool: `retrieveMemories(query)` → Qdrant + KG enriched results~~
+- [x] ~~Route general calls to ElevenLabs native LLM (no `llm.url` override)~~
+- [x] ~~Route health/cognitive calls to llm-server via `llm.url` in `conversation_config_override`~~
+- [x] ~~Topic tracking: post-call only (TopicManager deleted; GeneralPostCallGraph unchanged)~~
+- [ ] Verify MCP tool call latency is acceptable for conversational flow (manual QA)
+- [x] ~~Remove ConversationGraph, IntentClassifier, ConversationResolver from llm-server~~
+- [x] ~~GeneralPostCallGraph unchanged — still processes transcripts after call~~
+- [x] ~~Build apps/mcp-server with getUserProfile and retrieveMemories tools~~
+- [ ] ElevenLabs dashboard: configure agent to use native LLM + MCP server URL
 - [ ] See [ADR-008](../decisions/adr-008-general-persona-migration.md) for full context

@@ -7,12 +7,12 @@ export const PostCallState = Annotation.Root({
     transcript: Annotation<string>(),
 
     isFirstCall: Annotation<boolean>({
-        value: (x, y) => y ?? x ?? false,
+        value: (x: boolean, y: boolean) => y ?? x ?? false,
         default: () => false
     }),
 
     summaryId: Annotation<string | null>({
-        value: (x, y) => y ?? x ?? null,
+        value: (x: string | null, y: string | null) => y ?? x ?? null,
         
         default: () => null
     }),
@@ -22,22 +22,30 @@ export const PostCallState = Annotation.Root({
         topicsDiscussed: string[];
         keyHighlights: string[];
     } | null>({
-        value: (x, y) => y ?? x ?? null,
+        value: (x: {
+            summaryText: string;
+            topicsDiscussed: string[];
+            keyHighlights: string[];
+        } | null, y: {
+            summaryText: string;
+            topicsDiscussed: string[];
+            keyHighlights: string[];
+        } | null) => y ?? x ?? null,
         default: () => null
     }),
 
     newTopics: Annotation<string[]>({
-        value: (x, y) => y ?? x ?? [],
+        value: (x: string[], y: string[]) => y ?? x ?? [],
         default: () => []
     }),
 
     existingTopics: Annotation<ReturnedTopic[]>({
-        value: (x, y) => y ?? x ?? [],
+        value: (x: ReturnedTopic[], y: ReturnedTopic[]) => y ?? x ?? [],
         default: () => []
     }),
 
     topicsToCreate: Annotation<string[]>({
-        value: (x, y) => y ?? x ?? [],
+        value: (x: string[], y: string[]) => y ?? x ?? [],
         default: () => []
     }),
 
@@ -48,7 +56,19 @@ export const PostCallState = Annotation.Root({
         existingEmbedding: number[];
         newEmbedding: number[];
     }>>({
-        value: (x, y) => y ?? x ?? [],
+        value: (x: Array<{
+            oldName: string;
+            newName: string;
+            topicId: string;
+            existingEmbedding: number[];
+            newEmbedding: number[];
+        }>, y: Array<{
+            oldName: string;
+            newName: string;
+            topicId: string;
+            existingEmbedding: number[];
+            newEmbedding: number[];
+        }>) => y ?? x ?? [],
         default: () => []
     }),
 
@@ -58,12 +78,22 @@ export const PostCallState = Annotation.Root({
         existingTopicId?: string;
         similarity?: number;
     }>>({
-        value: (x, y) => y ?? x ?? [],
+        value: (x: Array<{
+            topic: string;
+            matchedExisting: boolean;
+            existingTopicId?: string;
+            similarity?: number;
+        }>, y: Array<{
+            topic: string;
+            matchedExisting: boolean;
+            existingTopicId?: string;
+            similarity?: number;
+        }>) => y ?? x ?? [],
         default: () => []
     }),
 
     callType: Annotation<'general' | 'health_check'>({
-        value: (x, y) => y ?? x ?? 'general',
+        value: (x: 'general' | 'health_check', y: 'general' | 'health_check') => y ?? x ?? 'general',
         default: () => 'general'
     }),
 
@@ -72,7 +102,15 @@ export const PostCallState = Annotation.Root({
         qdrantPointId: string;
         embedding: number[];
     }>>({
-        value: (x, y) => y ?? x ?? [],
+        value: (x: Array<{
+            text: string;
+            qdrantPointId: string;
+            embedding: number[];
+        }>, y: Array<{
+            text: string;
+            qdrantPointId: string;
+            embedding: number[];
+        }>) => y ?? x ?? [],
         default: () => []
     }),
 
@@ -83,27 +121,39 @@ export const PostCallState = Annotation.Root({
         context: string;
         highlightIndices: number[];
     }>>({
-        value: (x, y) => y ?? x ?? [],
+        value: (x: Array<{
+            id: string;
+            name: string;
+            role?: string;
+            context: string;
+            highlightIndices: number[];
+        }>, y: Array<{
+            id: string;
+            name: string;
+            role?: string;
+            context: string;
+            highlightIndices: number[];
+        }>) => y ?? x ?? [],
         default: () => []
     }),
 
     callDurationMinutes: Annotation<number | null>({
-        value: (x, y) => y ?? x ?? null,
+        value: (x: number | null, y: number | null) => y ?? x ?? null,
         default: () => null
     }),
 
     callDate: Annotation<string>({
-        value: (x, y) => y ?? x ?? '',
+        value: (x: string, y: string) => y ?? x ?? '',
         default: () => ''
     }),
 
     errors: Annotation<string[]>({
-        reducer: (x, y) => x.concat(y),
+        reducer: (x: string[], y: string[]) => x.concat(y),
         default: () => []
     }),
 
     completed: Annotation<boolean>({
-        value: (x, y) => y ?? x ?? false,
+        value: (x: boolean, y: boolean) => y ?? x ?? false,
         default: () => false
     })
 });

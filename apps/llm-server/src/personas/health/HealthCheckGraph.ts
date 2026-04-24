@@ -94,7 +94,7 @@ export class HealthCheckGraph {
         const { systemPrompt, messageWindowSize } = this.contextBuilder.build(question, state);
         const history = this.contextBuilder.filterMessages(state.messages, messageWindowSize);
 
-        const originalSystem = state.messages.find(m => m instanceof SystemMessage);
+        const originalSystem = state.messages.find((m: unknown) => m instanceof SystemMessage);
         const combined = originalSystem
             ? `${originalSystem.content}\n\n${systemPrompt}`
             : systemPrompt;
@@ -158,13 +158,13 @@ export class HealthCheckGraph {
         console.log('[HealthCheckGraph] Health check complete:', {
             userId: state.userId,
             totalAnswers: state.healthCheckAnswers.length,
-            validAnswers: state.healthCheckAnswers.filter(a => a.isValid).length
+            validAnswers: state.healthCheckAnswers.filter((a: { isValid: boolean }) => a.isValid).length
         });
 
         const lastAnswers = state.healthCheckAnswers
             .slice(-3)
-            .filter(a => a.isValid)
-            .map(a => `Q: ${a.question.question}\nA: ${a.rawAnswer}`)
+            .filter((a: { isValid: boolean }) => a.isValid)
+            .map((a: { question: { question: string }; rawAnswer: string }) => `Q: ${a.question.question}\nA: ${a.rawAnswer}`)
             .join('\n');
 
         const result = await this.llm.invoke([

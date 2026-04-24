@@ -5,7 +5,7 @@ import { TrustedContactRepository } from '@naiber/shared-data';
 export const observationsRouter = router({
     getTrustedContacts: caregiverProcedure
         .input(z.object({ elderlyProfileId: z.string().uuid() }))
-        .query(async ({ input }) => {
+        .query(async ({ input }: { input: any }) => {
             return await TrustedContactRepository.findByElderlyProfileId(input.elderlyProfileId);
         }),
 
@@ -19,7 +19,7 @@ export const observationsRouter = router({
             rawScore: z.number(),
             informantConcernIndex: z.number(),
         }))
-        .mutation(async ({ input }) => {
+        .mutation(async ({ input }: { input: any }) => {
             const submission = await TrustedContactRepository.createSubmission(input);
             await TrustedContactRepository.updateConcernIndex(
                 input.trustedContactId,
@@ -31,13 +31,13 @@ export const observationsRouter = router({
 
     getLatestSubmission: caregiverProcedure
         .input(z.object({ trustedContactId: z.string().uuid() }))
-        .query(async ({ input }) => {
+        .query(async ({ input }: { input: any }) => {
             return await TrustedContactRepository.getLatestSubmission(input.trustedContactId);
         }),
 
     getSubmissionHistory: caregiverProcedure
         .input(z.object({ trustedContactId: z.string().uuid() }))
-        .query(async ({ input }) => {
+        .query(async ({ input }: { input: any }) => {
             return await TrustedContactRepository.getSubmissionHistory(input.trustedContactId);
         }),
 });

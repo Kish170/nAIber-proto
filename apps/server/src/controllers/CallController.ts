@@ -1,5 +1,5 @@
 import { TwilioClient, ElevenLabsConfigs, RedisClient } from '@naiber/shared-clients';
-import { WebSocketServer, WebSocket } from 'ws';
+import { WebSocketServer, WebSocket, RawData } from 'ws';
 import http from 'http';
 import { WebSocketService } from '../services/WebSocketService.js';
 
@@ -65,7 +65,7 @@ export class CallController {
 
                 const webSocketService = new WebSocketService(ws, this.elevenLabsConfigs, 'general', this.twilioClient);
 
-                ws.on("message", async (rawData): Promise<void> => {
+                ws.on("message", async (rawData: RawData): Promise<void> => {
                     const buffer = Buffer.isBuffer(rawData) ? rawData : Buffer.from(rawData.toString());
                     await webSocketService.twilioEventProcessor(buffer);
                 });

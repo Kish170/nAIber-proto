@@ -147,6 +147,8 @@ services:
       LANGCHAIN_API_KEY: ${LANGCHAIN_API_KEY}
       LANGCHAIN_TRACING_V2: ${LANGCHAIN_TRACING_V2}
 
+      MCP_SERVER_URL: http://mcp-server:3002
+
     volumes:
       - ./apps/llm-server/src:/app/apps/llm-server/src
     ports:
@@ -155,6 +157,8 @@ services:
       redis:
         condition: service_healthy
       neo4j:
+        condition: service_healthy
+      mcp-server:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:

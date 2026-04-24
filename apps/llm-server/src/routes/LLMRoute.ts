@@ -3,7 +3,6 @@ import { LLMController } from '../controllers/LLMController.js';
 import type { ChatCompletionRequest } from '@naiber/shared-clients';
 import { RedisClient, OpenAIClient, TwilioClient } from '@naiber/shared-clients';
 import { BaseCheckpointSaver } from '@langchain/langgraph-checkpoint';
-import { ConversationResolver } from '../services/ConversationResolver.js';
 import { SupervisorGraph } from '../graphs/SupervisorGraph.js';
 import { HumanMessage, AIMessage, SystemMessage } from "@langchain/core/messages";
 
@@ -46,8 +45,6 @@ export function LLMRouter(checkpointer: BaseCheckpointSaver): Router {
         baseUrl: process.env.OPENAI_BASE_URL
     });
 
-    const conversationResolver = new ConversationResolver(redisClient);
-
     const supervisorGraph = new SupervisorGraph(
         openAIClient,
         redisClient,
@@ -76,7 +73,6 @@ export function LLMRouter(checkpointer: BaseCheckpointSaver): Router {
                 return;
             }
 
-            // Debug: log request pattern details
             const lastMsg = request.messages[request.messages.length - 1];
             const lastContent = typeof lastMsg?.content === 'string'
                 ? lastMsg.content.substring(0, 80)
@@ -92,18 +88,25 @@ export function LLMRouter(checkpointer: BaseCheckpointSaver): Router {
                 lastContent,
                 timestamp: Date.now()
             });
+            const reqBody = request as any;
+            const userId: string | undefined = reqBody.user ?? reqBody.user_id ?? reqBody.elevenlabs_extra_body?.user_id;
 
-            const conversation = await conversationResolver.resolveConversation(request);
+            let conversationId: string | undefined;
+            if (userId) {
+                conversationId = await redisClient.get(`rag:user:${userId}`) ?? undefined;
+                if (!conversationId) {
+                    console.warn('[LLM Route] No active session found for userId:', userId);
+                }
+            }
 
-            if (conversation) {
-                const key = conversation.conversationId;
-                const tracker = requestTracker.get(key) || { count: 0, lastTimestamp: 0 };
+            if (userId && conversationId) {
+                const tracker = requestTracker.get(conversationId) || { count: 0, lastTimestamp: 0 };
                 const gap = tracker.lastTimestamp ? Date.now() - tracker.lastTimestamp : 0;
                 tracker.count++;
                 tracker.lastTimestamp = Date.now();
-                requestTracker.set(key, tracker);
+                requestTracker.set(conversationId, tracker);
                 console.log('[LLM Route] DEBUG request pattern:', {
-                    conversationId: key,
+                    conversationId,
                     requestNum: tracker.count,
                     msSinceLastRequest: gap,
                     messageCount: request.messages.length,
@@ -111,8 +114,8 @@ export function LLMRouter(checkpointer: BaseCheckpointSaver): Router {
                 });
             }
 
-            if (!conversation) {
-                console.log('[LLM Route] Could not resolve conversation, falling back to LLMController');
+            if (!userId || !conversationId) {
+                console.log('[LLM Route] Could not resolve userId or conversationId, falling back to LLMController');
                 const controller = new LLMController();
 
                 if (request.stream === true) {
@@ -135,13 +138,13 @@ export function LLMRouter(checkpointer: BaseCheckpointSaver): Router {
                 return;
             }
 
-            const dedupTracker = requestTracker.get(conversation.conversationId);
+            const dedupTracker = requestTracker.get(conversationId);
             if (
                 dedupTracker?.lastResponse &&
                 dedupTracker.lastMessageCount === request.messages.length &&
                 Date.now() - dedupTracker.lastTimestamp < 500
             ) {
-                console.warn('[LLM Route] Duplicate request detected — returning cached response for:', conversation.conversationId);
+                console.warn('[LLM Route] Duplicate request detected — returning cached response for:', conversationId);
                 const cachedResult = { response: dedupTracker.lastResponse, isHealthCheckComplete: false, isCognitiveComplete: false };
                 if (request.stream === true) {
                     const completionId = `chatcmpl-${Date.now()}`;
@@ -168,8 +171,8 @@ export function LLMRouter(checkpointer: BaseCheckpointSaver): Router {
 
             const result = await supervisorGraph.graph.invoke({
                 messages: langchainMessages,
-                userId: conversation.userId,
-                conversationId: conversation.conversationId
+                userId,
+                conversationId
             });
 
             console.log('[LLM Route] SupervisorGraph result:', {
@@ -179,12 +182,10 @@ export function LLMRouter(checkpointer: BaseCheckpointSaver): Router {
                 responsePreview: result.response?.substring(0, 100)
             });
 
-            if (conversation) {
-                const tracker = requestTracker.get(conversation.conversationId);
-                if (tracker) {
-                    tracker.lastResponse = result.response;
-                    tracker.lastMessageCount = request.messages.length;
-                }
+            const tracker = requestTracker.get(conversationId);
+            if (tracker) {
+                tracker.lastResponse = result.response;
+                tracker.lastMessageCount = request.messages.length;
             }
 
             if (!result.response || typeof result.response !== 'string') {
@@ -238,7 +239,7 @@ export function LLMRouter(checkpointer: BaseCheckpointSaver): Router {
                 console.log('[LLM Route] SSE stream completed');
 
                 if (result.isHealthCheckComplete || result.isCognitiveComplete) {
-                    scheduleCallEnd(conversation.conversationId);
+                    scheduleCallEnd(conversationId);
                 }
             } else {
                 console.log('[LLM Route] Returning standard JSON format');
@@ -262,7 +263,7 @@ export function LLMRouter(checkpointer: BaseCheckpointSaver): Router {
                 res.status(200).json(completion);
 
                 if (result.isHealthCheckComplete || result.isCognitiveComplete) {
-                    scheduleCallEnd(conversation.conversationId);
+                    scheduleCallEnd(conversationId);
                 }
             }
 

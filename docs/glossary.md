@@ -54,13 +54,13 @@ See **General Call**.
 The ElevenLabs ConvAI concept for a voice interaction session. ElevenLabs assigns a `conversationId` when a session is initiated and sends it to `server` via the `conversation_initiation_metadata` event. This `conversationId` is the primary correlation key across the system — used in Redis session keys, LangGraph thread IDs, BullMQ job data, and database records. See **Critical Disambiguation**.
 
 ### ConversationGraph
-The LangGraph `StateGraph` for general calls. Implements the RAG pipeline: classify intent → manage topic state → retrieve memories → generate response. Skips RAG for non-substantive messages via the **intent classifier**. Lives in `llm-server/src/personas/general/ConversationGraph.ts`. See `docs/arch/llm-server.md`.
+**Deleted (ADR-008).** Was the LangGraph `StateGraph` for general calls (RAG pipeline). General calls now use ElevenLabs native LLM + `apps/mcp-server` MCP tools. Only `GeneralPostCallGraph` (post-call processing) remains in `llm-server`.
 
 ### ConversationId
 ElevenLabs-assigned unique identifier for a voice conversation. Received during the `conversation_initiation_metadata` WebSocket event. Used as the primary correlation key across all services — Redis session keys, LangGraph thread IDs, BullMQ job payloads, and Postgres records all reference this ID.
 
 ### ConversationResolver
-Service in `llm-server` that maps an incoming ElevenLabs `POST /v1/chat/completions` request to a Redis session. Extracts `userId` or `phone` from the request (system message or metadata), then looks up `rag:user:{userId}` or `rag:phone:{phone}` in Redis to find the active `conversationId`. If resolution fails, falls back to the generic `LLMController`. Lives in `llm-server/src/services/ConversationResolver.ts`.
+**Deleted (ADR-008).** Was the service that mapped ElevenLabs requests to Redis sessions via `rag:user:{userId}` lookup. Its logic is now inlined in `LLMRoute`: `userId` is read from `body.user` (ElevenLabs forwards the top-level `user_id` as `user`), and `conversationId` is looked up from `rag:user:{userId}` in Redis. ElevenLabs does not include `conversation_id` in the custom LLM POST body.
 
 ### cosine similarity
 The similarity metric used throughout the RAG pipeline and cognitive signal analysis. Measures the angle between two embedding vectors — a score of 1.0 is identical, 0.0 is orthogonal. Used by `TopicManager` to detect topic shifts (default threshold: 0.45) and by `MemoryRetriever` to score memory relevance against a query. See **topic centroid**.
@@ -93,7 +93,7 @@ The LangGraph `StateGraph` for health check calls. Implements a durable Q&A loop
 The passive cognitive monitoring tier. Runs post-call on every general conversation call as part of `GeneralPostCallGraph`. Extracts linguistic signals (speech rate, lexical diversity, semantic coherence, filler frequency) and acoustic signals (pause distribution, pitch variance) from the call transcript and audio. Deviation scores are computed against the user's **baseline** and stored in Postgres (`cognitive_signals` table). Contrast with **direct assessment**. See `docs/personas/cognitive.md`.
 
 ### Intent Classifier
-A service in `llm-server` (`services/IntentClassifier.ts`) that decides whether a user's message warrants RAG processing. Short, filler, or non-substantive messages ("yeah", "ok", "that's nice") are flagged to skip the RAG path in `ConversationGraph`. Prevents unnecessary vector searches on low-signal turns.
+**Deleted (ADR-008).** Was the service that flagged non-substantive messages to skip RAG in `ConversationGraph`. No longer needed — general calls use ElevenLabs native LLM which decides when to invoke the `retrieveMemories` MCP tool.
 
 ### Interrupt / Resume
 The LangGraph pattern used by `HealthCheckGraph` for durable multi-turn execution. The graph pauses at the `wait_for_answer` node (interrupt), returns the current question to ElevenLabs, and waits. On the next turn, `SupervisorGraph` detects an interrupted thread and resumes it via `Command({ resume: userAnswer })`, passing the user's response back into the graph. See **Durable Execution** and **Command**.
@@ -102,7 +102,7 @@ The LangGraph pattern used by `HealthCheckGraph` for durable multi-turn executio
 A graph-based AI orchestration framework from LangChain. Used in `llm-server` to model persona-specific conversation flows as directed graphs with typed state. Chosen for its native support for **durable execution** (checkpointer + interrupt/resume) and composable node model. Each persona is a `StateGraph`. See `docs/decisions/adr-001-langgraph.md`.
 
 ### Memory Retriever
-Service in `llm-server` (`services/MemoryRetriever.ts`) that performs vector similarity search against Qdrant to retrieve relevant past conversation memories. Called by `ConversationGraph` when a topic shift is detected or the topic cache is stale. Returns top-N memories (default: 5) above the cosine similarity threshold (default: 0.45).
+Performs vector similarity search against Qdrant to retrieve relevant past conversation memories. Previously a service in `llm-server` (`services/MemoryRetriever.ts`); now lives in `apps/mcp-server/src/rag/` as the implementation backing the `retrieveMemories` MCP tool. Called by the ElevenLabs native LLM during general calls.
 
 ### Monorepo
 The project is structured as an npm workspace monorepo. All packages live under `packages/`. Build order is strictly enforced: `shared-core → shared-clients → shared-data → shared-services → server / llm-server`. Run `npm run build` from the repo root.
@@ -174,7 +174,7 @@ A LangGraph checkpoint thread — a uniquely identified sequence of graph state 
 A vector (embedding) representing the current topic of a conversation. Stored in Redis at `rag:topic:{conversationId}`. `TopicManager` computes a new embedding for each user message and compares it to the centroid via cosine similarity. A score below the threshold (default: 0.45) signals a topic shift and triggers a fresh Qdrant memory search.
 
 ### TopicManager
-Service in `llm-server` (`services/TopicManager.ts`) that detects topic changes during general calls. Maintains a running topic centroid and memory highlights cache in Redis. A detected topic shift causes `ConversationGraph` to run a fresh `MemoryRetriever` vector search.
+**Deleted (ADR-008).** Was the service that detected topic shifts during live general calls by comparing message embeddings to a cached centroid. Topic extraction is now post-call only (run in `GeneralPostCallGraph`).
 
 ### Trusted Contact
 A person nominated by a user during cognitive assessment onboarding. They provide qualitative observations about the user's typical communication and alertness patterns, which are stored as part of the user's **baseline**. Also notified when the baseline drift detection determines a revalidation is needed.

@@ -192,7 +192,7 @@ export class DecisionEngine {
     private canFollowUp(state: HealthCheckStateType, isFollowUpQuestion: boolean): boolean {
         if (isFollowUpQuestion) return false;
         const alreadyHasFollowUp = state.healthCheckQuestions.some(
-            q => q.id.startsWith(`follow_up_${state.currentQuestionIndex}_`)
+            (q: QuestionData) => q.id.startsWith(`follow_up_${state.currentQuestionIndex}_`)
         );
         return !alreadyHasFollowUp;
     }

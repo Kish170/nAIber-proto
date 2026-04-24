@@ -108,14 +108,14 @@ function calculateAge(dateOfBirth: string): number | undefined {
 export const onboardingRouter = router({
     submit: caregiverProcedure
         .input(submitSchema)
-        .mutation(async ({ ctx, input }) => {
+        .mutation(async ({ ctx, input }: { ctx: any; input: any }) => {
             const caregiverProfileId = ctx.session.caregiverProfileId!;
 
             const interestsArray = input.interests
-                ? input.interests.split(',').map((s) => s.trim()).filter(Boolean)
+                ? input.interests.split(',').map((s: string) => s.trim()).filter(Boolean)
                 : [];
             const dislikesArray = input.dislikes
-                ? input.dislikes.split(',').map((s) => s.trim()).filter(Boolean)
+                ? input.dislikes.split(',').map((s: string) => s.trim()).filter(Boolean)
                 : [];
 
             const profile = await UserRepository.create(
@@ -135,7 +135,7 @@ export const onboardingRouter = router({
                     enableHealthCheckIns: false,
                     hasWebAccess: input.grantDashboardAccess === 'yes',
                     emergencyContact: input.emergencyContact,
-                    healthConditions: input.conditions?.map((c) => ({ condition: c })),
+                    healthConditions: input.conditions?.map((c: string) => ({ condition: c })),
                     medications: input.medications,
                 },
                 caregiverProfileId

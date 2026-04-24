@@ -188,7 +188,7 @@ export class GeneralPostCallGraph {
                 console.log('[PostCallGraph] First call - all topics will be created as new');
                 return {
                     topicsToCreate: topicsDiscussed,
-                    topicMatchResults: topicsDiscussed.map(topic => ({
+                    topicMatchResults: topicsDiscussed.map((topic: string) => ({
                         topic,
                         matchedExisting: false
                     }))
@@ -300,7 +300,7 @@ export class GeneralPostCallGraph {
                 try {
                     await updateConversationTopic(state.userId, oldName, newName);
 
-                    const avgEmbedding = existingEmbedding.map((v, i) => (v + newEmbedding[i]) / 2);
+                    const avgEmbedding = existingEmbedding.map((v: number, i: number) => (v + newEmbedding[i]) / 2);
                     await ConversationRepository.upsertTopic({
                         elderlyProfileId: state.userId,
                         topicName: newName,
@@ -353,7 +353,7 @@ export class GeneralPostCallGraph {
             };
 
             const highlightEntries = await Promise.all(
-                state.summary.keyHighlights.map(async (text) => {
+                state.summary.keyHighlights.map(async (text: string) => {
                     const { embedding } = await this.embeddingService.generateEmbedding(text);
                     return {
                         text,
@@ -367,7 +367,7 @@ export class GeneralPostCallGraph {
             console.log(`[PostCallGraph] Stored ${highlightEntries.length} highlights in vector database`);
 
             return {
-                highlightEntries: highlightEntries.map(e => ({
+                highlightEntries: highlightEntries.map((e: { text: string; embedding: number[]; id: string }) => ({
                     text: e.text,
                     embedding: e.embedding,
                     qdrantPointId: e.id,

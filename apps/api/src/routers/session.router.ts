@@ -10,7 +10,7 @@ export const sessionRouter = router({
             offset: z.number().min(0).default(0),
             callType: z.enum(['GENERAL', 'HEALTH_CHECK', 'COGNITIVE']).optional(),
         }))
-        .query(async ({ input }) => {
+        .query(async ({ input }: { input: any }) => {
             return await CallLogRepository.findByElderlyProfileId(input.elderlyProfileId, {
                 limit: input.limit,
                 offset: input.offset,
@@ -20,13 +20,13 @@ export const sessionRouter = router({
 
     getCallLogDetail: caregiverProcedure
         .input(z.object({ id: z.string().uuid() }))
-        .query(async ({ input }) => {
+        .query(async ({ input }: { input: any }) => {
             return await CallLogRepository.findById(input.id);
         }),
 
     getCallStats: caregiverProcedure
         .input(z.object({ elderlyProfileId: z.string().uuid() }))
-        .query(async ({ input }) => {
+        .query(async ({ input }: { input: any }) => {
             return await CallLogRepository.getCallStats(input.elderlyProfileId);
         }),
 });

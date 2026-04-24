@@ -28,8 +28,9 @@ COPY apps/mcp-server ./apps/mcp-server
 RUN npm run build --workspace=@naiber/shared-core && \
     npm run build --workspace=@naiber/shared-clients && \
     npm run build --workspace=@naiber/shared-data && \
-    npm run build --workspace=@naiber/shared-services
+    npm run build --workspace=@naiber/shared-services && \
+    npm run build --workspace=@naiber/mcp-server
 
 EXPOSE 3002
 
-CMD ["npx", "tsx", "watch", "apps/mcp-server/src/index.ts"]
+CMD ["node", "apps/mcp-server/dist/index.js"]

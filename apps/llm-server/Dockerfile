@@ -12,7 +12,12 @@ COPY packages/shared-core/package.json ./packages/shared-core/
 COPY packages/shared-clients/package.json ./packages/shared-clients/
 COPY packages/shared-services/package.json ./packages/shared-services/
 COPY packages/shared-data/package.json ./packages/shared-data/
+COPY apps/api/package.json ./apps/api/
 COPY apps/llm-server/package.json ./apps/llm-server/
+COPY apps/mcp-server/package.json ./apps/mcp-server/
+COPY apps/scheduler-server/package.json ./apps/scheduler-server/
+COPY apps/server/package.json ./apps/server/
+COPY apps/web/package.json ./apps/web/
 
 RUN npm ci
 
