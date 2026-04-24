@@ -123,7 +123,14 @@ export class GeneralPostCallGraph {
                     - Capture topics the user seemed engaged with
                     - Note any important life updates, health mentions, or emotional moments
                     - Keep it concise but meaningful
-                    - Include user's emotional tone in the summaryText`
+                    - Include user's emotional tone in the summaryText
+
+                    Topic rules — topicsDiscussed are reusable category labels, NOT event descriptions:
+                    - Use short general words or phrases (1-3 words): "baking", "gardening", "family", "health", "music"
+                    - Do NOT describe the specific event — that belongs in keyHighlights
+                    - Good: ["baking", "family", "health"] — Bad: ["baking gingerbread cookies", "family lunch visit", "husband's hospital update"]
+                    - Do NOT include meta-topics about the conversation itself: "end of conversation", "goodbye", "greeting", "small talk", "technical issues"
+                    - Aim for 2-5 topics; a topic that only came up briefly does not need to be included`
                 },
                 {
                     role: 'user',
@@ -306,15 +313,15 @@ export class GeneralPostCallGraph {
                 }
             }
 
-            for (const { oldName, newName, topicId, existingEmbedding, newEmbedding } of state.topicsToUpdate) {
+            for (const { oldName, newName, topicId, newEmbedding } of state.topicsToUpdate) {
                 try {
                     await updateConversationTopic(state.userId, oldName, newName);
 
-                    const avgEmbedding = existingEmbedding.map((v: number, i: number) => (v + newEmbedding[i]) / 2);
+
                     await ConversationRepository.upsertTopic({
                         elderlyProfileId: state.userId,
                         topicName: newName,
-                        topicEmbedding: avgEmbedding
+                        topicEmbedding: newEmbedding
                     });
 
                     await createConversationReferences({
@@ -322,7 +329,7 @@ export class GeneralPostCallGraph {
                         conversationTopicId: topicId
                     });
 
-                    console.log(`[PostCallGraph] Updated topic: "${oldName}" → "${newName}" (embedding updated)`);
+                    console.log(`[PostCallGraph] Updated topic: "${oldName}" → "${newName}" (embedding replaced)`);
                 } catch (error) {
                     const errorMsg = `Failed to update topic "${oldName}": ${error instanceof Error ? error.message : 'Unknown error'}`;
                     console.error('[PostCallGraph]', errorMsg);
