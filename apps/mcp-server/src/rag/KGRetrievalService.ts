@@ -156,6 +156,11 @@ export class KGRetrievalService {
         stream1: Stream1Result,
         stream2: Stream2Result
     ): Map<string, EnrichedMemory> {
+        const effectiveAlpha = qdrantDocuments.length > 0 ? this.config.alpha : 0.0;
+        if (effectiveAlpha !== this.config.alpha) {
+            console.log(`[KGRetrievalService] mergeAndDeduplicate: no Qdrant results — effectiveAlpha=0 (configured alpha=${this.config.alpha})`);
+        }
+
         const mergedMap = new Map<string, EnrichedMemory>();
 
         for (const doc of qdrantDocuments) {
@@ -170,7 +175,7 @@ export class KGRetrievalService {
                 text: doc.pageContent,
                 qdrantScore: doc.score,
                 kgScore,
-                finalScore: this.config.alpha * doc.score + (1 - this.config.alpha) * kgScore,
+                finalScore: effectiveAlpha * doc.score + (1 - effectiveAlpha) * kgScore,
                 topicLabels: ctx?.topics.map(t => t.label) ?? [],
                 relatedTopics: stream2.relatedTopics
                     .filter(rt => ctx?.topics.some(t => stream2.topTopicIds.includes(t.topicId)))
@@ -188,8 +193,8 @@ export class KGRetrievalService {
                 existing.source = 'both';
                 existing.kgScore = Math.min(1.0, existing.kgScore + 0.15);
                 existing.finalScore =
-                    this.config.alpha * existing.qdrantScore +
-                    (1 - this.config.alpha) * existing.kgScore;
+                    effectiveAlpha * existing.qdrantScore +
+                    (1 - effectiveAlpha) * existing.kgScore;
                 continue;
             }
 
@@ -199,7 +204,7 @@ export class KGRetrievalService {
                 text: kgH.text,
                 qdrantScore: 0,
                 kgScore,
-                finalScore: (1 - this.config.alpha) * kgScore,
+                finalScore: (1 - effectiveAlpha) * kgScore,
                 topicLabels: kgH.topicLabels,
                 relatedTopics: [],
                 persons: [],
