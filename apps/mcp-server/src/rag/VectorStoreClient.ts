@@ -25,7 +25,7 @@ export class VectorStoreClient {
             const results = await this.vectorStore.similaritySearchVectorWithScore(
                 embedding,
                 k,
-                { must: [{ key: 'userId', match: { value: userId } }] }
+                { must: [{ key: 'metadata.userId', match: { value: userId } }] }
             );
 
             const docs = results.map(([doc, score]) => ({

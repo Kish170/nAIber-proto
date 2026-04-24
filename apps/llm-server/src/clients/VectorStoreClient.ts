@@ -27,7 +27,7 @@ export class VectorStoreClient {
     async searchMemories(query: string, userId: string, k: number = 5) {
         const retriever = this.vectorStore.asRetriever({
             k,
-            filter: { must: [{ key: "userId", match: { value: userId } }] },
+            filter: { must: [{ key: "metadata.userId", match: { value: userId } }] },
             searchType: "similarity",
         });
 
@@ -58,7 +58,7 @@ export class VectorStoreClient {
         const results = await this.vectorStore.similaritySearchVectorWithScore(
             embedding,
             k,
-            { must: [{ key: "userId", match: { value: userId } }] }
+            { must: [{ key: "metadata.userId", match: { value: userId } }] }
         );
 
         return results.map(([doc, score]) => ({
