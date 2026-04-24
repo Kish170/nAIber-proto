@@ -387,8 +387,8 @@ export class WebSocketService {
 
             console.log('[WebSocketService] Starting post-call workflow for conversation:', this.conversationId);
 
-            console.log('[WebSocketService] Waiting 3 seconds for transcript to be ready...');
-            await new Promise(resolve => setTimeout(resolve, 3000));
+            console.log('[WebSocketService] Waiting 6 seconds for transcript to be ready...');
+            await new Promise(resolve => setTimeout(resolve, 6000));
 
             const postCallQueue = PostCallQueue.getInstance();
 
