@@ -1,7 +1,7 @@
-# ADR-008: Migrate General Persona to ElevenLabs Native LLM with RAG Tool
+# ADR-008: General Persona RAG via MCP Tool Calling
 
-**Status:** Accepted (implemented 2026-04-02)
-**Date:** 2026-03-24
+**Status:** Revised — original decision superseded during implementation (see Implementation Outcome below)
+**Date:** 2026-03-24 | **Revised:** 2026-04-24
 
 ## Context
 
@@ -11,13 +11,26 @@ The general conversation pipeline today: SupervisorGraph → ConversationGraph �
 
 Meanwhile, ElevenLabs supports MCP tool use — their built-in LLM can call external tools during conversation. This opens a path where the general persona uses ElevenLabs' LLM directly, with RAG exposed as a tool the LLM calls when it needs context.
 
-## Decision
+## Original Decision (superseded)
 
-**Accepted: Split orchestration by persona**
+**Proposed: Split orchestration by persona**
 
 - **General calls** → ElevenLabs native LLM + MCP tool for RAG retrieval
 - **Health check calls** → continue routing to llm-server for deterministic LangGraph flow
 - **Cognitive calls** → continue routing to llm-server for deterministic LangGraph flow
+
+## Implementation Outcome (2026-04-24)
+
+**Actual implementation: custom LLM for all call types, MCP invoked by llm-server**
+
+During implementation the ElevenLabs-native-LLM path was evaluated and rejected in favour of keeping custom LLM for general calls as well. The original proposal is retained above for context, but **the architecture described in "Proposed Architecture" below does not reflect what was built.** See "Actual Architecture" further down.
+
+Reasons for diverging from the original decision:
+- **`userId` reliability** — ElevenLabs does not include `conversation_id` in MCP tool call arguments. Without llm-server as the intermediary, reliably scoping `retrieveMemories` to the correct user requires passing `userId` through tool args, which the LLM controls and can get wrong. With the custom LLM path, llm-server injects `userId` from graph state before executing the tool — never from LLM args.
+- **Debuggability** — All call types flowing through llm-server means a single place to observe, log, and trace tool calls. Two different LLM execution paths (ElevenLabs-native vs. custom) added operational complexity that outweighed the simplification benefit for a call type that was not yet proven stable.
+- **Scoping** — The `retrieveMemories` tool schema intentionally omits `userId` to avoid the LLM hallucinating or leaking user IDs; this requires the execution layer to inject it. llm-server's `executeToolsNode` does this; ElevenLabs' native tool caller cannot.
+
+The outcome is equivalent to the original intent — general calls use RAG via MCP — but the execution path differs.
 
 ### Why General Is Different
 
@@ -34,7 +47,38 @@ General conversation requires none of this. The LLM just needs to:
 
 An LLM with a good system prompt and a RAG tool can do this without graph orchestration.
 
-## Proposed Architecture
+## Actual Architecture
+
+### During Call (All Types)
+
+All call types route through llm-server via the custom LLM endpoint:
+
+```
+ElevenLabs → POST /v1/chat/completions → llm-server
+  └── SupervisorGraph
+        ├── General   → ConversationGraph (LangGraph)
+        │     ├── agentNode: GPT-4o with RETRIEVE_MEMORIES_TOOL bound
+        │     └── executeToolsNode: McpClient.retrieveMemories(query, userId)
+        │                              → mcp-server /mcp → Qdrant + KG
+        ├── Health    → HealthCheckGraph (deterministic, durable execution)
+        └── Cognitive → CognitiveGraph (deterministic, durable execution)
+```
+
+The LLM decides when to call `retrieveMemories` via OpenAI function calling. `userId` is injected from graph state in `executeToolsNode` — never from LLM-generated args. Examples:
+- User mentions a past event → LLM emits a tool call to retrieve related highlights
+- User asks "do you remember when..." → LLM calls tool
+- Casual small talk → LLM responds directly, no tool call emitted
+
+Full user profile is injected into the system prompt by `server` at session start (`PromptInterface.buildUserContext`). No per-turn profile fetch is needed.
+
+### During Call (Health / Cognitive) — unchanged
+
+```
+ElevenLabs → POST /v1/chat/completions → llm-server
+  └── SupervisorGraph → HealthCheckGraph / CognitiveGraph (unchanged)
+```
+
+## Proposed Architecture (original — not implemented)
 
 ### During Call (General)
 
@@ -46,10 +90,7 @@ ElevenLabs built-in LLM
         └── retrieveMemories(query) → Qdrant + KG enriched results
 ```
 
-The LLM decides when to call `retrieveMemories` based on conversation context. For example:
-- User mentions a past event → LLM calls tool to retrieve related highlights
-- User asks "do you remember when..." → LLM calls tool
-- Casual small talk → LLM responds directly, no tool call needed
+This path was not implemented. See Implementation Outcome above.
 
 ### During Call (Health / Cognitive)
 
@@ -71,13 +112,15 @@ Post-call processing unchanged for all personas:
 
 In the current WebSocket bridge, post-call is still triggered on WebSocket close (unchanged).
 
-## Implementation notes (2026-04-02)
+## Implementation Notes (2026-04-24)
 
-- **`apps/server/src/services/WebSocketService.ts`** — For `health_check` and `cognitive` only, `conversation_config_override.agent.llm` sets `type: "custom_llm"`, `url` from `ELEVENLABS_CUSTOM_LLM_URL`, and optional `model_id` from `ELEVENLABS_MODEL_ID`. General calls omit `llm` so the agent uses ElevenLabs’ built-in model.
-- **`apps/llm-server`** — `SupervisorGraph` no longer compiles `ConversationGraph`; it handles health and cognitive only. If a `general` session incorrectly hits llm-server, `general_misrouted` logs a warning and returns a safe fallback message. `LLMRoute` no longer constructs general inline-RAG dependencies (vector store, `MemoryRetriever`, `TopicManager`, `KGRetrievalService`); live RAG for general is via **mcp-server** (`retrieveMemories`). Post-call (`GeneralPostCallGraph`, embeddings, KG) is unchanged.
-- **`docker-compose.yml`** — `server` service passes `ELEVENLABS_CUSTOM_LLM_URL` (public URL to llm-server OpenAI-compatible endpoint, e.g. ngrok base + path as required by ElevenLabs).
-- **ElevenLabs agent** — Dashboard (or Agents API): native LLM as default; MCP server URL pointing at **mcp-server** `/mcp` for tools such as `getUserProfile` / `retrieveMemories`. Custom LLM URL should match what is sent in the override for health/cognitive.
-- **Topic drift** — Per-turn topic tracking removed with `ConversationGraph`; topic work remains in post-call extraction (per open questions above, we accept this tradeoff for now).
+- **`apps/llm-server/src/personas/general/ConversationGraph.ts`** — Revised (not removed). `ConversationGraph` is a two-node LangGraph loop: `agentNode` (GPT-4o with `RETRIEVE_MEMORIES_TOOL` bound) → `executeToolsNode` (calls `McpClient.retrieveMemories`). `IntentClassifier`, `TopicManager`, and `MemoryRetriever` graph nodes were removed; the LLM handles intent and retrieval timing.
+- **`apps/llm-server/src/graphs/SupervisorGraph.ts`** — Still routes general calls to `ConversationGraph`. The `general_misrouted` fallback remains for safety but is no longer the expected general call path.
+- **`apps/llm-server/src/clients/McpClient.ts`** — Executes `retrieveMemories(query, userId)` against **mcp-server** `/mcp`. `userId` injected from graph state, not from LLM-generated args.
+- **`apps/mcp-server`** — MCP server exposes `retrieveMemories` and `getUserProfile` tools. Called by llm-server’s `McpClient`, not by ElevenLabs directly.
+- **`apps/server/src/services/WebSocketService.ts`** — All call types use `conversation_config_override.agent.llm` with `type: "custom_llm"` pointing at llm-server. There is no general-call path that omits the `llm` override.
+- **Topic drift** — Per-turn topic tracking removed; topic extraction remains in post-call (`GeneralPostCallGraph`). Accepted tradeoff.
+- **`getUserProfile`** — Tool exists in MCP server and `McpClient` but is not called during live general turns. User profile is injected into the system prompt at session start via `PromptInterface.buildUserContext` in `server`.
 
 ## MCP RAG Tool Design
 
@@ -100,22 +143,21 @@ Internally, this tool would:
 
 This reuses the existing RAG infrastructure — just exposed as a tool instead of a graph node.
 
-## What Gets Removed from llm-server (General Path)
+## What Changed from the Original ConversationGraph
 
-- `ConversationGraph` — replaced by ElevenLabs native LLM
-- `IntentClassifier` — LLM handles intent naturally
-- `MemoryRetriever` as a graph node — becomes MCP tool
-- General call routing in `SupervisorGraph` — no longer receives general call requests
+Removed from general call path:
+- `IntentClassifier` — LLM handles intent and filler detection naturally via tool calling
+- `MemoryRetriever` as a graph node — replaced by `executeToolsNode` calling MCP
 - `TopicManager` per-turn state — topic detection moves to post-call only
+- Redis `rag:topic:{conversationId}` per-turn cache — no longer needed
 
-## What Stays
-
-- **SupervisorGraph** — still routes health/cognitive calls
-- **HealthCheckGraph / CognitiveGraph** — unchanged, deterministic flows
-- **GeneralPostCallGraph** — unchanged, still processes transcripts after call
+Kept / revised:
+- **`ConversationGraph`** — retained as a two-node LangGraph loop (agent ↔ tools)
+- **`SupervisorGraph`** — still routes all call types including general
+- **`HealthCheckGraph / CognitiveGraph`** — unchanged
+- **`GeneralPostCallGraph`** — unchanged
 - **All post-call infrastructure** — BullMQ, PostCallWorker, KG population
-- **RAG infrastructure** — Qdrant, KGRetrievalService, EmbeddingService (exposed via MCP instead of graph node)
-- **TopicManager** — used in post-call for topic extraction, no longer per-turn
+- **RAG infrastructure** — Qdrant, KGRetrievalService, EmbeddingService (reached via mcp-server)
 
 ## Open Questions
 
@@ -140,17 +182,16 @@ ElevenLabs supports multiple LLM providers (GPT-4o, Claude, Gemini). We'd need t
 ## Consequences
 
 **Positive:**
-- Significantly simpler general call path — no graph orchestration for free-form conversation
-- Reduced llm-server load — general calls (likely the most frequent) bypass it entirely
+- Simpler general call path — `IntentClassifier`, `TopicManager`, and `MemoryRetriever` graph nodes removed
 - RAG only called when needed (LLM judges relevance) vs every turn
-- Cleaner separation: structured flows (health/cognitive) use graphs, free-form (general) uses native LLM
+- `userId` injection is safe and server-controlled — LLM args never influence which user's memories are fetched
+- Single LLM execution path for all call types — easier to observe and debug
+- All call types observable in one place (llm-server logs, Bull Board)
 
 **Negative / Trade-offs:**
-- Less control over when RAG is invoked — LLM may over/under-retrieve
+- Less control over when RAG is invoked — LLM may over/under-retrieve compared to rule-based threshold
 - Per-turn topic tracking lost (moved to post-call only)
-- Two different LLM paths to maintain and debug
-- MCP tool latency during conversation is an unknown
-- Dependency on ElevenLabs MCP availability and reliability
+- General calls still add llm-server hop; the load reduction from the original proposal was not realised
 
 ## Relationship to Other ADRs
 

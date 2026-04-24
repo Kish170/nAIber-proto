@@ -90,14 +90,14 @@ After each general call, `GeneralPostCallGraph` runs as a BullMQ job:
 3. **Embeddings** — Meaningful content from the call is embedded (via `EmbeddingService`) and upserted to Qdrant for future vector retrieval.
 
 ### How memory is retrieved (during call)
-On each conversation turn, `ConversationGraph` may run the RAG pipeline:
+`ConversationGraph` uses OpenAI function calling to let the LLM decide when to retrieve memories:
 
-1. The user's message is embedded and compared to a cached topic centroid in Redis.
-2. If the topic has shifted (cosine similarity below threshold, default 0.45), a fresh vector search is run against Qdrant (top-5 similar memories).
-3. Retrieved memories are injected into the LLM system prompt under a `RELEVANT MEMORIES` section.
-4. The topic centroid and memory highlights are cached in Redis (`rag:topic:{conversationId}`) to avoid redundant searches mid-call.
+1. The LLM receives the `retrieveMemories` tool schema via `bindTools()`. It decides whether to call it based on conversation context.
+2. When the LLM emits a tool call, `executeToolsNode` calls `McpClient.retrieveMemories(query, userId)`. `userId` is injected from graph state — not from LLM-generated args — to ensure the correct user's memories are always fetched.
+3. `McpClient` calls `mcp-server` which searches Qdrant and enriches results via KGRetrievalService (related topics, persons).
+4. Retrieved context is returned to the LLM as a `ToolMessage`. The LLM incorporates it into its next response.
 
-Short or filler messages ("yeah", "ok", "that's nice") skip the RAG path entirely via the intent classifier.
+The LLM naturally skips the tool call for short or filler responses ("yeah", "ok", "that's nice") — no explicit intent classifier needed. There is no per-turn Redis topic cache; retrieval is on-demand only.
 
 ### Data storage
 | Data | Store | TTL / Retention |
@@ -105,13 +105,12 @@ Short or filler messages ("yeah", "ok", "that's nice") skip the RAG path entirel
 | Conversation summaries | Postgres | Permanent |
 | Conversation topics | Postgres | Permanent |
 | Memory embeddings | Qdrant | Permanent |
-| In-call topic cache | Redis | Cleared post-call |
 | Active session mapping | Redis | 1h (cleared post-call) |
 
 ### Known future improvements
-The current RAG implementation is vector similarity only. Planned improvements include:
-- Better topic change detection (topic drift, short-response signals, engagement patterns)
-- Knowledge Graph (KG) integration to give memories semantic structure — relationships between people, events, and topics rather than flat embeddings. See `docs/future/knowledge-graph.md`.
+- Better retrieval coverage for specific named facts (family members, key life events) — currently stored as part of longer highlights; may need to be embedded as discrete facts.
+- Dynamic tool descriptions — `retrieveMemories` description in `McpTools.ts` is currently static. Could be made dynamic to hint to the LLM what context is available (e.g. "user's known topics: gardening, jazz"). See `personas/general/CLAUDE.md` for implementation notes.
+- Per-turn topic tracking — removed when `TopicManager` was dropped from the live path. Post-call topic extraction is the current substitute.
 
 ---
 
@@ -125,7 +124,6 @@ Call ends
       1. Generate conversation summary → Postgres
       2. Extract topics via NLP → Postgres
       3. Generate embeddings → Qdrant upsert
-  → Redis cleanup: delete rag:topic:{conversationId}
   → SessionManager.deleteSession() clears session + RAG mappings
 ```
 
@@ -157,6 +155,7 @@ Call ends
 ## Known Gaps
 
 - **Silence behaviour** is not formally specified — current implementation (gentle prompt → check-in) is functional but not a finalized product decision.
-- **Engagement signals** (short responses, disengagement) are detected heuristically but do not currently trigger adaptive behaviour beyond skipping RAG.
+- **Engagement signals** (short responses, disengagement) are not explicitly detected. The LLM implicitly skips tool calls for filler messages but there is no adaptive behaviour triggered by low-engagement patterns.
+- **RAG data coverage** — `retrieveMemories` returns vector-similar highlights; specific named facts (e.g. family member names) may not be retrievable if they were never stored as standalone embeddings. This is a data coverage gap, not a retrieval code gap.
 - **No user satisfaction signal** is currently collected post-call. Success metrics are inferred from conversation data rather than explicit feedback.
 - **Post-call summary quality** depends on LLM output quality — there is no validation or quality threshold for what gets persisted to Postgres.
