@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { traceable } from 'langsmith/traceable';
 import { OpenAIClient } from '@naiber/shared-clients';
 import { EmbeddingService } from '@naiber/shared-services';
 import { VectorStoreClient } from '../../rag/VectorStoreClient.js';
@@ -48,30 +49,49 @@ function getServices(): { embeddingService: EmbeddingService; vectorStoreClient:
 
 const SIMILARITY_THRESHOLD = parseFloat(process.env.RAG_MEMORY_SIMILARITY_THRESHOLD || '0.45');
 
-export async function retrieveMemoriesHandler(args: { query: string; userId: string }) {
-    const { query, userId } = args;
-    const { embeddingService: emb, vectorStoreClient: vs, kgRetrievalService: kg } = getServices();
+export const retrieveMemoriesHandler = traceable(
+    async (args: { query: string; userId: string }) => {
+        const { query, userId } = args;
+        const { embeddingService: emb, vectorStoreClient: vs, kgRetrievalService: kg } = getServices();
 
-    const { embedding } = await emb.generateEmbedding(query);
+        const { embedding } = await emb.generateEmbedding(query);
 
-    const rawDocs = await vs.searchByEmbedding(embedding, userId, 5);
-    const filteredDocs = rawDocs.filter(d => d.score > SIMILARITY_THRESHOLD);
+        const rawDocs = await vs.searchByEmbedding(embedding, userId, 5);
+        const filteredDocs = rawDocs.filter(d => d.score > SIMILARITY_THRESHOLD);
 
-    const result = await kg.retrieve(userId, embedding, filteredDocs);
+        console.log(`[retrieveMemories] query="${query}" userId=${userId} rawDocs=${rawDocs.length} filteredDocs=${filteredDocs.length} threshold=${SIMILARITY_THRESHOLD}`);
+        console.log(`[retrieveMemories] raw scores: [${rawDocs.map(d => d.score.toFixed(4)).join(', ')}]`);
 
-    return {
-        highlights: result.enrichedMemories.map(m => ({
-            text: m.text,
-            topic: m.topicLabels.join(', '),
-            similarity: m.finalScore,
-        })),
-        relatedTopics: result.relatedTopics.map(t => ({
-            name: t.label,
-            mentionCount: t.coOccurrenceCount,
-        })),
-        persons: result.personsContext.map(p => ({
-            name: p.name,
-            relationship: p.role ?? '',
-        })),
-    };
-}
+        const result = await kg.retrieve(userId, embedding, filteredDocs);
+
+        const sourceBreakdown = {
+            fromQdrant: result.enrichedMemories.filter(m => m.source === 'qdrant').length,
+            fromKG: result.enrichedMemories.filter(m => m.source === 'kg_discovery').length,
+            fromBoth: result.enrichedMemories.filter(m => m.source === 'both').length,
+        };
+
+        console.log(`[retrieveMemories] results=${result.enrichedMemories.length} sources: qdrant=${sourceBreakdown.fromQdrant} kg=${sourceBreakdown.fromKG} both=${sourceBreakdown.fromBoth}`);
+
+        return {
+            highlights: result.enrichedMemories.map(m => ({
+                text: m.text,
+                topic: m.topicLabels.join(', '),
+                similarity: m.finalScore,
+                source: m.source,
+            })),
+            relatedTopics: result.relatedTopics.map(t => ({
+                name: t.label,
+                mentionCount: t.coOccurrenceCount,
+            })),
+            persons: result.personsContext.map(p => ({
+                name: p.name,
+                relationship: p.role ?? '',
+            })),
+        };
+    },
+    {
+        name: 'retrieveMemories',
+        run_type: 'retriever',
+        metadata: { similarityThreshold: SIMILARITY_THRESHOLD },
+    }
+);

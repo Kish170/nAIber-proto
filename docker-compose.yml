@@ -146,6 +146,7 @@ services:
 
       LANGCHAIN_API_KEY: ${LANGCHAIN_API_KEY}
       LANGCHAIN_TRACING_V2: ${LANGCHAIN_TRACING_V2}
+      LANGCHAIN_PROJECT: naiber-llm-postcall
 
       MCP_SERVER_URL: http://mcp-server:3002
 
@@ -219,6 +220,10 @@ services:
       DIRECT_URL: ${DIRECT_URL}
 
       RAG_MEMORY_SIMILARITY_THRESHOLD: ${RAG_MEMORY_SIMILARITY_THRESHOLD:-0.45}
+
+      LANGCHAIN_API_KEY: ${LANGCHAIN_API_KEY}
+      LANGCHAIN_TRACING_V2: ${LANGCHAIN_TRACING_V2}
+      LANGCHAIN_PROJECT: naiber-mcp-retrieval
 
     volumes:
       - ./apps/mcp-server/src:/app/apps/mcp-server/src

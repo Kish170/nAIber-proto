@@ -1,4 +1,5 @@
 import { Session } from 'neo4j-driver';
+import { traceable } from 'langsmith/traceable';
 import { Neo4jClient } from '../clients/Neo4jClient.js';
 import type {
     UserNode,
@@ -30,7 +31,7 @@ export class GraphRepository {
         await this.session.close();
     }
 
-    async mergeUser(params: UserNode): Promise<void> {
+    mergeUser = traceable(async (params: UserNode): Promise<void> => {
         try {
             await this.session.run(
                 `MERGE (u:User {userId: $userId})
@@ -41,9 +42,9 @@ export class GraphRepository {
             console.error('[GraphRepository] Error merging User:', error);
             throw error;
         }
-    }
+    }, { name: 'neo4j_mergeUser', run_type: 'chain' });
 
-    async mergeTopic(params: TopicNode): Promise<void> {
+    mergeTopic = traceable(async (params: TopicNode): Promise<void> => {
         try {
             await this.session.run(
                 `MERGE (t:Topic {topicId: $topicId})
@@ -57,9 +58,9 @@ export class GraphRepository {
             console.error('[GraphRepository] Error merging Topic:', error);
             throw error;
         }
-    }
+    }, { name: 'neo4j_mergeTopic', run_type: 'chain' });
 
-    async mergeHighlight(params: HighlightNode): Promise<void> {
+    mergeHighlight = traceable(async (params: HighlightNode): Promise<void> => {
         try {
             await this.session.run(
                 `MERGE (h:Highlight {qdrantPointId: $qdrantPointId})
@@ -73,9 +74,9 @@ export class GraphRepository {
             console.error('[GraphRepository] Error merging Highlight:', error);
             throw error;
         }
-    }
+    }, { name: 'neo4j_mergeHighlight', run_type: 'chain' });
 
-    async mergeSummary(params: SummaryNode): Promise<void> {
+    mergeSummary = traceable(async (params: SummaryNode): Promise<void> => {
         try {
             await this.session.run(
                 `MERGE (s:Summary {id: $id})
@@ -87,9 +88,9 @@ export class GraphRepository {
             console.error('[GraphRepository] Error merging Summary:', error);
             throw error;
         }
-    }
+    }, { name: 'neo4j_mergeSummary', run_type: 'chain' });
 
-    async mergeConversation(params: ConversationNode): Promise<void> {
+    mergeConversation = traceable(async (params: ConversationNode): Promise<void> => {
         try {
             await this.session.run(
                 `MERGE (c:Conversation {conversationId: $conversationId})
@@ -103,9 +104,9 @@ export class GraphRepository {
             console.error('[GraphRepository] Error merging Conversation:', error);
             throw error;
         }
-    }
+    }, { name: 'neo4j_mergeConversation', run_type: 'chain' });
 
-    async mergePerson(params: PersonNode): Promise<void> {
+    mergePerson = traceable(async (params: PersonNode): Promise<void> => {
         try {
             await this.session.run(
                 `MERGE (p:Person {id: $id})
@@ -117,9 +118,9 @@ export class GraphRepository {
             console.error('[GraphRepository] Error merging Person:', error);
             throw error;
         }
-    }
+    }, { name: 'neo4j_mergePerson', run_type: 'chain' });
 
-    async linkUserToConversation(params: LinkUserToConversationParams): Promise<void> {
+    linkUserToConversation = traceable(async (params: LinkUserToConversationParams): Promise<void> => {
         try {
             await this.session.run(
                 `MATCH (u:User {userId: $userId})
@@ -131,9 +132,9 @@ export class GraphRepository {
             console.error('[GraphRepository] Error linking User to Conversation:', error);
             throw error;
         }
-    }
+    }, { name: 'neo4j_linkUserToConversation', run_type: 'chain' });
 
-    async linkConversationToSummary(params: LinkConversationToSummaryParams): Promise<void> {
+    linkConversationToSummary = traceable(async (params: LinkConversationToSummaryParams): Promise<void> => {
         try {
             await this.session.run(
                 `MATCH (c:Conversation {conversationId: $conversationId})
@@ -146,9 +147,9 @@ export class GraphRepository {
             console.error('[GraphRepository] Error linking Conversation to Summary:', error);
             throw error;
         }
-    }
+    }, { name: 'neo4j_linkConversationToSummary', run_type: 'chain' });
 
-    async linkConversationToHighlight(params: LinkConversationToHighlightParams): Promise<void> {
+    linkConversationToHighlight = traceable(async (params: LinkConversationToHighlightParams): Promise<void> => {
         try {
             await this.session.run(
                 `MATCH (c:Conversation {conversationId: $conversationId})
@@ -161,9 +162,9 @@ export class GraphRepository {
             console.error('[GraphRepository] Error linking Conversation to Highlight:', error);
             throw error;
         }
-    }
+    }, { name: 'neo4j_linkConversationToHighlight', run_type: 'chain' });
 
-    async linkSummaryToTopic(params: SummaryMentionsTopicParams): Promise<void> {
+    linkSummaryToTopic = traceable(async (params: SummaryMentionsTopicParams): Promise<void> => {
         try {
             await this.session.run(
                 `MATCH (s:Summary {id: $summaryId})
@@ -176,9 +177,9 @@ export class GraphRepository {
             console.error('[GraphRepository] Error linking Summary to Topic:', error);
             throw error;
         }
-    }
+    }, { name: 'neo4j_linkSummaryToTopic', run_type: 'chain' });
 
-    async linkHighlightToTopic(params: HighlightMentionsTopicParams): Promise<void> {
+    linkHighlightToTopic = traceable(async (params: HighlightMentionsTopicParams): Promise<void> => {
         try {
             await this.session.run(
                 `MATCH (h:Highlight {qdrantPointId: $highlightId})
@@ -191,9 +192,9 @@ export class GraphRepository {
             console.error('[GraphRepository] Error linking Highlight to Topic:', error);
             throw error;
         }
-    }
+    }, { name: 'neo4j_linkHighlightToTopic', run_type: 'chain' });
 
-    async linkSummaryToHighlight(params: LinkSummaryToHighlightParams): Promise<void> {
+    linkSummaryToHighlight = traceable(async (params: LinkSummaryToHighlightParams): Promise<void> => {
         try {
             await this.session.run(
                 `MATCH (s:Summary {id: $summaryId})
@@ -205,9 +206,9 @@ export class GraphRepository {
             console.error('[GraphRepository] Error linking Summary to Highlight:', error);
             throw error;
         }
-    }
+    }, { name: 'neo4j_linkSummaryToHighlight', run_type: 'chain' });
 
-    async upsertUserMentionsTopic(params: UserMentionsTopicParams): Promise<void> {
+    upsertUserMentionsTopic = traceable(async (params: UserMentionsTopicParams): Promise<void> => {
         try {
             await this.session.run(
                 `MATCH (u:User {userId: $userId})
@@ -224,9 +225,9 @@ export class GraphRepository {
             console.error('[GraphRepository] Error upserting User MENTIONS Topic:', error);
             throw error;
         }
-    }
+    }, { name: 'neo4j_upsertUserMentionsTopic', run_type: 'chain' });
 
-    async upsertTopicRelatedToTopic(params: TopicRelatedToTopicParams): Promise<void> {
+    upsertTopicRelatedToTopic = traceable(async (params: TopicRelatedToTopicParams): Promise<void> => {
         try {
             await this.session.run(
                 `MATCH (a:Topic {topicId: $fromTopicId})
@@ -241,9 +242,9 @@ export class GraphRepository {
             console.error('[GraphRepository] Error upserting Topic RELATED_TO Topic:', error);
             throw error;
         }
-    }
+    }, { name: 'neo4j_upsertTopicRelatedToTopic', run_type: 'chain' });
 
-    async deriveInterestedInEdges(userId: string, minCount: number = 3, recencyDays: number = 30): Promise<void> {
+    deriveInterestedInEdges = traceable(async (userId: string, minCount: number = 3, recencyDays: number = 30): Promise<void> => {
         try {
             const cutoff = new Date(Date.now() - recencyDays * 24 * 60 * 60 * 1000).toISOString();
             await this.session.run(
@@ -259,9 +260,9 @@ export class GraphRepository {
             console.error('[GraphRepository] Error deriving INTERESTED_IN edges:', error);
             throw error;
         }
-    }
+    }, { name: 'neo4j_deriveInterestedInEdges', run_type: 'chain' });
 
-    async upsertUserMentionedPerson(params: UserMentionedPersonParams): Promise<void> {
+    upsertUserMentionedPerson = traceable(async (params: UserMentionedPersonParams): Promise<void> => {
         try {
             await this.session.run(
                 `MATCH (u:User {userId: $userId})
@@ -278,9 +279,9 @@ export class GraphRepository {
             console.error('[GraphRepository] Error upserting User MENTIONED Person:', error);
             throw error;
         }
-    }
+    }, { name: 'neo4j_upsertUserMentionedPerson', run_type: 'chain' });
 
-    async upsertPersonAssociatedWithTopic(params: PersonAssociatedWithTopicParams): Promise<void> {
+    upsertPersonAssociatedWithTopic = traceable(async (params: PersonAssociatedWithTopicParams): Promise<void> => {
         try {
             await this.session.run(
                 `MATCH (p:Person {id: $personId})
@@ -296,5 +297,5 @@ export class GraphRepository {
             console.error('[GraphRepository] Error upserting Person ASSOCIATED_WITH Topic:', error);
             throw error;
         }
-    }
+    }, { name: 'neo4j_upsertPersonAssociatedWithTopic', run_type: 'chain' });
 }

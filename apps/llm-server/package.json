@@ -24,6 +24,7 @@
     "bullmq": "^5.66.5",
     "compromise": "^14.14.3",
     "compute-cosine-similarity": "^1.1.0",
+    "langsmith": "^0.3.67",
     "dotenv": "^16.6.1",
     "express": "^4.21.2",
     "neo4j-driver": "^6.0.1",

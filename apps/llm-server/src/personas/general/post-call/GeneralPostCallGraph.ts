@@ -143,7 +143,13 @@ export class GeneralPostCallGraph {
             }
 
             const summary = JSON.parse(response.choices[0].message.content);
-            console.log('[PostCallGraph] Conversation summary generated successfully');
+            console.log('[PostCallGraph] Summary generated:', JSON.stringify({
+                summaryTextLength: summary.summaryText?.length ?? 0,
+                topicCount: summary.topicsDiscussed?.length ?? 0,
+                highlightCount: summary.keyHighlights?.length ?? 0,
+                topics: summary.topicsDiscussed,
+                highlights: summary.keyHighlights,
+            }));
 
             const conversationSummary = await createSummary({
                 elderlyProfileId: state.userId,
@@ -247,7 +253,11 @@ export class GeneralPostCallGraph {
                 }
             }
 
-            console.log(`[PostCallGraph] Topic matching complete: ${topicsToCreate.length} new, ${topicsToUpdate.length} matched`);
+            console.log('[PostCallGraph] Topic matching complete:', JSON.stringify({
+                newTopicCount: topicsToCreate.length,
+                matchedCount: topicsToUpdate.length,
+                topicMatchResults,
+            }));
 
             return {
                 existingTopics,
@@ -364,7 +374,11 @@ export class GeneralPostCallGraph {
             );
 
             await this.vectorStore.addMemoriesWithIds(highlightEntries, metadata);
-            console.log(`[PostCallGraph] Stored ${highlightEntries.length} highlights in vector database`);
+            console.log('[PostCallGraph] Embeddings stored:', JSON.stringify({
+                highlightCount: highlightEntries.length,
+                qdrantPointIds: highlightEntries.map((e: { id: string }) => e.id),
+                textLengths: highlightEntries.map((e: { text: string }) => e.text.length),
+            }));
 
             return {
                 highlightEntries: highlightEntries.map((e: { text: string; embedding: number[]; id: string }) => ({
@@ -438,7 +452,10 @@ export class GeneralPostCallGraph {
             }
 
             const extractedPersons = await this.nerService.extractPersons(state.transcript);
-            console.log(`[PostCallGraph] Extracted ${extractedPersons.length} person(s) from transcript`);
+            console.log('[PostCallGraph] NER extraction:', JSON.stringify({
+                personCount: extractedPersons.length,
+                persons: extractedPersons.map(p => ({ name: p.name, role: p.role, contextLength: p.context.length })),
+            }));
 
             return { extractedPersons };
 
