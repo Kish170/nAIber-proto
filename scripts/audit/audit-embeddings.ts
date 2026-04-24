@@ -66,7 +66,7 @@ async function qdrantSearch(vector: number[], userId: string, limit = 10): Promi
         body: JSON.stringify({
             vector,
             limit,
-            filter: { must: [{ key: 'userId', match: { value: userId } }] },
+            filter: { must: [{ key: 'metadata.userId', match: { value: userId } }] },
             with_payload: true,
         }),
     });
@@ -95,7 +95,7 @@ async function main() {
     // Fetch all vectors
     console.log('Fetching vectors (with embeddings)...');
     const points = await qdrantScroll(
-        { must: [{ key: 'userId', match: { value: userId } }] },
+        { must: [{ key: 'metadata.userId', match: { value: userId } }] },
         true
     );
     const withVectors = points.filter(p => p.vector && Array.isArray(p.vector));
@@ -153,7 +153,7 @@ async function main() {
         for (const cluster of clusters.slice(0, 5)) {
             console.log(`\n  Cluster (${cluster.indices.length} points, avg sim=${cluster.avgSim.toFixed(4)}):`);
             for (const idx of cluster.indices.slice(0, 3)) {
-                const text = (withVectors[idx].payload.pageContent || withVectors[idx].payload.text || '').slice(0, 80);
+                const text = (withVectors[idx].payload.content || withVectors[idx].payload.pageContent || withVectors[idx].payload.text || '').slice(0, 80);
                 console.log(`    "${text}${text.length >= 80 ? '...' : ''}"`);
             }
             if (cluster.indices.length > 3) {
@@ -196,7 +196,7 @@ async function main() {
             console.log(`    No results`);
         } else {
             for (const r of results) {
-                const text = (r.payload.pageContent || r.payload.text || '').slice(0, 60);
+                const text = (r.payload.content || r.payload.pageContent || r.payload.text || '').slice(0, 60);
                 console.log(`    score=${r.score.toFixed(4)} "${text}${text.length >= 60 ? '...' : ''}"`);
             }
             const scores = results.map(r => r.score);

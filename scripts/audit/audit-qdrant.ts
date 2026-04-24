@@ -90,9 +90,14 @@ async function main() {
     console.log(`Collection: ${COLLECTION}`);
     console.log(`Qdrant URL: ${QDRANT_URL}\n`);
 
+    const getField = (p: QdrantPoint, field: string) =>
+        p.payload.metadata?.[field] ?? p.payload[field] ?? null;
+    const getText = (p: QdrantPoint) =>
+        p.payload.content ?? p.payload.pageContent ?? p.payload.text ?? '';
+
     // Fetch all points for this user
     const points = await qdrantScroll({
-        must: [{ key: 'userId', match: { value: userId } }],
+        must: [{ key: 'metadata.userId', match: { value: userId } }],
     });
 
     console.log(`--- Overview ---`);
@@ -104,12 +109,12 @@ async function main() {
     }
 
     // Unique conversations
-    const conversationIds = new Set(points.map(p => p.payload.conversationId).filter(Boolean));
+    const conversationIds = new Set(points.map(p => getField(p, 'conversationId')).filter(Boolean));
     console.log(`Unique conversations: ${conversationIds.size}`);
 
     // Date range
     const dates = points
-        .map(p => p.payload.createdAt)
+        .map(p => getField(p, 'createdAt'))
         .filter(Boolean)
         .sort();
     if (dates.length > 0) {
@@ -118,7 +123,7 @@ async function main() {
 
     // --- Chunk quality ---
     console.log(`\n--- Chunk Quality ---`);
-    const texts = points.map(p => p.payload.pageContent || p.payload.text || '');
+    const texts = points.map(p => getText(p));
     const textLengths = texts.map((t: string) => t.length);
     const avgLength = textLengths.reduce((a: number, b: number) => a + b, 0) / textLengths.length;
     const emptyTexts = texts.filter((t: string) => t.trim().length === 0);
@@ -144,21 +149,21 @@ async function main() {
     console.log(`\n--- Metadata Completeness ---`);
     const requiredFields = ['userId', 'conversationId', 'createdAt', 'summaryId'];
     for (const field of requiredFields) {
-        const present = points.filter(p => p.payload[field] != null).length;
+        const present = points.filter(p => getField(p, field) != null).length;
         const pct = ((present / points.length) * 100).toFixed(0);
         const status = present === points.length ? 'OK' : 'MISSING';
         console.log(`  ${field}: ${present}/${points.length} (${pct}%) ${status !== 'OK' ? `⚠ ${status}` : ''}`);
     }
 
     // Check for qdrantPointId in metadata (needed for KG cross-reference)
-    const hasQdrantPointId = points.filter(p => p.payload.qdrantPointId != null).length;
+    const hasQdrantPointId = points.filter(p => getField(p, 'qdrantPointId') != null).length;
     console.log(`  qdrantPointId (in payload): ${hasQdrantPointId}/${points.length} (${((hasQdrantPointId / points.length) * 100).toFixed(0)}%)`);
 
     // --- Duplicate detection ---
     console.log(`\n--- Duplicate Detection ---`);
     const textSet = new Map<string, string[]>();
     for (const p of points) {
-        const text = (p.payload.pageContent || p.payload.text || '').trim().toLowerCase();
+        const text = getText(p).trim().toLowerCase();
         if (!textSet.has(text)) textSet.set(text, []);
         textSet.get(text)!.push(p.id as string);
     }
@@ -172,16 +177,16 @@ async function main() {
     console.log(`\n--- Sample Highlights (up to 10) ---`);
     const sample = points.slice(0, 10);
     for (const p of sample) {
-        const text = (p.payload.pageContent || p.payload.text || '').slice(0, 100);
+        const text = getText(p).slice(0, 100);
         console.log(`  [${(p.id as string).slice(0, 8)}...] "${text}${text.length >= 100 ? '...' : ''}"`);
-        console.log(`    conversationId=${p.payload.conversationId || 'MISSING'} createdAt=${p.payload.createdAt || 'MISSING'}`);
+        console.log(`    conversationId=${getField(p, 'conversationId') || 'MISSING'} createdAt=${getField(p, 'createdAt') || 'MISSING'}`);
     }
 
     // --- Near-duplicate detection (if vectors available) ---
     console.log(`\n--- Near-Duplicate Detection (via re-fetch with vectors) ---`);
     if (points.length <= 200) {
         const pointsWithVectors = await qdrantScroll(
-            { must: [{ key: 'userId', match: { value: userId } }] },
+            { must: [{ key: 'metadata.userId', match: { value: userId } }] },
             true
         );
 

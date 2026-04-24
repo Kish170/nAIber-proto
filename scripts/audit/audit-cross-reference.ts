@@ -15,6 +15,7 @@ const QDRANT_API_KEY = process.env.QDRANT_API_KEY!;
 const COLLECTION = process.env.QDRANT_COLLECTION!;
 
 type QdrantPayload = Record<string, any> & {
+    metadata?: Record<string, any>;
     qdrantPointId?: string;
     conversationId?: string;
 };
@@ -25,7 +26,7 @@ interface QdrantPoint {
 }
 
 function getQdrantPointId(point: QdrantPoint): string {
-    return point.payload.qdrantPointId || point.id;
+    return point.payload.metadata?.qdrantPointId || point.payload.qdrantPointId || point.id;
 }
 
 async function findBestUserId(): Promise<string> {
@@ -105,7 +106,7 @@ async function main() {
 
         // Qdrant: all vectors for user
         const qdrantPoints = await qdrantScroll({
-            must: [{ key: 'userId', match: { value: userId } }],
+            must: [{ key: 'metadata.userId', match: { value: userId } }],
         });
 
         // Neo4j: highlights and topics
@@ -186,7 +187,7 @@ async function main() {
         console.log('\n--- Per-Conversation Consistency ---');
         const qdrantByConversation = new Map<string, string[]>();
         for (const p of qdrantPoints) {
-            const cid = p.payload.conversationId;
+            const cid = p.payload.metadata?.conversationId || p.payload.conversationId;
             if (!cid) continue;
             if (!qdrantByConversation.has(cid)) qdrantByConversation.set(cid, []);
             qdrantByConversation.get(cid)!.push(getQdrantPointId(p));
