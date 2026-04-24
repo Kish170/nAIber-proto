@@ -201,6 +201,8 @@ export class KGPopulationService {
                     }
                 }
 
+                await repo.deriveInterestedInEdges(state.userId);
+
                 console.log('[KGPopulationService] populateRelationships complete:', JSON.stringify({
                     highlightTopicLinksCreated,
                     highlightTopicLinksSkipped,

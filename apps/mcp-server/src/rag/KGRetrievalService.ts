@@ -178,7 +178,7 @@ export class KGRetrievalService {
                 finalScore: effectiveAlpha * doc.score + (1 - effectiveAlpha) * kgScore,
                 topicLabels: ctx?.topics.map(t => t.label) ?? [],
                 relatedTopics: stream2.relatedTopics
-                    .filter(rt => ctx?.topics.some(t => stream2.topTopicIds.includes(t.topicId)))
+                    .filter(_rt => ctx?.topics.some(t => stream2.topTopicIds.includes(t.topicId)))
                     .map(rt => rt.label),
                 persons: ctx?.persons ?? [],
                 conversationDate: ctx?.conversation?.startedAt,
