@@ -395,7 +395,7 @@ export class CognitiveDecisionEngine {
             };
         }
 
-        const stillMissed = state.delayedRecallMissedWords.filter(w => !updatedResults.some(r => r.word === w));
+        const stillMissed = state.delayedRecallMissedWords.filter((w: string) => !updatedResults.some(r => r.word === w));
 
         if (stillMissed.length === 0) {
             return this.recordDelayedRecallResult(state, task, updatedResults, []);

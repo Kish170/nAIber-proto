@@ -13,7 +13,7 @@ Telephony layer — handles Twilio webhooks, ElevenLabs WebSocket sessions, and 
 1. **Initiation** — `POST /call` → `CallController.createCall()` → TwilioClient dials user, stores `call_type:{callSid}` in Redis (60s TTL)
 2. **Twilio connects** — Audio streams to WSS `/outbound-media-stream` → `CallController` creates `WebSocketService`
 3. **ElevenLabs connects** — On Twilio "start" event, `WebSocketService` loads UserProfile, gets ElevenLabs signed URL, opens WSS, sends system prompt + first message
-4. **Session registered** — On `conversation_id` received, `SessionManager` creates Redis session (`session:{conversationId}`, 1hr TTL) + mapping keys (`rag:user:{userId}`, `rag:phone:{phone}`)
+4. **Session registered** — On `conversation_id` received, `SessionManager` creates Redis session (`session:{conversationId}`, 1hr TTL). `userId` and `conversationId` are read directly from the ElevenLabs POST body in `llm-server` — no extra mapping keys needed.
 5. **Streaming** — Bidirectional audio: Twilio ↔ WebSocketService ↔ ElevenLabs
 6. **Call ends** — ElevenLabs closes WSS → `WebSocketService.closeWSConnection()` → clears intervals, closes both sockets
 7. **Post-call** — 3s delay, then `PostCallQueue.add()` fires BullMQ job. `SessionManager.deleteSession()` cleans up Redis.

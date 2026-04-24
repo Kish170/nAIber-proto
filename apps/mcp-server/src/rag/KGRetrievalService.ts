@@ -1,15 +1,15 @@
 import cosine from 'compute-cosine-similarity';
-import { GraphQueryRepository } from '../repositories/GraphQueryRepository.js';
-import { getConversationTopics } from '../personas/general/ConversationHandler.js';
+import { ConversationRepository } from '@naiber/shared-data';
+import { GraphQueryRepository } from './GraphQueryRepository.js';
 import type {
-    EnrichedMemory,
-    KGRetrievalResult,
-    KGHighlightContext,
-    KGPersonResult,
+    MemoryDocument,
     KGHighlightResult,
     KGRelatedTopic,
-} from '../types/graph.js';
-import type { MemoryDocument } from './MemoryRetriever.js';
+    KGPersonResult,
+    KGHighlightContext,
+    EnrichedMemory,
+    KGRetrievalResultExtended,
+} from './types.js';
 
 export interface KGRetrievalConfig {
     alpha: number;
@@ -59,55 +59,36 @@ export class KGRetrievalService {
         userId: string,
         messageEmbedding: number[],
         qdrantDocuments: MemoryDocument[]
-    ): Promise<KGRetrievalResult> {
+    ): Promise<KGRetrievalResultExtended> {
         try {
             const qdrantPointIds = qdrantDocuments
                 .map(d => d.metadata?.qdrantPointId)
-                .filter((id): id is string => !!id);
+                .filter((id): id is string => typeof id === 'string' && !!id);
 
             const [stream1, stream2] = await Promise.all([
                 this.enrichQdrantResults(qdrantPointIds),
                 this.discoverFromKG(userId, messageEmbedding),
             ]);
 
-            const mergedMap = this.mergeAndDeduplicate(
-                qdrantDocuments,
-                stream1,
-                stream2
-            );
-
+            const mergedMap = this.mergeAndDeduplicate(qdrantDocuments, stream1, stream2);
             const ranked = this.rerank(mergedMap);
             await this.expandContext(ranked);
-
-            console.log('[KGRetrievalService] Retrieval complete:', {
-                qdrantInput: qdrantDocuments.length,
-                kgDiscovered: stream2.kgDiscoveredHighlights.length,
-                merged: mergedMap.size,
-                finalCount: ranked.length,
-                personsCount: stream2.personsForTopics.length,
-            });
 
             return {
                 enrichedMemories: ranked,
                 highlights: ranked.map(m => m.text),
                 personsContext: stream2.personsForTopics,
+                relatedTopics: stream2.relatedTopics,
             };
         } catch (error) {
             console.error('[KGRetrievalService] KG retrieval failed, falling back to empty:', error);
-            return {
-                enrichedMemories: [],
-                highlights: [],
-                personsContext: [],
-            };
+            return { enrichedMemories: [], highlights: [], personsContext: [], relatedTopics: [] };
         }
     }
 
     private async enrichQdrantResults(qdrantPointIds: string[]): Promise<Stream1Result> {
         if (qdrantPointIds.length === 0) {
-            return {
-                topicsForHighlights: new Map(),
-                contextMap: new Map(),
-            };
+            return { topicsForHighlights: new Map(), contextMap: new Map() };
         }
 
         const [topicsForHighlights, highlightContexts] = await Promise.all([
@@ -124,20 +105,15 @@ export class KGRetrievalService {
     }
 
     private async discoverFromKG(userId: string, messageEmbedding: number[]): Promise<Stream2Result> {
-        const pgTopics = await getConversationTopics(userId);
-        const rankedTopics = this.rankTopicsByEmbedding(pgTopics, messageEmbedding);
-        const topTopicIds = rankedTopics
-            .slice(0, this.config.pgTopicLimit)
-            .map(t => t.id);
+        const pgTopics = await ConversationRepository.findTopicsByElderlyProfileId(userId);
+        const rankedTopics = this.rankTopicsByEmbedding(
+            pgTopics.map(t => ({ id: t.id, topicName: t.topicName, topicEmbedding: (t.topicEmbedding ?? []) as number[] })),
+            messageEmbedding
+        );
+        const topTopicIds = rankedTopics.slice(0, this.config.pgTopicLimit).map(t => t.id);
 
         if (topTopicIds.length === 0) {
-            return {
-                rankedTopics,
-                topTopicIds,
-                kgDiscoveredHighlights: [],
-                relatedTopics: [],
-                personsForTopics: [],
-            };
+            return { rankedTopics, topTopicIds, kgDiscoveredHighlights: [], relatedTopics: [], personsForTopics: [] };
         }
 
         const [kgDiscoveredHighlights, relatedTopics, personsForTopics] = await Promise.all([
@@ -157,7 +133,7 @@ export class KGRetrievalService {
         const mergedMap = new Map<string, EnrichedMemory>();
 
         for (const doc of qdrantDocuments) {
-            const pid = doc.metadata?.qdrantPointId;
+            const pid = doc.metadata?.qdrantPointId as string | undefined;
             if (!pid) continue;
 
             const ctx = stream1.contextMap.get(pid);
@@ -185,8 +161,9 @@ export class KGRetrievalService {
                 const existing = mergedMap.get(kgH.qdrantPointId)!;
                 existing.source = 'both';
                 existing.kgScore = Math.min(1.0, existing.kgScore + 0.15);
-                existing.finalScore = this.config.alpha * existing.qdrantScore
-                    + (1 - this.config.alpha) * existing.kgScore;
+                existing.finalScore =
+                    this.config.alpha * existing.qdrantScore +
+                    (1 - this.config.alpha) * existing.kgScore;
                 continue;
             }
 
@@ -232,7 +209,7 @@ export class KGRetrievalService {
             }
         }
     }
-    
+
     private rankTopicsByEmbedding(
         topics: { id: string; topicName: string; topicEmbedding: number[] }[],
         messageEmbedding: number[]
@@ -272,9 +249,7 @@ export class KGRetrievalService {
         for (const tid of highlight.topicIds) {
             topicRelevance += rankedMap.get(tid) ?? 0;
         }
-        topicRelevance = highlight.topicIds.length > 0
-            ? topicRelevance / highlight.topicIds.length
-            : 0;
+        topicRelevance = highlight.topicIds.length > 0 ? topicRelevance / highlight.topicIds.length : 0;
 
         const importance = Math.min(1.0, highlight.importanceScore / 10);
         return 0.6 * topicRelevance + 0.4 * importance;

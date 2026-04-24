@@ -60,11 +60,48 @@ export abstract class SystemPrompt {
     `.trim();
 
     protected buildUserContext(userProfile: UserProfile): string {
-        return `
-            # USER CONTEXT
-            User ID: ${userProfile.id}
-            Phone: ${userProfile.phone}
-        `.trim();
+        const basic = userProfile.getBasicInfo();
+        const lines: string[] = [
+            '# USER CONTEXT',
+            `User ID: ${userProfile.id}`,
+            `Name: ${basic.name}`,
+        ];
+
+        if (basic.age)    lines.push(`Age: ${basic.age}`);
+        if (basic.gender) lines.push(`Gender: ${basic.gender}`);
+
+        if (basic.interests?.length) {
+            const list = (basic.interests as any[])
+                .map((i: any) => typeof i === 'string' ? i : (i.name ?? JSON.stringify(i)))
+                .join(', ');
+            lines.push(`Interests: ${list}`);
+        }
+        if (basic.dislikes?.length) {
+            const list = (basic.dislikes as any[])
+                .map((i: any) => typeof i === 'string' ? i : (i.name ?? JSON.stringify(i)))
+                .join(', ');
+            lines.push(`Dislikes: ${list}`);
+        }
+
+        const conditions = userProfile.getActiveHealthConditions();
+        if (conditions.length) {
+            const formatted = conditions.map(c =>
+                c.notes ? `${c.condition} (${c.severity} — ${c.notes})` : `${c.condition} (${c.severity})`
+            );
+            lines.push(`Health conditions: ${formatted.join('; ')}`);
+        }
+
+        const medications = userProfile.getActiveMedications();
+        if (medications.length) {
+            lines.push(`Medications: ${medications.map(m => m.name).join(', ')}`);
+        }
+
+        const topics = userProfile.getConversationTopics(5);
+        if (topics.length) {
+            lines.push(`Recent conversation topics: ${topics.map(t => t.topicName).join(', ')}`);
+        }
+
+        return lines.join('\n');
     }
 
     protected cleanJson(obj: any): string {

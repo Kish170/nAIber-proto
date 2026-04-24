@@ -45,15 +45,15 @@ const keep = <T>(fallback: T) => ({
 
 export const HealthCheckState = Annotation.Root({
     messages: Annotation<BaseMessage[]>({
-        reducer: (x, y) => x.concat(y),
+        reducer: (x: BaseMessage[], y: BaseMessage[]) => x.concat(y),
         default: () => []
     }),
     userId: Annotation<string>({
-        reducer: (x, y) => y || x || '',
+        reducer: (x: string, y: string) => y || x || '',
         default: () => ''
     }),
     conversationId: Annotation<string>({
-        reducer: (x, y) => y || x || '',
+        reducer: (x: string, y: string) => y || x || '',
         default: () => ''
     }),
 
@@ -72,11 +72,11 @@ export const HealthCheckState = Annotation.Root({
     response: Annotation<string>(keep<string>("")),
 
     lastInterpretation: Annotation<InterpretationResult | null>({
-        reducer: (_x, y) => (y !== undefined ? y : null),
+        reducer: (_x: InterpretationResult | null, y: InterpretationResult | null) => (y !== undefined ? y : null),
         default: () => null
     }),
     currentDecision: Annotation<AgentDecision | null>({
-        reducer: (_x, y) => (y !== undefined ? y : null),
+        reducer: (_x: AgentDecision | null, y: AgentDecision | null) => (y !== undefined ? y : null),
         default: () => null
     }),
     currentQuestionFollowUpCount: Annotation<number>(keep<number>(0)),

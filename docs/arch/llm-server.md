@@ -10,12 +10,12 @@ For the full end-to-end picture see `docs/arch/overview.md`. This document goes 
 
 ## Responsibilities
 
-- Serve `POST /v1/chat/completions` (OpenAI-compatible) for ElevenLabs
-- Resolve conversation context from Redis for each incoming request
+- Serve `POST /v1/chat/completions` (OpenAI-compatible) for ElevenLabs (health/cognitive calls only)
 - Route messages to the correct persona graph via `SupervisorGraph`
-- Run the **general conversation** graph with RAG memory retrieval
 - Run the **health check** graph with durable interrupt/resume execution
 - Process post-call jobs (summarization, embeddings, DB persistence)
+
+**General calls** are handled by ElevenLabs native LLM + `apps/mcp-server` MCP tools. llm-server is not involved in general call live turns.
 
 **Does NOT own:** Telephony, WebSocket session management, system prompts (those live in `server/src/prompts/`), shared types or clients.
 
@@ -26,14 +26,11 @@ For the full end-to-end picture see `docs/arch/overview.md`. This document goes 
 ```
 packages/llm-server/src/
 ├── controllers/
-│   └── LLMController.ts                  # Fallback handler when no session context found
+│   └── LLMController.ts                  # Fallback handler when userId/conversationId missing
 ├── graphs/
 │   └── SupervisorGraph.ts                # Top-level router to persona graphs
 ├── personas/
 │   ├── general/
-│   │   ├── ConversationGraph.ts          # Intent → RAG → Response pipeline
-│   │   ├── ConversationState.ts          # LangGraph state annotation
-│   │   ├── ConversationHandler.ts        # Helper methods (memory injection, etc.)
 │   │   └── post-call/
 │   │       ├── GeneralPostCallGraph.ts   # Summary, topic extraction, embeddings
 │   │       └── PostCallState.ts
@@ -60,10 +57,6 @@ packages/llm-server/src/
 │   ├── StatusRoute.ts                    # GET /status
 │   └── BullBoardRoute.ts                 # GET /admin/queues (queue dashboard)
 ├── services/
-│   ├── ConversationResolver.ts           # Extracts session context from incoming requests
-│   ├── MemoryRetriever.ts                # Qdrant vector search
-│   ├── TopicManager.ts                   # Topic change detection + embedding cache
-│   ├── IntentClassifier.ts               # Classifies if message needs RAG
 │   └── HealthDataService.ts              # Health-specific data utilities
 ├── states/
 │   └── SupervisorState.ts                # Shared state annotation for supervisor
@@ -82,23 +75,17 @@ packages/llm-server/src/
 sequenceDiagram
     participant EL as ElevenLabs
     participant Route as LLMRoute
-    participant Resolver as ConversationResolver
     participant Redis
     participant SG as SupervisorGraph
     participant PG as Persona Graph
 
-    EL->>Route: POST /v1/chat/completions { messages, user }
-    Route->>Resolver: resolveConversation(request)
-    Resolver->>Redis: GET rag:user:{userId} → conversationId
-    Resolver->>Redis: GET session:{conversationId} → session
-    Resolver-->>Route: { conversationId, userId, callType, ... }
+    EL->>Route: POST /v1/chat/completions { messages, conversation_id, elevenlabs_extra_body.user_id }
+    Note over Route: userId = body.elevenlabs_extra_body.user_id<br/>conversationId = body.conversation_id
 
     Route->>SG: invoke({ messages, userId, conversationId })
     SG->>Redis: GET session:{conversationId} → callType
 
-    alt callType = general
-        SG->>PG: ConversationGraph.invoke()
-    else callType = health_check
+    alt callType = health_check
         SG->>PG: HealthCheckGraph.invoke() with checkpointer
     end
 
@@ -114,20 +101,16 @@ sequenceDiagram
 
 ---
 
-## ConversationResolver
+## Context Resolution
 
-`services/ConversationResolver.ts` bridges the gap between an ElevenLabs request (which has an OpenAI-style message array) and the Redis session data written by `server`.
+`LLMRoute` resolves context using a two-step approach:
 
-**Resolution order:**
-1. Check `request.user` or `request.user_id` field
-2. Extract `userId` from system message via regex pattern
-3. Extract `phone` from system message
-4. Look up `rag:user:{userId}` or `rag:phone:{phone}` in Redis to get `conversationId`
-5. Fetch `session:{conversationId}` for full session data
+1. `userId` — from `body.user` (ElevenLabs forwards the top-level `user_id` from `conversation_initiation_client_data` as `user` in every custom LLM POST body), with fallbacks to `body.user_id` and `body.elevenlabs_extra_body.user_id`.
+2. `conversationId` — Redis lookup: `GET rag:user:{userId}` (written by `server`'s `registerSession()` when ElevenLabs sends the conversation ID back over the WebSocket).
 
-If resolution fails (no session found), `LLMRoute` falls back to `LLMController` — a generic GPT-4o passthrough with no persona context. This is a degraded state, not an error.
+**Why Redis for conversationId?** ElevenLabs does **not** include `conversation_id` in the POST body to custom LLM endpoints. It is only sent in the `conversation_initiation_metadata` WebSocket event — which `server` receives and writes to Redis.
 
-**Known gap:** If a Redis session expires mid-call (1h TTL), the resolver will fail to find context and fall back to the generic controller. This silently degrades the call experience.
+If either is missing, `LLMRoute` falls back to `LLMController` — a generic GPT-4o passthrough with no persona context.
 
 ---
 
@@ -156,52 +139,13 @@ flowchart LR
 
 ---
 
-## ConversationGraph (General Call)
+## General Call (ElevenLabs Native LLM + MCP)
 
-`personas/general/ConversationGraph.ts` handles the RAG-backed conversation pipeline for general companionship calls.
+General calls are handled entirely by ElevenLabs native LLM + `apps/mcp-server` MCP tools. llm-server is **not involved** in live general call turns.
 
-```mermaid
-flowchart LR
-    start([start]) --> classify_intent
-    classify_intent -->|needs RAG| manage_topic_state
-    classify_intent -->|skip| skip_rag
-    manage_topic_state --> retrieve_memories
-    retrieve_memories --> generate_response
-    skip_rag --> generate_response
-    generate_response --> END([end])
-```
+ElevenLabs calls `getUserProfile` and `retrieveMemories` tools from `apps/mcp-server` as needed. The general agent system prompt is injected by `server` at session start via `conversation_config_override`.
 
-### Nodes
-
-**`classify_intent`**
-Calls `IntentClassifier` to decide if the user's message warrants RAG lookup. Short responses ("yeah", "ok", "that's nice"), pleasantries, and simple continuations are tagged as non-substantive and skip the RAG path. This avoids expensive vector searches on filler turns.
-
-**`manage_topic_state`**
-- Generates an embedding for the current user message
-- Compares cosine similarity to the cached topic centroid (`rag:topic:{conversationId}`)
-- If similarity is below threshold → topic has changed → marks `topicChanged: true`
-- Updates the centroid and highlights cache in Redis
-
-**`retrieve_memories`**
-- If `topicChanged` or cache is stale: calls `MemoryRetriever.search()` for top-5 similar memories from Qdrant
-- Returns `retrievedMemories[]` — strings to inject into the LLM system prompt
-- If topic has not changed and cache is fresh: skips the vector search and uses cached highlights
-
-**`skip_rag`**
-Sets `shouldProcessRAG: false`. The graph still generates a response, just without memory context.
-
-**`generate_response`**
-- Calls GPT-4o with the conversation history
-- If memories were retrieved, they are injected under a `RELEVANT MEMORIES` section in the system prompt
-- Returns the response string
-
-### RAG flow summary
-```
-user message → embed → compare to topic centroid
-  → if changed: Qdrant vector search (top-5) → inject into prompt
-  → if same: use cached highlights → inject into prompt
-  → GPT-4o response
-```
+Post-call processing (`GeneralPostCallGraph`) still runs in llm-server via BullMQ.
 
 ---
 
@@ -302,10 +246,6 @@ Post-call: worker reads checkpoint state → extracts healthCheckAnswers[] → p
 
 | Service | Purpose |
 |---|---|
-| `ConversationResolver` | Maps incoming ElevenLabs request → Redis session context |
-| `IntentClassifier` | Classifies if a message is substantive enough to warrant RAG |
-| `TopicManager` | Detects topic shifts via cosine similarity; manages Redis embedding cache |
-| `MemoryRetriever` | Qdrant vector search for top-N memories by cosine similarity |
 | `HealthDataService` | Health-specific data utilities used by HealthCheckHandler |
 
 ---
@@ -317,7 +257,7 @@ Post-call: worker reads checkpoint state → extracts healthCheckAnswers[] → p
 | `health_check:{userId}:{conversationId}` | checkpoint-managed | LangGraph state blob (questions, answers, index, attempts) |
 | `rag:topic:{conversationId}` | variable | `{ centroid: number[], highlights: string[], messageCount: number }` |
 
-> `llm-server` also **reads** `session:{conversationId}`, `rag:user:{userId}`, and `rag:phone:{phone}` — but these are written and owned by `server`.
+> `llm-server` also **reads** `session:{conversationId}` — written and owned by `server`.
 
 ---
 

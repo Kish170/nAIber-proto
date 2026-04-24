@@ -19,10 +19,10 @@ export class QuestionContextBuilder {
             ctx += `Use this when directly relevant. Reference prior data naturally — do not recite the full list.\n\n`;
         }
 
-        const validAnswers = state.healthCheckAnswers.filter(a => a.isValid);
+        const validAnswers = state.healthCheckAnswers.filter((a: HealthCheckAnswer) => a.isValid);
         if (validAnswers.length > 0) {
             ctx += `## Recorded Responses So Far\n`;
-            validAnswers.forEach(a => {
+            validAnswers.forEach((a: HealthCheckAnswer) => {
                 ctx += `- ${a.question.question}: ${a.validatedAnswer}\n`;
             });
             ctx += `\n`;
@@ -58,7 +58,7 @@ export class QuestionContextBuilder {
     }
 
     private buildNextContext(question: QuestionData, state: HealthCheckStateType): string {
-        const lastValid = [...state.healthCheckAnswers].reverse().find(a => a.isValid);
+        const lastValid = [...state.healthCheckAnswers].reverse().find((a: HealthCheckAnswer) => a.isValid);
 
         if (!lastValid || lastValid.question.type !== 'boolean') {
             return this.buildStandardQuestion(question);
@@ -168,7 +168,7 @@ export class QuestionContextBuilder {
         const match = question.id.match(/^follow_up_(\d+)_/);
         if (!match) return undefined;
         const parentIndex = parseInt(match[1], 10);
-        return state.healthCheckAnswers.find(a => a.questionIndex === parentIndex);
+        return state.healthCheckAnswers.find((a: HealthCheckAnswer) => a.questionIndex === parentIndex);
     }
 
     private getFormatHint(question: QuestionData): string {
@@ -198,7 +198,7 @@ export class QuestionContextBuilder {
 
     filterMessages(messages: BaseMessage[], windowSize: number): BaseMessage[] {
         return messages
-            .filter(m => !(m instanceof SystemMessage))
+            .filter((m: BaseMessage) => !(m instanceof SystemMessage))
             .slice(-windowSize);
     }
 }

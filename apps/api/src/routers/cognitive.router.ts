@@ -8,19 +8,19 @@ export const cognitiveRouter = router({
             elderlyProfileId: z.string().uuid(),
             limit: z.number().min(1).max(50).default(10),
         }))
-        .query(async ({ input }) => {
+        .query(async ({ input }: { input: any }) => {
             return await CognitiveRepository.findSessionsWithCallLog(input.elderlyProfileId, input.limit);
         }),
 
     getSessionDetail: caregiverProcedure
         .input(z.object({ id: z.string().uuid() }))
-        .query(async ({ input }) => {
+        .query(async ({ input }: { input: any }) => {
             return await CognitiveRepository.findSessionDetailById(input.id);
         }),
 
     getBaseline: caregiverProcedure
         .input(z.object({ elderlyProfileId: z.string().uuid() }))
-        .query(async ({ input }) => {
+        .query(async ({ input }: { input: any }) => {
             return await CognitiveRepository.getLatestBaseline(input.elderlyProfileId);
         }),
 
@@ -29,7 +29,7 @@ export const cognitiveRouter = router({
             elderlyProfileId: z.string().uuid(),
             count: z.number().min(2).max(20).default(10),
         }))
-        .query(async ({ input }) => {
+        .query(async ({ input }: { input: any }) => {
             return await CognitiveRepository.findRecentCompletedResults(input.elderlyProfileId, input.count);
         }),
 });

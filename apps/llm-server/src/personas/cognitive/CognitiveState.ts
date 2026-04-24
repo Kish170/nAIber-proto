@@ -11,15 +11,15 @@ const keep = <T>(fallback: T) => ({
 
 export const CognitiveState = Annotation.Root({
     messages: Annotation<BaseMessage[]>({
-        reducer: (x, y) => x.concat(y),
+        reducer: (x: BaseMessage[], y: BaseMessage[]) => x.concat(y),
         default: () => []
     }),
     userId: Annotation<string>({
-        reducer: (x, y) => y || x || '',
+        reducer: (x: string, y: string) => y || x || '',
         default: () => ''
     }),
     conversationId: Annotation<string>({
-        reducer: (x, y) => y || x || '',
+        reducer: (x: string, y: string) => y || x || '',
         default: () => ''
     }),
     response: Annotation<string>(keep<string>("")),

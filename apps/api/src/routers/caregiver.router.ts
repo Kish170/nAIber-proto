@@ -5,12 +5,12 @@ import { CaregiverRepository, CaregiverUserLinkRepository } from '@naiber/shared
 
 export const caregiverRouter = router({
     getProfile: caregiverProcedure
-        .query(async ({ ctx }) => {
+        .query(async ({ ctx }: { ctx: any }) => {
             return await CaregiverRepository.findById(ctx.session.caregiverProfileId!);
         }),
 
     getManagedUsers: caregiverProcedure
-        .query(async ({ ctx }) => {
+        .query(async ({ ctx }: { ctx: any }) => {
             return await CaregiverRepository.findManagedUsers(ctx.session.caregiverProfileId!);
         }),
 
@@ -19,7 +19,7 @@ export const caregiverRouter = router({
             elderlyProfileId: z.string().uuid(),
             isPrimary: z.boolean().default(false),
         }))
-        .mutation(async ({ ctx, input }) => {
+        .mutation(async ({ ctx, input }: { ctx: any; input: any }) => {
             const existing = await CaregiverUserLinkRepository.findByCaregiverAndUser(
                 ctx.session.caregiverProfileId!,
                 input.elderlyProfileId,
@@ -36,7 +36,7 @@ export const caregiverRouter = router({
 
     removeLink: caregiverProcedure
         .input(z.object({ linkId: z.string().uuid() }))
-        .mutation(async ({ input }) => {
+        .mutation(async ({ input }: { input: any }) => {
             return await CaregiverUserLinkRepository.removeLink(input.linkId);
         }),
 });

@@ -78,6 +78,7 @@ services:
       ELEVENLABS_MODEL_ID: ${ELEVENLABS_MODEL_ID}
       ELEVENLABS_AUDIO_FORMAT: ${ELEVENLABS_AUDIO_FORMAT}
       ELEVENLABS_SAMPLE_RATE: ${ELEVENLABS_SAMPLE_RATE}
+      ELEVENLABS_CUSTOM_LLM_URL: ${ELEVENLABS_CUSTOM_LLM_URL}
 
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       OPENAI_BASE_URL: ${OPENAI_BASE_URL}
@@ -146,6 +147,8 @@ services:
       LANGCHAIN_API_KEY: ${LANGCHAIN_API_KEY}
       LANGCHAIN_TRACING_V2: ${LANGCHAIN_TRACING_V2}
 
+      MCP_SERVER_URL: http://mcp-server:3002
+
     volumes:
       - ./apps/llm-server/src:/app/apps/llm-server/src
     ports:
@@ -154,6 +157,8 @@ services:
       redis:
         condition: service_healthy
       neo4j:
+        condition: service_healthy
+      mcp-server:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
@@ -186,6 +191,52 @@ services:
       timeout: 3s
       retries: 3
       start_period: 10s
+
+  mcp-server:
+    build:
+      context: .
+      dockerfile: apps/mcp-server/Dockerfile
+    container_name: naiber-mcp-server
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      MCP_PORT: 3002
+
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL}
+
+      QDRANT_API_KEY: ${QDRANT_API_KEY}
+      QDRANT_URL: ${QDRANT_URL}
+      QDRANT_COLLECTION: ${QDRANT_COLLECTION}
+
+      REDIS_URL: redis://redis:6379
+
+      NEO4J_URI: ${NEO4J_URI:-bolt://neo4j:7687}
+      NEO4J_USERNAME: ${NEO4J_USERNAME:-neo4j}
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD}
+      NEO4J_DATABASE: ${NEO4J_DATABASE}
+
+      DATABASE_URL: ${DATABASE_URL}
+      DIRECT_URL: ${DIRECT_URL}
+
+      RAG_MEMORY_SIMILARITY_THRESHOLD: ${RAG_MEMORY_SIMILARITY_THRESHOLD:-0.45}
+
+    volumes:
+      - ./apps/mcp-server/src:/app/apps/mcp-server/src
+    ports:
+      - "${MCP_HOST_PORT:-3004}:3002"
+    depends_on:
+      redis:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3002/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 40s
+
 
 volumes:
   redis_data:

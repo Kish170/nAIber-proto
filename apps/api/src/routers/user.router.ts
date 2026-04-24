@@ -6,7 +6,7 @@ import { UserRepository } from '@naiber/shared-data';
 export const userRouter = router({
     getById: caregiverProcedure
         .input(z.object({ id: z.string().uuid() }))
-        .query(async ({ input }) => {
+        .query(async ({ input }: { input: any }) => {
             const profile = await UserRepository.findById(input.id);
             if (!profile) {
                 throw new TRPCError({ code: 'NOT_FOUND', message: 'Elderly profile not found' });
@@ -15,7 +15,7 @@ export const userRouter = router({
         }),
 
     getOwnProfile: elderlyProcedure
-        .query(async ({ ctx }) => {
+        .query(async ({ ctx }: { ctx: any }) => {
             const profile = await UserRepository.findById(ctx.session.elderlyProfileId!);
             if (!profile) {
                 throw new TRPCError({ code: 'NOT_FOUND', message: 'Profile not found' });
