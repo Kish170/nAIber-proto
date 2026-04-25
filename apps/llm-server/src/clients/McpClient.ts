@@ -36,24 +36,46 @@ export class McpClient {
         try {
             await client.connect(transport);
             const result = await client.callTool({ name: toolName, arguments: args });
+            const contents = Array.isArray(result.content) ? result.content : [];
+            const textContent = contents.find(
+                (content): content is { type: 'text'; text: string } =>
+                    typeof content === 'object' &&
+                    content !== null &&
+                    'type' in content &&
+                    content.type === 'text' &&
+                    'text' in content &&
+                    typeof content.text === 'string'
+            );
 
-            const content = result.content?.[0];
-            if (content?.type === 'text') {
-                return content.text;
+            if (result.isError) {
+                const message = textContent?.text ?? `MCP tool ${toolName} failed`;
+                throw new Error(`MCP tool ${toolName} failed: ${message}`);
             }
-            throw new Error(`Unexpected MCP response content type: ${content?.type}`);
+
+            if (textContent) {
+                return textContent.text;
+            }
+            throw new Error(`Unexpected MCP response content type for ${toolName}`);
         } finally {
             await client.close().catch(() => {});
         }
     }
 
+    private parseJsonResponse<T>(toolName: string, text: string): T {
+        try {
+            return JSON.parse(text) as T;
+        } catch {
+            throw new Error(`MCP tool ${toolName} returned non-JSON text: ${text}`);
+        }
+    }
+
     async getUserProfile(userId: string): Promise<UserProfileData> {
         const text = await this.callTool('getUserProfile', { userId });
-        return JSON.parse(text) as UserProfileData;
+        return this.parseJsonResponse<UserProfileData>('getUserProfile', text);
     }
 
     async retrieveMemories(query: string, userId: string): Promise<MemoriesData> {
         const text = await this.callTool('retrieveMemories', { query, userId });
-        return JSON.parse(text) as MemoriesData;
+        return this.parseJsonResponse<MemoriesData>('retrieveMemories', text);
     }
 }

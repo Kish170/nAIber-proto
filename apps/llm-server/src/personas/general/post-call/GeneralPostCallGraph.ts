@@ -115,15 +115,40 @@ export class GeneralPostCallGraph {
                     {
                       "summaryText": "A 2-3 sentence summary of the conversation covering main topics and user's mood/state",
                       "topicsDiscussed": ["topic1", "topic2", "topic3"],
-                      "keyHighlights": ["notable thing user mentioned 1", "notable thing user mentioned 2"]
+                      "keyHighlights": [
+                        { "text": "80-150 char description of a notable moment", "importanceScore": 7 }
+                      ]
                     }
 
                     Guidelines:
                     - Focus on what the USER said, not what nAIber said
                     - Capture topics the user seemed engaged with
                     - Note any important life updates, health mentions, or emotional moments
-                    - Keep it concise but meaningful
-                    - Include user's emotional tone in the summaryText`
+                    - Include user's emotional tone in the summaryText
+
+                    Topic rules — topicsDiscussed are reusable category labels, NOT event descriptions:
+                    - Use short general words or phrases (1-3 words): "baking", "gardening", "family", "health", "music"
+                    - Do NOT describe the specific event — that belongs in keyHighlights
+                    - Good: ["baking", "family", "health"] — Bad: ["baking gingerbread cookies", "family lunch visit", "husband's hospital update"]
+                    - Do NOT include meta-topics about the conversation itself: "end of conversation", "goodbye", "greeting", "small talk", "technical issues"
+                    - Aim for 2-5 topics; a topic that only came up briefly does not need to be included
+
+                    keyHighlights rules — each highlight is a standalone memory entry:
+                    - Write 80-150 characters per highlight — enough context to stand alone as a memory
+                    - Include: what happened, any named person involved, and the user's emotional response or mood
+                    - Focus on specificity and feeling, not just the event label
+                    - Bad:  "lunch with daughter Sarah"
+                    - Good: "shared lunch with daughter Sarah who visited from out of town; user seemed warm and happy"
+                    - Bad:  "garden work"
+                    - Good: "neighbor Tom helped in the garden; user mentioned it was good to have company outside"
+                    - Bad:  "positive blood pressure update from Dr. Patel"
+                    - Good: "Dr. Patel told user blood pressure is improving; user sounded relieved and pleased with progress"
+
+                    importanceScore — integer 1-10 reflecting significance to this user's life:
+                    - 1-3: routine mention, passing comment
+                    - 4-6: notable event or update worth remembering
+                    - 7-9: meaningful life event (family visit, health news, emotional moment)
+                    - 10: significant milestone or moment`
                 },
                 {
                     role: 'user',
@@ -143,14 +168,35 @@ export class GeneralPostCallGraph {
             }
 
             const summary = JSON.parse(response.choices[0].message.content);
-            console.log('[PostCallGraph] Conversation summary generated successfully');
+
+            const rawHighlights: unknown[] = Array.isArray(summary.keyHighlights) ? summary.keyHighlights : [];
+            summary.keyHighlights = rawHighlights.map((h: unknown) => {
+                if (typeof h === 'string') return { text: h, importanceScore: 5 };
+                const hl = h as { text?: string; importanceScore?: number };
+                return {
+                    text: hl.text ?? String(h),
+                    importanceScore: typeof hl.importanceScore === 'number'
+                        ? Math.min(10, Math.max(1, Math.round(hl.importanceScore)))
+                        : 5,
+                };
+            });
+
+            console.log('[PostCallGraph] Summary generated:', JSON.stringify({
+                summaryTextLength: summary.summaryText?.length ?? 0,
+                topicCount: summary.topicsDiscussed?.length ?? 0,
+                highlightCount: summary.keyHighlights?.length ?? 0,
+                topics: summary.topicsDiscussed,
+                highlights: summary.keyHighlights.map((h: { text: string; importanceScore: number }) =>
+                    `[${h.importanceScore}] ${h.text}`
+                ),
+            }));
 
             const conversationSummary = await createSummary({
                 elderlyProfileId: state.userId,
                 conversationId: state.conversationId,
                 summaryText: summary.summaryText,
                 topicsDiscussed: summary.topicsDiscussed,
-                keyHighlights: summary.keyHighlights
+                keyHighlights: summary.keyHighlights.map((h: { text: string }) => h.text)
             });
 
             console.log('[PostCallGraph] Summary saved to PostgreSQL');
@@ -247,7 +293,11 @@ export class GeneralPostCallGraph {
                 }
             }
 
-            console.log(`[PostCallGraph] Topic matching complete: ${topicsToCreate.length} new, ${topicsToUpdate.length} matched`);
+            console.log('[PostCallGraph] Topic matching complete:', JSON.stringify({
+                newTopicCount: topicsToCreate.length,
+                matchedCount: topicsToUpdate.length,
+                topicMatchResults,
+            }));
 
             return {
                 existingTopics,
@@ -296,15 +346,15 @@ export class GeneralPostCallGraph {
                 }
             }
 
-            for (const { oldName, newName, topicId, existingEmbedding, newEmbedding } of state.topicsToUpdate) {
+            for (const { oldName, newName, topicId, newEmbedding } of state.topicsToUpdate) {
                 try {
                     await updateConversationTopic(state.userId, oldName, newName);
 
-                    const avgEmbedding = existingEmbedding.map((v: number, i: number) => (v + newEmbedding[i]) / 2);
+
                     await ConversationRepository.upsertTopic({
                         elderlyProfileId: state.userId,
                         topicName: newName,
-                        topicEmbedding: avgEmbedding
+                        topicEmbedding: newEmbedding
                     });
 
                     await createConversationReferences({
@@ -312,7 +362,7 @@ export class GeneralPostCallGraph {
                         conversationTopicId: topicId
                     });
 
-                    console.log(`[PostCallGraph] Updated topic: "${oldName}" → "${newName}" (embedding updated)`);
+                    console.log(`[PostCallGraph] Updated topic: "${oldName}" → "${newName}" (embedding replaced)`);
                 } catch (error) {
                     const errorMsg = `Failed to update topic "${oldName}": ${error instanceof Error ? error.message : 'Unknown error'}`;
                     console.error('[PostCallGraph]', errorMsg);
@@ -353,10 +403,11 @@ export class GeneralPostCallGraph {
             };
 
             const highlightEntries = await Promise.all(
-                state.summary.keyHighlights.map(async (text: string) => {
-                    const { embedding } = await this.embeddingService.generateEmbedding(text);
+                state.summary.keyHighlights.map(async (highlight: { text: string; importanceScore: number }) => {
+                    const { embedding } = await this.embeddingService.generateEmbedding(highlight.text);
                     return {
-                        text,
+                        text: highlight.text,
+                        importanceScore: highlight.importanceScore,
                         embedding,
                         id: crypto.randomUUID()
                     };
@@ -364,13 +415,19 @@ export class GeneralPostCallGraph {
             );
 
             await this.vectorStore.addMemoriesWithIds(highlightEntries, metadata);
-            console.log(`[PostCallGraph] Stored ${highlightEntries.length} highlights in vector database`);
+            console.log('[PostCallGraph] Embeddings stored:', JSON.stringify({
+                highlightCount: highlightEntries.length,
+                qdrantPointIds: highlightEntries.map((e: { id: string }) => e.id),
+                textLengths: highlightEntries.map((e: { text: string }) => e.text.length),
+                importanceScores: highlightEntries.map((e: { importanceScore: number }) => e.importanceScore),
+            }));
 
             return {
-                highlightEntries: highlightEntries.map((e: { text: string; embedding: number[]; id: string }) => ({
+                highlightEntries: highlightEntries.map((e: { text: string; embedding: number[]; id: string; importanceScore: number }) => ({
                     text: e.text,
                     embedding: e.embedding,
                     qdrantPointId: e.id,
+                    importanceScore: e.importanceScore,
                 }))
             };
 
@@ -438,7 +495,10 @@ export class GeneralPostCallGraph {
             }
 
             const extractedPersons = await this.nerService.extractPersons(state.transcript);
-            console.log(`[PostCallGraph] Extracted ${extractedPersons.length} person(s) from transcript`);
+            console.log('[PostCallGraph] NER extraction:', JSON.stringify({
+                personCount: extractedPersons.length,
+                persons: extractedPersons.map(p => ({ name: p.name, role: p.role, contextLength: p.context.length })),
+            }));
 
             return { extractedPersons };
 

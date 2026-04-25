@@ -1,4 +1,5 @@
 import cosine from 'compute-cosine-similarity';
+import { traceable } from 'langsmith/traceable';
 import { ConversationRepository } from '@naiber/shared-data';
 import { GraphQueryRepository } from './GraphQueryRepository.js';
 import type {
@@ -55,81 +56,122 @@ export class KGRetrievalService {
         this.config = { ...DEFAULT_CONFIG, ...config };
     }
 
-    async retrieve(
-        userId: string,
-        messageEmbedding: number[],
-        qdrantDocuments: MemoryDocument[]
-    ): Promise<KGRetrievalResultExtended> {
-        try {
-            const qdrantPointIds = qdrantDocuments
-                .map(d => d.metadata?.qdrantPointId)
-                .filter((id): id is string => typeof id === 'string' && !!id);
+    retrieve = traceable(
+        async (
+            userId: string,
+            messageEmbedding: number[],
+            qdrantDocuments: MemoryDocument[]
+        ): Promise<KGRetrievalResultExtended> => {
+            try {
+                const qdrantPointIds = qdrantDocuments
+                    .map(d => d.metadata?.qdrantPointId)
+                    .filter((id): id is string => typeof id === 'string' && !!id);
 
-            const [stream1, stream2] = await Promise.all([
-                this.enrichQdrantResults(qdrantPointIds),
-                this.discoverFromKG(userId, messageEmbedding),
+                console.log(`[KGRetrievalService] Starting retrieval: qdrantDocs=${qdrantDocuments.length} qdrantPointIds=${qdrantPointIds.length}`);
+
+                const [stream1, stream2] = await Promise.all([
+                    this.enrichQdrantResults(qdrantPointIds),
+                    this.discoverFromKG(userId, messageEmbedding),
+                ]);
+
+                const mergedMap = this.mergeAndDeduplicate(qdrantDocuments, stream1, stream2);
+                const ranked = this.rerank(mergedMap);
+                await this.expandContext(ranked);
+
+                console.log(`[KGRetrievalService] Retrieval complete: enrichedMemories=${ranked.length} persons=${stream2.personsForTopics.length} relatedTopics=${stream2.relatedTopics.length}`);
+
+                return {
+                    enrichedMemories: ranked,
+                    highlights: ranked.map(m => m.text),
+                    personsContext: stream2.personsForTopics,
+                    relatedTopics: stream2.relatedTopics,
+                };
+            } catch (error) {
+                console.error('[KGRetrievalService] KG retrieval failed, falling back to empty:', error);
+                return { enrichedMemories: [], highlights: [], personsContext: [], relatedTopics: [] };
+            }
+        },
+        { name: 'kg_retrieval', run_type: 'chain' }
+    );
+
+    private enrichQdrantResults = traceable(
+        async (qdrantPointIds: string[]): Promise<Stream1Result> => {
+            if (qdrantPointIds.length === 0) {
+                console.log('[KGRetrievalService] enrichQdrantResults: no point IDs to enrich');
+                return { topicsForHighlights: new Map(), contextMap: new Map() };
+            }
+
+            const [topicsForHighlights, highlightContexts] = await Promise.all([
+                this.graphQuery.getTopicsForHighlights(qdrantPointIds),
+                this.graphQuery.getHighlightContext(qdrantPointIds),
             ]);
 
-            const mergedMap = this.mergeAndDeduplicate(qdrantDocuments, stream1, stream2);
-            const ranked = this.rerank(mergedMap);
-            await this.expandContext(ranked);
+            const contextMap = new Map<string, KGHighlightContext>();
+            for (const ctx of highlightContexts) {
+                contextMap.set(ctx.qdrantPointId, ctx);
+            }
 
-            return {
-                enrichedMemories: ranked,
-                highlights: ranked.map(m => m.text),
-                personsContext: stream2.personsForTopics,
-                relatedTopics: stream2.relatedTopics,
-            };
-        } catch (error) {
-            console.error('[KGRetrievalService] KG retrieval failed, falling back to empty:', error);
-            return { enrichedMemories: [], highlights: [], personsContext: [], relatedTopics: [] };
-        }
-    }
+            const pointsWithTopics = qdrantPointIds.filter(id => (topicsForHighlights.get(id)?.length ?? 0) > 0);
+            const pointsWithoutTopics = qdrantPointIds.filter(id => !pointsWithTopics.includes(id));
 
-    private async enrichQdrantResults(qdrantPointIds: string[]): Promise<Stream1Result> {
-        if (qdrantPointIds.length === 0) {
-            return { topicsForHighlights: new Map(), contextMap: new Map() };
-        }
+            console.log(`[KGRetrievalService] enrichQdrantResults: pointIds=${qdrantPointIds.length} withTopics=${pointsWithTopics.length} withoutTopics(miss)=${pointsWithoutTopics.length} contextsFound=${contextMap.size}`);
 
-        const [topicsForHighlights, highlightContexts] = await Promise.all([
-            this.graphQuery.getTopicsForHighlights(qdrantPointIds),
-            this.graphQuery.getHighlightContext(qdrantPointIds),
-        ]);
+            return { topicsForHighlights, contextMap };
+        },
+        { name: 'kg_enrich_qdrant', run_type: 'chain' }
+    );
 
-        const contextMap = new Map<string, KGHighlightContext>();
-        for (const ctx of highlightContexts) {
-            contextMap.set(ctx.qdrantPointId, ctx);
-        }
+    private discoverFromKG = traceable(
+        async (userId: string, messageEmbedding: number[]): Promise<Stream2Result> => {
+            const pgTopics = await ConversationRepository.findTopicsByElderlyProfileId(userId);
+            const rawRankedTopics = this.rankTopicsByEmbedding(
+                pgTopics.map(t => ({ id: t.id, topicName: t.topicName, topicEmbedding: (t.topicEmbedding ?? []) as number[] })),
+                messageEmbedding
+            );
 
-        return { topicsForHighlights, contextMap };
-    }
+            const interestedInMap = await this.graphQuery.getInterestedInStrengths(
+                userId,
+                rawRankedTopics.map(t => t.id)
+            );
+            const rankedTopics = rawRankedTopics
+                .map(t => ({
+                    ...t,
+                    similarity: Math.min(1.0, t.similarity * (1 + (interestedInMap.get(t.id) ?? 0)))
+                }))
+                .sort((a, b) => b.similarity - a.similarity);
 
-    private async discoverFromKG(userId: string, messageEmbedding: number[]): Promise<Stream2Result> {
-        const pgTopics = await ConversationRepository.findTopicsByElderlyProfileId(userId);
-        const rankedTopics = this.rankTopicsByEmbedding(
-            pgTopics.map(t => ({ id: t.id, topicName: t.topicName, topicEmbedding: (t.topicEmbedding ?? []) as number[] })),
-            messageEmbedding
-        );
-        const topTopicIds = rankedTopics.slice(0, this.config.pgTopicLimit).map(t => t.id);
+            const topTopicIds = rankedTopics.slice(0, this.config.pgTopicLimit).map(t => t.id);
+            const topTopics = rankedTopics.slice(0, this.config.pgTopicLimit);
+            console.log(`[KGRetrievalService] discoverFromKG: pgTopics=${pgTopics.length} interestedIn=${interestedInMap.size} topTopics=[${topTopics.map(t => `${t.topicName}(${t.similarity.toFixed(3)})`).join(', ')}]`);
 
-        if (topTopicIds.length === 0) {
-            return { rankedTopics, topTopicIds, kgDiscoveredHighlights: [], relatedTopics: [], personsForTopics: [] };
-        }
+            if (topTopicIds.length === 0) {
+                console.log('[KGRetrievalService] discoverFromKG: no topics found — KG discovery empty');
+                return { rankedTopics, topTopicIds, kgDiscoveredHighlights: [], relatedTopics: [], personsForTopics: [] };
+            }
 
-        const [kgDiscoveredHighlights, relatedTopics, personsForTopics] = await Promise.all([
-            this.graphQuery.getHighlightsByTopicIds(topTopicIds, this.config.kgHighlightLimit),
-            this.graphQuery.getRelatedTopics(topTopicIds, this.config.relatedTopicMinStrength),
-            this.graphQuery.getPersonsForTopics(topTopicIds),
-        ]);
+            const [kgDiscoveredHighlights, relatedTopics, personsForTopics] = await Promise.all([
+                this.graphQuery.getHighlightsByTopicIds(topTopicIds, this.config.kgHighlightLimit),
+                this.graphQuery.getRelatedTopics(topTopicIds, this.config.relatedTopicMinStrength),
+                this.graphQuery.getPersonsForTopics(topTopicIds),
+            ]);
 
-        return { rankedTopics, topTopicIds, kgDiscoveredHighlights, relatedTopics, personsForTopics };
-    }
+            console.log(`[KGRetrievalService] discoverFromKG: kgHighlights=${kgDiscoveredHighlights.length} relatedTopics=${relatedTopics.length} persons=${personsForTopics.length}`);
+
+            return { rankedTopics, topTopicIds, kgDiscoveredHighlights, relatedTopics, personsForTopics };
+        },
+        { name: 'kg_discover', run_type: 'chain' }
+    );
 
     private mergeAndDeduplicate(
         qdrantDocuments: MemoryDocument[],
         stream1: Stream1Result,
         stream2: Stream2Result
     ): Map<string, EnrichedMemory> {
+        const effectiveAlpha = qdrantDocuments.length > 0 ? this.config.alpha : 0.0;
+        if (effectiveAlpha !== this.config.alpha) {
+            console.log(`[KGRetrievalService] mergeAndDeduplicate: no Qdrant results — effectiveAlpha=0 (configured alpha=${this.config.alpha})`);
+        }
+
         const mergedMap = new Map<string, EnrichedMemory>();
 
         for (const doc of qdrantDocuments) {
@@ -144,10 +186,10 @@ export class KGRetrievalService {
                 text: doc.pageContent,
                 qdrantScore: doc.score,
                 kgScore,
-                finalScore: this.config.alpha * doc.score + (1 - this.config.alpha) * kgScore,
+                finalScore: effectiveAlpha * doc.score + (1 - effectiveAlpha) * kgScore,
                 topicLabels: ctx?.topics.map(t => t.label) ?? [],
                 relatedTopics: stream2.relatedTopics
-                    .filter(rt => ctx?.topics.some(t => stream2.topTopicIds.includes(t.topicId)))
+                    .filter(_rt => ctx?.topics.some(t => stream2.topTopicIds.includes(t.topicId)))
                     .map(rt => rt.label),
                 persons: ctx?.persons ?? [],
                 conversationDate: ctx?.conversation?.startedAt,
@@ -162,8 +204,8 @@ export class KGRetrievalService {
                 existing.source = 'both';
                 existing.kgScore = Math.min(1.0, existing.kgScore + 0.15);
                 existing.finalScore =
-                    this.config.alpha * existing.qdrantScore +
-                    (1 - this.config.alpha) * existing.kgScore;
+                    effectiveAlpha * existing.qdrantScore +
+                    (1 - effectiveAlpha) * existing.kgScore;
                 continue;
             }
 
@@ -173,13 +215,24 @@ export class KGRetrievalService {
                 text: kgH.text,
                 qdrantScore: 0,
                 kgScore,
-                finalScore: (1 - this.config.alpha) * kgScore,
+                finalScore: (1 - effectiveAlpha) * kgScore,
                 topicLabels: kgH.topicLabels,
                 relatedTopics: [],
                 persons: [],
                 conversationDate: kgH.createdAt,
                 source: 'kg_discovery',
             });
+        }
+
+        const sourceBreakdown = {
+            fromQdrant: Array.from(mergedMap.values()).filter(m => m.source === 'qdrant').length,
+            fromKG: Array.from(mergedMap.values()).filter(m => m.source === 'kg_discovery').length,
+            fromBoth: Array.from(mergedMap.values()).filter(m => m.source === 'both').length,
+        };
+        console.log(`[KGRetrievalService] mergeAndDeduplicate: total=${mergedMap.size} qdrant=${sourceBreakdown.fromQdrant} kg=${sourceBreakdown.fromKG} both=${sourceBreakdown.fromBoth}`);
+
+        for (const mem of mergedMap.values()) {
+            console.log(`[KGRetrievalService]   ${mem.qdrantPointId.slice(0, 8)}... qdrantScore=${mem.qdrantScore.toFixed(4)} kgScore=${mem.kgScore.toFixed(4)} finalScore=${mem.finalScore.toFixed(4)} source=${mem.source}`);
         }
 
         return mergedMap;
