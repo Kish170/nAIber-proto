@@ -14,9 +14,8 @@
 import 'dotenv/config';
 import { randomUUID } from 'crypto';
 import { PrismaClient } from '../../generated/prisma/index.js';
-import { Neo4jClient } from '../../packages/shared-clients/src/Neo4jClient.js';
+import { Neo4jClient, VectorStoreClient, VectorStoreConfigs } from '@naiber/shared-clients';
 import { GraphRepository } from '../../apps/llm-server/src/repositories/GraphRepository.js';
-import { VectorStoreClient, VectorStoreConfigs } from '../../packages/shared-clients/src/VectorStoreClient.js';
 import { OpenAIEmbeddings } from '@langchain/openai';
 
 const REQUIRED_ENV = [
@@ -282,7 +281,7 @@ const HAROLD: UserDef = {
     age: 78,
     phone: '+15550000002',
     gender: 'MALE',
-    educationLevel: 'BACHELORS_DEGREE',
+    educationLevel: 'BACHELORS_OR_EQUIVALENT',
     interests: ['Classical music', 'Reading', 'Neighbourhood walks', 'Technology', 'Family calls'],
     dislikes: ['Loud environments', 'Rushed conversations', 'Spicy food'],
     callFrequency: 'WEEKLY',
@@ -464,7 +463,7 @@ const DOROTHY: UserDef = {
     age: 68,
     phone: '+15550000003',
     gender: 'FEMALE',
-    educationLevel: 'BACHELORS_DEGREE',
+    educationLevel: 'BACHELORS_OR_EQUIVALENT',
     interests: ['Community events', 'Baking', 'Bird watching', 'Walking', 'Knitting', 'Health advocacy'],
     dislikes: ['Inactivity', 'Being patronised', 'Processed food'],
     callFrequency: 'DAILY',
@@ -672,18 +671,19 @@ async function neo4jWipeUser(session: any, userId: string): Promise<void> {
 }
 
 async function neo4jWipeOrphanTopicsAndPersons(session: any): Promise<void> {
-    await session.run(`MATCH (t:Topic) WHERE NOT (t)<-[:MENTIONS]-() DELETE t`);
-    await session.run(`MATCH (p:Person) WHERE NOT ()<-[:MENTIONED]-(p) DELETE p`);
+    await session.run(`MATCH (t:Topic) WHERE NOT (t)<-[:MENTIONS]-() DETACH DELETE t`);
+    await session.run(`MATCH (p:Person) WHERE NOT ()<-[:MENTIONED]-(p) DETACH DELETE p`);
 }
 
 // Pre-compute pairwise co-occurrence counts across all conversations for a user
-function computeCoOccurrences(conversations: ConversationDef[]): Map<string, number> {
+// Uses Postgres topic IDs (not the hardcoded TOPICS.id) so Neo4j topicIds match
+function computeCoOccurrences(conversations: ConversationDef[], postgresTopics: Record<string, string>): Map<string, number> {
     const counts = new Map<string, number>();
     for (const conv of conversations) {
         const keys = [...new Set(conv.topics)] as TopicKey[];
         for (let i = 0; i < keys.length; i++) {
             for (let j = i + 1; j < keys.length; j++) {
-                const [a, b] = [TOPICS[keys[i]].id, TOPICS[keys[j]].id].sort();
+                const [a, b] = [postgresTopics[keys[i]], postgresTopics[keys[j]]].sort();
                 const key = `${a}|${b}`;
                 counts.set(key, (counts.get(key) ?? 0) + 1);
             }
@@ -799,11 +799,11 @@ async function seedUser(
     // Neo4j User node
     await graphRepo.mergeUser({ userId, name: user.name });
 
-    // Shared Neo4j Topic nodes (MERGE — safe to call per user)
+    // Shared Neo4j Topic nodes — use Postgres-assigned IDs so KG queries match
     for (const key of usedTopicKeys) {
         const t = TOPICS[key as TopicKey];
         await graphRepo.mergeTopic({
-            topicId: t.id,
+            topicId: postgresTopics[key],
             label: t.label,
             variations: [...t.variations],
             createdAt: now.toISOString(),
@@ -812,7 +812,7 @@ async function seedUser(
     }
 
     // Compute co-occurrences upfront for RELATED_TO strengths
-    const coOccurrences = computeCoOccurrences(user.conversations);
+    const coOccurrences = computeCoOccurrences(user.conversations, postgresTopics);
 
     // Process each conversation
     let totalQdrantPoints = 0;
@@ -916,21 +916,21 @@ async function seedUser(
 
         // --- Neo4j: Summary → Topic edges ---
         for (const topicKey of conv.topics) {
-            const topicId = TOPICS[topicKey as TopicKey].id;
+            const topicId = postgresTopics[topicKey];
             await graphRepo.linkSummaryToTopic({ summaryId, topicId, similarityScore: 0.85 });
         }
 
         // --- Neo4j: Highlight → Topic edges (each highlight linked to all topics in the conversation) ---
         for (const h of highlightEntries) {
             for (const topicKey of conv.topics) {
-                const topicId = TOPICS[topicKey as TopicKey].id;
+                const topicId = postgresTopics[topicKey];
                 await graphRepo.linkHighlightToTopic({ highlightId: h.id, topicId, similarityScore: 0.75 });
             }
         }
 
         // --- Neo4j: User → Topic MENTIONS (incremental) ---
         for (const topicKey of conv.topics) {
-            const topicId = TOPICS[topicKey as TopicKey].id;
+            const topicId = postgresTopics[topicKey];
             await graphRepo.upsertUserMentionsTopic({
                 userId,
                 topicId,
@@ -949,7 +949,7 @@ async function seedUser(
                 lastSeen: convDate.toISOString(),
             });
             for (const topicKey of p.topicKeys) {
-                const topicId = TOPICS[topicKey as TopicKey].id;
+                const topicId = postgresTopics[topicKey];
                 await graphRepo.upsertPersonAssociatedWithTopic({
                     personId,
                     topicId,
