@@ -156,6 +156,27 @@ export class GraphQueryRepository {
         { name: 'neo4j_getPersonsForTopics', run_type: 'chain' }
     );
 
+    getInterestedInStrengths = traceable(
+        async (userId: string, topicIds: string[]): Promise<Map<string, number>> => {
+            return this.runQuery(async (session) => {
+                if (topicIds.length === 0) return new Map();
+                const result = await session.run(
+                    `MATCH (u:User {userId: $userId})-[i:INTERESTED_IN]->(t:Topic)
+                     WHERE t.topicId IN $topicIds
+                     RETURN t.topicId AS topicId, i.strength AS strength`,
+                    { userId, topicIds }
+                );
+                const map = new Map<string, number>();
+                for (const r of result.records) {
+                    map.set(r.get('topicId'), r.get('strength') ?? 0);
+                }
+                console.log(`[GraphQueryRepository] getInterestedInStrengths: userId=${userId} queried=${topicIds.length} matched=${map.size}`);
+                return map;
+            });
+        },
+        { name: 'neo4j_getInterestedInStrengths', run_type: 'chain' }
+    );
+
     getHighlightContext = traceable(
         async (qdrantPointIds: string[]): Promise<KGHighlightContext[]> => {
             return this.runQuery(async (session) => {

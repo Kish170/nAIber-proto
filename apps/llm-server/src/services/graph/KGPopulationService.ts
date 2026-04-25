@@ -38,7 +38,7 @@ export class KGPopulationService {
                         id: entry.qdrantPointId,
                         qdrantPointId: entry.qdrantPointId,
                         text: entry.text,
-                        importanceScore: 1.0,
+                        importanceScore: entry.importanceScore,
                         createdAt: now,
                     });
                 }
@@ -175,7 +175,7 @@ export class KGPopulationService {
                         await repo.upsertTopicRelatedToTopic({
                             fromTopicId: discussedTopics[i].id,
                             toTopicId: discussedTopics[j].id,
-                            strength: 1.0,
+                            strength: 0.0,
                             coOccurrenceCount: 1,
                         });
                         topicTopicLinksCreated++;

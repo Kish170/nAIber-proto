@@ -20,16 +20,16 @@ export const PostCallState = Annotation.Root({
     summary: Annotation<{
         summaryText: string;
         topicsDiscussed: string[];
-        keyHighlights: string[];
+        keyHighlights: Array<{ text: string; importanceScore: number }>;
     } | null>({
         value: (x: {
             summaryText: string;
             topicsDiscussed: string[];
-            keyHighlights: string[];
+            keyHighlights: Array<{ text: string; importanceScore: number }>;
         } | null, y: {
             summaryText: string;
             topicsDiscussed: string[];
-            keyHighlights: string[];
+            keyHighlights: Array<{ text: string; importanceScore: number }>;
         } | null) => y ?? x ?? null,
         default: () => null
     }),
@@ -101,15 +101,18 @@ export const PostCallState = Annotation.Root({
         text: string;
         qdrantPointId: string;
         embedding: number[];
+        importanceScore: number;
     }>>({
         value: (x: Array<{
             text: string;
             qdrantPointId: string;
             embedding: number[];
+            importanceScore: number;
         }>, y: Array<{
             text: string;
             qdrantPointId: string;
             embedding: number[];
+            importanceScore: number;
         }>) => y ?? x ?? [],
         default: () => []
     }),
