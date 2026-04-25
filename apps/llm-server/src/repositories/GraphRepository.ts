@@ -235,7 +235,8 @@ export class GraphRepository {
                  MERGE (a)-[r:RELATED_TO]->(b)
                  ON CREATE SET r.strength          = $strength,
                                r.coOccurrenceCount = 1
-                 ON MATCH  SET r.coOccurrenceCount = r.coOccurrenceCount + 1`,
+                 ON MATCH  SET r.coOccurrenceCount = r.coOccurrenceCount + 1,
+                               r.strength          = 1.0 - 1.0 / toFloat(r.coOccurrenceCount + 1)`,
                 params
             );
         } catch (error) {

@@ -124,14 +124,25 @@ export class KGRetrievalService {
     private discoverFromKG = traceable(
         async (userId: string, messageEmbedding: number[]): Promise<Stream2Result> => {
             const pgTopics = await ConversationRepository.findTopicsByElderlyProfileId(userId);
-            const rankedTopics = this.rankTopicsByEmbedding(
+            const rawRankedTopics = this.rankTopicsByEmbedding(
                 pgTopics.map(t => ({ id: t.id, topicName: t.topicName, topicEmbedding: (t.topicEmbedding ?? []) as number[] })),
                 messageEmbedding
             );
-            const topTopicIds = rankedTopics.slice(0, this.config.pgTopicLimit).map(t => t.id);
 
+            const interestedInMap = await this.graphQuery.getInterestedInStrengths(
+                userId,
+                rawRankedTopics.map(t => t.id)
+            );
+            const rankedTopics = rawRankedTopics
+                .map(t => ({
+                    ...t,
+                    similarity: Math.min(1.0, t.similarity * (1 + (interestedInMap.get(t.id) ?? 0)))
+                }))
+                .sort((a, b) => b.similarity - a.similarity);
+
+            const topTopicIds = rankedTopics.slice(0, this.config.pgTopicLimit).map(t => t.id);
             const topTopics = rankedTopics.slice(0, this.config.pgTopicLimit);
-            console.log(`[KGRetrievalService] discoverFromKG: pgTopics=${pgTopics.length} topTopics=[${topTopics.map(t => `${t.topicName}(${t.similarity.toFixed(3)})`).join(', ')}]`);
+            console.log(`[KGRetrievalService] discoverFromKG: pgTopics=${pgTopics.length} interestedIn=${interestedInMap.size} topTopics=[${topTopics.map(t => `${t.topicName}(${t.similarity.toFixed(3)})`).join(', ')}]`);
 
             if (topTopicIds.length === 0) {
                 console.log('[KGRetrievalService] discoverFromKG: no topics found — KG discovery empty');

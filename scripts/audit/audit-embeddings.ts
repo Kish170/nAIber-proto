@@ -180,28 +180,78 @@ async function main() {
     });
     await prisma.$disconnect();
 
+    // Baselines from pre-improvement audit (2026-04-24) for comparison
+    const PRE_IMPROVEMENT_BASELINES: Record<string, number> = {
+        'How have you been feeling?': 0.2709,
+        'What did we talk about last time?': 0.3285,
+    };
+
     const testQueries = [
-        ...(topics.length > 0 ? [`Tell me about ${topics[0].topicName}`] : []),
+        ...(topics.length > 0 ? [
+            `Tell me about ${topics[0].topicName}`,
+            ...(topics.length > 1 ? [`Tell me about ${topics[1].topicName}`] : []),
+        ] : []),
         'How have you been feeling?',
-        'quantum computing research',
+        'How have things been going lately?',
+        'Tell me something nice that happened recently',
         'What did we talk about last time?',
+        'quantum computing research',  // irrelevant control — should stay low
     ];
+
+    const THRESHOLD = 0.45;
+    const queryResults: Array<{ query: string; topScore: number; aboveThreshold: number; total: number }> = [];
 
     for (const query of testQueries) {
         const { embedding } = await embService.generateEmbedding(query);
         const results = await qdrantSearch(embedding, userId, 5);
+
+        const topScore = results.length > 0 ? results[0].score : 0;
+        const aboveThreshold = results.filter(r => r.score > THRESHOLD).length;
+        queryResults.push({ query, topScore, aboveThreshold, total: results.length });
 
         console.log(`\n  Query: "${query}"`);
         if (results.length === 0) {
             console.log(`    No results`);
         } else {
             for (const r of results) {
-                const text = (r.payload.content || r.payload.pageContent || r.payload.text || '').slice(0, 60);
-                console.log(`    score=${r.score.toFixed(4)} "${text}${text.length >= 60 ? '...' : ''}"`);
+                const text = (r.payload.content || r.payload.pageContent || r.payload.text || '').slice(0, 80);
+                console.log(`    score=${r.score.toFixed(4)} "${text}${text.length >= 80 ? '...' : ''}"`);
             }
-            const scores = results.map(r => r.score);
-            const above045 = scores.filter(s => s > 0.45).length;
-            console.log(`    Above threshold (0.45): ${above045}/${results.length}`);
+            console.log(`    Above threshold (${THRESHOLD}): ${aboveThreshold}/${results.length}`);
+
+            const baseline = PRE_IMPROVEMENT_BASELINES[query];
+            if (baseline !== undefined) {
+                const delta = topScore - baseline;
+                const sign = delta >= 0 ? '+' : '';
+                const flag = delta > 0.05 ? '↑ improved' : delta < -0.05 ? '↓ degraded' : '→ similar';
+                console.log(`    vs pre-improvement baseline: ${baseline.toFixed(4)} → ${topScore.toFixed(4)} (${sign}${delta.toFixed(4)}) ${flag}`);
+            }
+        }
+    }
+
+    // Summary table
+    console.log(`\n--- Query Recall Summary ---`);
+    console.log(`${'Query'.padEnd(45)} ${'Top Score'.padStart(10)} ${'Above 0.45'.padStart(12)}`);
+    console.log('-'.repeat(70));
+    for (const r of queryResults) {
+        const aboveStr = `${r.aboveThreshold}/${r.total}`;
+        const flag = r.topScore < THRESHOLD ? ' ⚠' : '';
+        console.log(`${r.query.slice(0, 44).padEnd(45)} ${r.topScore.toFixed(4).padStart(10)} ${aboveStr.padStart(12)}${flag}`);
+    }
+
+    const generalQueries = queryResults.filter(r =>
+        ['How have you been feeling?', 'How have things been going lately?', 'What did we talk about last time?'].includes(r.query)
+    );
+    if (generalQueries.length > 0) {
+        const avgGeneral = generalQueries.reduce((s, r) => s + r.topScore, 0) / generalQueries.length;
+        const preAvg = 0.2997; // avg of the two pre-improvement general query baselines
+        console.log(`\nAvg top score for general queries: ${avgGeneral.toFixed(4)} (pre-improvement avg: ${preAvg.toFixed(4)})`);
+        if (avgGeneral > preAvg + 0.05) {
+            console.log('✓ General query recall improved relative to baseline');
+        } else if (avgGeneral < preAvg - 0.05) {
+            console.log('⚠ General query recall degraded — check highlight text quality');
+        } else {
+            console.log('→ General query recall similar to baseline — more calls needed for richer highlights to dominate');
         }
     }
 

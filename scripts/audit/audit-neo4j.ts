@@ -170,34 +170,110 @@ async function main() {
              RETURN count(r) AS count`, { userId });
         console.log(`Person-Topic ASSOCIATED_WITH edges: ${personTopicLinks[0]?.count ?? 0}`);
 
-        // --- Suspicious patterns ---
-        console.log('\n--- Suspicious Patterns ---');
-        const allRelatedTo = await runQuery<{ strength: number; coOccurrenceCount: number }>(driver,
+        // --- RELATED_TO edge quality ---
+        console.log('\n--- RELATED_TO Edge Quality ---');
+        const allRelatedTo = await runQuery<{ fromLabel: string; toLabel: string; strength: number; coOccurrenceCount: number }>(driver,
             `MATCH (u:User {userId: $userId})-[:MENTIONS]->(t:Topic)-[r:RELATED_TO]->(t2:Topic)
-             RETURN r.strength AS strength, r.coOccurrenceCount AS coOccurrenceCount`, { userId });
+             RETURN t.label AS fromLabel, t2.label AS toLabel, r.strength AS strength, r.coOccurrenceCount AS coOccurrenceCount
+             ORDER BY r.coOccurrenceCount DESC`, { userId });
 
-        const allStrength1 = allRelatedTo.every(r => r.strength === 1.0);
-        console.log(`All RELATED_TO strength=1.0: ${allStrength1} (${allStrength1 ? '⚠ hardcoded — no differentiation' : 'varies'})`);
+        console.log(`Total RELATED_TO edges: ${allRelatedTo.length}`);
+        if (allRelatedTo.length > 0) {
+            const allStrength1 = allRelatedTo.every(r => r.strength === 1.0);
+            const allStrength0 = allRelatedTo.every(r => r.strength === 0.0);
+            const strengthFlag = allStrength1 ? '⚠ all 1.0 — still hardcoded (old edges)'
+                : allStrength0 ? 'all 0.0 — first co-occurrence only, none repeated yet'
+                : 'varies — co-occurrence formula active';
+            console.log(`Strength status: ${strengthFlag}`);
 
-        const avgCoOccurrence = allRelatedTo.length > 0
-            ? allRelatedTo.reduce((a, r) => a + (r.coOccurrenceCount ?? 0), 0) / allRelatedTo.length
-            : 0;
-        console.log(`Average co-occurrence count: ${avgCoOccurrence.toFixed(1)}`);
+            const avgCoOccurrence = allRelatedTo.reduce((a, r) => a + (r.coOccurrenceCount ?? 0), 0) / allRelatedTo.length;
+            console.log(`Average co-occurrence count: ${avgCoOccurrence.toFixed(1)}`);
 
-        // Check INTERESTED_IN edges (derived — should they exist?)
-        const interestedIn = await runQuery<{ count: number }>(driver,
-            `MATCH (u:User {userId: $userId})-[r:INTERESTED_IN]->(t:Topic)
-             RETURN count(r) AS count`, { userId });
-        console.log(`INTERESTED_IN edges: ${interestedIn[0]?.count ?? 0} (${(interestedIn[0]?.count ?? 0) === 0 ? '⚠ deriveInterestedInEdges never called' : 'present'})`);
+            // Strength distribution
+            const strengthBuckets = { '0.0': 0, '0.01-0.49': 0, '0.5-0.74': 0, '0.75-0.99': 0, '1.0': 0 };
+            for (const r of allRelatedTo) {
+                const s = r.strength ?? 0;
+                if (s === 0) strengthBuckets['0.0']++;
+                else if (s < 0.5) strengthBuckets['0.01-0.49']++;
+                else if (s < 0.75) strengthBuckets['0.5-0.74']++;
+                else if (s < 1.0) strengthBuckets['0.75-0.99']++;
+                else strengthBuckets['1.0']++;
+            }
+            console.log('Strength distribution:');
+            for (const [range, count] of Object.entries(strengthBuckets)) {
+                if (count > 0) console.log(`  ${range}: ${count} edges`);
+            }
 
-        // Check highlight importanceScore distribution
+            // Show top co-occurring pairs
+            const multipleCoOccurrence = allRelatedTo.filter(r => (r.coOccurrenceCount ?? 0) >= 2);
+            if (multipleCoOccurrence.length > 0) {
+                console.log(`\nPairs with 2+ co-occurrences (strength formula active):`);
+                for (const r of multipleCoOccurrence.slice(0, 5)) {
+                    console.log(`  "${r.fromLabel}" ↔ "${r.toLabel}" — count=${r.coOccurrenceCount} strength=${r.strength?.toFixed(2)}`);
+                }
+            } else {
+                console.log('\nNo repeated co-occurrences yet (all count=1) — strength formula will activate on next shared call');
+            }
+        }
+
+        // --- INTERESTED_IN edge quality ---
+        console.log('\n--- INTERESTED_IN Edge Quality ---');
+        const interestedIn = await runQuery<{ label: string; strength: number; count: number; derivedAt: string }>(driver,
+            `MATCH (u:User {userId: $userId})-[i:INTERESTED_IN]->(t:Topic)
+             RETURN t.label AS label, i.strength AS strength, i.count AS count, i.derivedAt AS derivedAt
+             ORDER BY i.strength DESC`, { userId });
+
+        if (interestedIn.length === 0) {
+            console.log(`INTERESTED_IN edges: 0 — topics need MENTIONS count >= 3 to qualify`);
+            // Show how close topics are to the threshold
+            const mentionCounts = await runQuery<{ label: string; count: number }>(driver,
+                `MATCH (u:User {userId: $userId})-[m:MENTIONS]->(t:Topic)
+                 RETURN t.label AS label, m.count AS count
+                 ORDER BY m.count DESC LIMIT 10`, { userId });
+            console.log('MENTIONS counts (threshold: 3):');
+            for (const t of mentionCounts) {
+                const gap = Math.max(0, 3 - (t.count ?? 0));
+                const status = (t.count ?? 0) >= 3 ? '✓ qualifies' : `${gap} more call(s) needed`;
+                console.log(`  "${t.label}" — count=${t.count} (${status})`);
+            }
+        } else {
+            console.log(`INTERESTED_IN edges: ${interestedIn.length}`);
+            for (const edge of interestedIn) {
+                console.log(`  "${edge.label}" — strength=${edge.strength?.toFixed(3)} mentions=${edge.count} derivedAt=${edge.derivedAt?.slice(0, 10)}`);
+            }
+        }
+
+        // --- Highlight importanceScore quality ---
+        console.log('\n--- Highlight importanceScore Quality ---');
         const importanceScores = await runQuery<{ score: number; count: number }>(driver,
             `MATCH (u:User {userId: $userId})-[:HAS_CONVERSATION]->(c)-[:HAS_HIGHLIGHT]->(h:Highlight)
              RETURN h.importanceScore AS score, count(*) AS count
              ORDER BY score`, { userId });
-        console.log(`\nHighlight importanceScore distribution:`);
+
+        const totalHighlights = importanceScores.reduce((s, r) => s + (r.count ?? 0), 0);
+        const allHardcoded1 = importanceScores.length === 1 && importanceScores[0]?.score === 1.0;
+        const allDefault5 = importanceScores.length === 1 && importanceScores[0]?.score === 5;
+        const statusMsg = allHardcoded1 ? '⚠ all 1.0 — old highlights, importanceScore not yet applied'
+            : allDefault5 ? '⚠ all 5 — LLM falling back to default, check prompt'
+            : 'varied — LLM-derived scores active';
+        console.log(`Total highlights: ${totalHighlights} — ${statusMsg}`);
+        console.log('Score distribution:');
         for (const { score, count } of importanceScores) {
-            console.log(`  score=${score}: ${count} highlights ${score === 1.0 ? '(⚠ all hardcoded to 1.0)' : ''}`);
+            const bar = '█'.repeat(Math.round((count / totalHighlights) * 20));
+            const oldFlag = score === 1.0 && allHardcoded1 ? ' ← pre-improvement' : '';
+            console.log(`  score=${score}: ${count} highlights ${bar}${oldFlag}`);
+        }
+
+        // Sample recent highlights with scores
+        const recentHighlights = await runQuery<{ text: string; score: number; date: string }>(driver,
+            `MATCH (u:User {userId: $userId})-[:HAS_CONVERSATION]->(c)-[:HAS_HIGHLIGHT]->(h:Highlight)
+             RETURN h.text AS text, h.importanceScore AS score, h.createdAt AS date
+             ORDER BY h.createdAt DESC LIMIT 5`, { userId });
+        if (recentHighlights.length > 0) {
+            console.log('\nMost recent highlights:');
+            for (const h of recentHighlights) {
+                console.log(`  [score=${h.score}] "${h.text}"`);
+            }
         }
 
         console.log('\n=== AUDIT COMPLETE ===');

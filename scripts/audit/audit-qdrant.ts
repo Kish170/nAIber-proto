@@ -133,17 +133,26 @@ async function main() {
     console.log(`Empty texts: ${emptyTexts.length}`);
     console.log(`Very short texts (<20 chars): ${shortTexts.length}`);
     console.log(`Text length distribution:`);
-    const buckets = { '0-20': 0, '21-50': 0, '51-100': 0, '101-200': 0, '200+': 0 };
+    const buckets = { '0-20': 0, '21-50': 0, '51-80': 0, '81-150': 0, '151+': 0 };
     for (const len of textLengths) {
         if (len <= 20) buckets['0-20']++;
         else if (len <= 50) buckets['21-50']++;
-        else if (len <= 100) buckets['51-100']++;
-        else if (len <= 200) buckets['101-200']++;
-        else buckets['200+']++;
+        else if (len <= 80) buckets['51-80']++;
+        else if (len <= 150) buckets['81-150']++;
+        else buckets['151+']++;
     }
     for (const [range, count] of Object.entries(buckets)) {
-        console.log(`  ${range}: ${count} (${((count / points.length) * 100).toFixed(0)}%)`);
+        const flag = range === '81-150' ? ' ← target range' : '';
+        console.log(`  ${range}: ${count} (${((count / points.length) * 100).toFixed(0)}%)${flag}`);
     }
+
+    // Quality threshold check: 80+ chars is the new target for richer highlights
+    const aboveThreshold = textLengths.filter((l: number) => l >= 80).length;
+    const pctAbove = ((aboveThreshold / points.length) * 100).toFixed(0);
+    const thresholdStatus = aboveThreshold === points.length ? 'all richer highlights'
+        : aboveThreshold > points.length / 2 ? 'majority richer (some pre-improvement highlights remain)'
+        : '⚠ majority still short — check prompt or recent call logs';
+    console.log(`\nHighlights >= 80 chars: ${aboveThreshold}/${points.length} (${pctAbove}%) — ${thresholdStatus}`);
 
     // --- Metadata completeness ---
     console.log(`\n--- Metadata Completeness ---`);
