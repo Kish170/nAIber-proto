@@ -17,7 +17,7 @@ import {
 } from "../ConversationHandler.js";
 import { ConversationRepository } from "@naiber/shared-data";
 import cosine from 'compute-cosine-similarity';
-import { VectorStoreClient } from "../../../clients/VectorStoreClient.js";
+import { VectorStoreClient } from "@naiber/shared-clients";
 import { NERService } from "../../../services/graph/NERService.js";
 import { KGPopulationService } from "../../../services/graph/KGPopulationService.js";
 

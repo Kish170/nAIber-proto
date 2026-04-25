@@ -1,5 +1,6 @@
-import { QdrantVectorStore } from "@langchain/qdrant";
-import { OpenAIEmbeddings } from "@langchain/openai";
+import { QdrantVectorStore } from '@langchain/qdrant';
+import { OpenAIEmbeddings } from '@langchain/openai';
+import { traceable } from 'langsmith/traceable';
 
 export interface VectorStoreConfigs {
     baseUrl: string;
@@ -13,6 +14,12 @@ export interface HighlightEntry {
     id: string;
 }
 
+export interface MemorySearchResult {
+    pageContent: string;
+    metadata: Record<string, unknown>;
+    score: number;
+}
+
 export class VectorStoreClient {
     private vectorStore: QdrantVectorStore;
     private payloadIndexEnsured = false;
@@ -21,9 +28,10 @@ export class VectorStoreClient {
         this.vectorStore = new QdrantVectorStore(embeddingModel, {
             url: config.baseUrl,
             apiKey: config.apiKey,
-            collectionName: config.collectionName
+            collectionName: config.collectionName,
         });
     }
+
     private async ensurePayloadIndex(): Promise<void> {
         if (this.payloadIndexEnsured) return;
         const vs = this.vectorStore as any;
@@ -46,19 +54,20 @@ export class VectorStoreClient {
         await this.ensurePayloadIndex();
         const retriever = this.vectorStore.asRetriever({
             k,
-            filter: { must: [{ key: "metadata.userId", match: { value: userId } }] },
-            searchType: "similarity",
+            filter: { must: [{ key: 'metadata.userId', match: { value: userId } }] },
+            searchType: 'similarity',
         });
-
         return await retriever.invoke(query);
     }
 
-    async addMemories(highlights: string[], metadata: {userId: string; conversationId: string; createdAt?: string; summaryId?: string;}) {
+    async addMemories(
+        highlights: string[],
+        metadata: { userId: string; conversationId: string; createdAt?: string; summaryId?: string }
+    ): Promise<void> {
         const documents = highlights.map(highlight => ({
             pageContent: highlight,
-            metadata
+            metadata,
         }));
-
         await this.vectorStore.addDocuments(documents);
     }
 
@@ -91,18 +100,25 @@ export class VectorStoreClient {
         console.log(`[VectorStoreClient] addMemoriesWithIds: verified ${ids.length}/${ids.length} points in Qdrant`);
     }
 
-    async searchByEmbedding(embedding: number[], userId: string, k: number = 5) {
-        await this.ensurePayloadIndex();
-        const results = await this.vectorStore.similaritySearchVectorWithScore(
-            embedding,
-            k,
-            { must: [{ key: "metadata.userId", match: { value: userId } }] }
-        );
+    searchByEmbedding = traceable(
+        async (embedding: number[], userId: string, k: number = 5): Promise<MemorySearchResult[]> => {
+            await this.ensurePayloadIndex();
+            const results = await this.vectorStore.similaritySearchVectorWithScore(
+                embedding,
+                k,
+                { must: [{ key: 'metadata.userId', match: { value: userId } }] }
+            );
 
-        return results.map(([doc, score]) => ({
-            pageContent: doc.pageContent,
-            metadata: doc.metadata,
-            score
-        }));
-    }
+            const docs = results.map(([doc, score]) => ({
+                pageContent: doc.pageContent,
+                metadata: doc.metadata as Record<string, unknown>,
+                score,
+            }));
+
+            console.log(`[VectorStoreClient] searchByEmbedding userId=${userId} k=${k} results=${docs.length} scores=[${docs.map(d => d.score.toFixed(4)).join(', ')}]`);
+
+            return docs;
+        },
+        { name: 'qdrant_vector_search', run_type: 'retriever' }
+    );
 }
