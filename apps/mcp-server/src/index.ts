@@ -2,7 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { RedisClient } from '@naiber/shared-clients';
-import { Neo4jClient } from './rag/Neo4jClient.js';
+import { Neo4jClient } from '@naiber/shared-clients';
 import { createMcpServer } from './mcp/server.js';
 
 const PORT = parseInt(process.env.MCP_PORT ?? '3002', 10);

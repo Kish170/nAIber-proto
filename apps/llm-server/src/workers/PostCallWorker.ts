@@ -6,7 +6,7 @@ import { ShallowRedisSaver } from '@langchain/langgraph-checkpoint-redis/shallow
 import { GeneralPostCallGraph } from '../personas/general/post-call/GeneralPostCallGraph.js';
 import { HealthPostCallGraph } from '../personas/health/post-call/HealthPostCallGraph.js';
 import { CognitivePostCallGraph } from '../personas/cognitive/post-call/CognitivePostCallGraph.js';
-import { VectorStoreClient } from '../clients/VectorStoreClient.js';
+import { VectorStoreClient } from '@naiber/shared-clients';
 
 export class PostCallWorker {
     private worker: Worker<PostCallJobData>;

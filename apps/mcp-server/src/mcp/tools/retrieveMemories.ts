@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { traceable } from 'langsmith/traceable';
 import { OpenAIClient } from '@naiber/shared-clients';
 import { EmbeddingService } from '@naiber/shared-services';
-import { VectorStoreClient } from '../../rag/VectorStoreClient.js';
+import { VectorStoreClient } from '@naiber/shared-clients';
 import { GraphQueryRepository } from '../../rag/GraphQueryRepository.js';
 import { KGRetrievalService } from '../../rag/KGRetrievalService.js';
 

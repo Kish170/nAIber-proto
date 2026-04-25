@@ -1,6 +1,6 @@
 import { Session } from 'neo4j-driver';
 import { traceable } from 'langsmith/traceable';
-import { Neo4jClient } from '../clients/Neo4jClient.js';
+import { Neo4jClient } from '@naiber/shared-clients';
 import type {
     UserNode,
     TopicNode,

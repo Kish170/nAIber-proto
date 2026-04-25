@@ -7,7 +7,7 @@ import { BullBoardRouter } from './routes/BullBoardRoute.js';
 import { PostCallWorker } from './workers/PostCallWorker.js';
 import { RedisClient } from '@naiber/shared-clients';
 import { FixedShallowRedisSaver } from './checkpointers/FixedShallowRedisSaver.js';
-import { Neo4jClient } from './clients/Neo4jClient.js';
+import { Neo4jClient } from '@naiber/shared-clients';
 
 const app = express();
 

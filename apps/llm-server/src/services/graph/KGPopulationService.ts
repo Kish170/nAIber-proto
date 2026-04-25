@@ -57,7 +57,7 @@ export class KGPopulationService {
                     await repo.mergePerson({
                         id: person.id,
                         name: person.name,
-                        role: person.role,
+                        role: person.role ?? '',
                     });
                 }
 
