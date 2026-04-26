@@ -47,6 +47,8 @@ These rules govern every signal pipeline and override any conflicting design ins
 - Confidence is multiplicatively or additively penalized.
 - Confounders are logged explicitly per signal and surfaced downstream.
 
+> **v1 note:** confounder detection + confidence penalty is deferred. v1 extractors set `confidence = 1.0` when `sufficiencyMet = true` and populate `confounders = []`. Schema columns are reserved; no migration needed when v1.next adds detection. Full design (penalty tiers, design decisions, calibration plan) in `docs/research/confounder-penalties-deferred.md`. Raw-value preservation (the rule's first clause) still binds in v1.
+
 ### 3. Trends override snapshots
 
 - Single measurements are contextual information, not signals.
@@ -134,6 +136,8 @@ Required checks:
 
 Without these, early users see noisy graphs and stakeholders misinterpret randomness as signal.
 
+> **v1 thresholds — confirmed:** the values in the *Data Sufficiency* column above are the v1 starting points (≥100 words for lexical, ≥10 sentences for syntactic, ≥5 sentence pairs for coherence, ≥3 multi-turn exchanges for disfluency, ≥10 interaction pairs for latency). Each extractor enforces its own threshold inline — there is no shared sufficiency-gate utility. **Expected v1 behaviour:** cognitive-assessment (MoCA) calls will routinely fail the lexical-diversity threshold because MoCA elicits short answers. This is by design — those signals will surface from the elder's general and health calls instead. The cross-persona scope of extraction (ADR-005) is what makes this work.
+
 ### Cross-signal contamination
 
 Many signals share confounders even though their pipelines are independent. Examples:
@@ -142,7 +146,7 @@ Many signals share confounders even though their pipelines are independent. Exam
 - Stress → more topic switching → higher semantic drift
 - Background noise → pause artifacts
 
-Per Global Rule 1, a pipeline must not consume another pipeline's output to compensate. Per Global Rule 2, each pipeline must instead log its own confounders and reduce its own confidence. Provenance and confounder lists are persisted alongside every signal.
+Per Global Rule 1, a pipeline must not consume another pipeline's output to compensate. Per Global Rule 2, each pipeline must instead log its own confounders and reduce its own confidence. Provenance and confounder lists are persisted alongside every signal. **(v1 note: confounder logging + confidence penalty is deferred — see `confounder-penalties-deferred.md`. v1 leaves `confounders = []` and `confidence = 1.0`. Provenance is still populated.)**
 
 ### Temporal resolution
 

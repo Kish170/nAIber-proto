@@ -35,7 +35,7 @@ These rules are normative — every extractor and every consumer must respect th
 
 1. **Signals do not explain each other.** Each signal is an independent measurement. A signal's value or meaning is determined only by its own inputs. No signal pipeline may consume another signal pipeline's output. Signals run in parallel. Any relationship between signals is expressed only at visualization or interpretation time — never at extraction time. Cross-signal correlation is not computed or persisted.
 
-2. **Confounders reduce confidence, not value.** When something external may have affected a signal's reliability, the raw value is preserved and the signal's confidence is penalized. Confounders are logged per signal alongside the value so they surface downstream.
+2. **Confounders reduce confidence, not value.** When something external may have affected a signal's reliability, the raw value is preserved and the signal's confidence is penalized. Confounders are logged per signal alongside the value so they surface downstream. **(v1 simplification — see below.)**
 
 3. **Trends override snapshots.** Single measurements are contextual information, not signals. Only changes over time are treated as meaningful. Baselines are rolling. Alerts (where any exist) require multiple time points.
 
@@ -76,6 +76,13 @@ Per-signal confidence is the source of truth. Session-level confidence will be a
 - Cross-persona scope means extraction logic must be persona-agnostic. Anything that needs persona context (e.g. "lower expected response latency during cognitive tasks") must live at the interpretation layer, not in the extractor.
 - Trend signals (rolling averages, deltas vs baseline, drift detection) are deferred along with RCI to a later phase. The demo surfaces per-call signals only — multi-session pattern surfaces are a follow-up.
 - Audio-dependent signals (prosody, pause timing, fluency) are also deferred. The current pipeline does not retain raw audio for post-call analysis, so the v1 signal list is transcript-only.
+
+## v1 simplifications
+
+These narrow Rule 2's scope for the v1 demo. The architectural posture is unchanged — we are deferring implementation, not the rule.
+
+- **Confounder detection and confidence penalty deferred.** v1 extractors do not detect confounders. `IndirectSignal.confounders` is populated as `[]`. `confidence` is set to `1.0` whenever `sufficiencyMet = true` and the signal is not persisted otherwise. The `confidence` and `confounders` columns remain in the schema for v1.next; no migration will be needed when the detection pipeline lands. Full design (penalty tiers, special cases like nulling response latency under network spikes, calibration plan) is captured in `docs/research/confounder-penalties-deferred.md`.
+- **Sufficiency gating stays inline, not centralised.** Each extractor handles its own minimum-data check (writing `sufficiencyMet` and `insufficiencyReason`). There is no shared sufficiency-gate utility in v1. Thresholds default to the values in `docs/research/indirect-signals.md`.
 
 ## Out of scope for this ADR
 
