@@ -8,14 +8,20 @@ The health check-in is too rigid. It follows a rule-based question collection fl
 
 ## Change 1 — Clinical Data Expansion
 
-Add the following clinical instruments to the health check-in, grounded in the research document:
+Add the following clinical instruments, grounded in the research document. **v1 scope is narrower than originally proposed** — see deferred items below.
 
-- **PHQ-2 depression screen** — two questions, scored 0–3 each. Score ≥ 3 triggers full GDS-15 assessment. This is critical because depression mimics cognitive decline (pseudodementia) and without mood screening the cognitive persona cannot distinguish reversible depression from actual decline.
-- **GDS-15** — administered only when PHQ-2 threshold is met, not every call.
-- **IADL questions** — instrumental activities of daily living. These are the earliest behavioral markers of cognitive decline, appearing 2–3 years before formal MCI diagnosis. Key domains: medication management, finances, transportation, meal preparation. New difficulty in a previously independent domain is a major clinical red flag.
-- **Self-reported cognitive changes** — direct questions asking if the user has noticed increased forgetfulness, trouble following conversations, or repeating themselves. Validated clinical signal.
+### v1 (in scope)
 
-These additions serve a dual purpose: improving health data quality and feeding signals into the cognitive persona to contextualize assessment scores (health → cognitive signal sharing via Redis).
+- **IADL (Lawton 8-domain)** — instrumental activities of daily living. The earliest behavioral markers of cognitive decline, appearing 2–3 years before formal MCI diagnosis. Domains: telephone use, shopping, food preparation, housekeeping, laundry, transportation, medication management, finances. New difficulty in a previously independent domain is a major clinical red flag. **Captured at onboarding via the trusted-contact (caregiver) flow** — informant-reported, not self-reported. Stored in `IadlAssessment` with `source = ONBOARDING`. Re-administration triggers (`DRIFT_TRIGGERED`, `SCHEDULED_REFRESH`, `CAREGIVER_INITIATED`) reserved on the enum but not yet wired up.
+- **Self-reported cognitive changes** — three frequency questions (forgetfulness, conversation difficulty, self-repetition) rated `NEVER` (0) → `DAILY` (4), totalled 0–12. **Captured at onboarding**, not in-call. Stored in `CognitiveSelfReport` with `source = ONBOARDING`.
+
+These onboarding-time assessments serve a dual purpose: they form the baseline behavioural layer the cognitive persona uses to contextualize MoCA scores, and they avoid biasing the live health-check call toward a structured screening posture.
+
+### Deferred (see linked docs)
+
+- **PHQ-2 / GDS-15 depression assessment** — deferred entirely from v1. Adding it inline biases the health check toward a mental-health screen we don't have the clinical scaffolding to support, and the trigger logic (longitudinal mood signal across N sessions, separate `DEPRESSION_ASSESSMENT` call type) belongs to a later phase. Design intent captured in `docs/research/depression-assessment-deferred.md`.
+- **In-call IADL re-assessment** — for v1, IADL is collected once at onboarding from the caregiver. Drift-triggered or scheduled re-administration is reserved on the `IadlSource` enum but not implemented.
+- **Health → Cognitive signal sharing via Redis** — the cross-persona Redis contract is Phase 0 work (separate task) and not yet built.
 
 ## Change 2 — Conversation Flexibility via Medallion Data Collection
 
@@ -47,10 +53,10 @@ The cognitive persona uses the MoCA protocol to assess cognitive function throug
 
 ### As a confounding signal source
 
-The clinical research identifies several conditions that produce cognitive scores mimicking decline when the underlying cause is actually reversible — depression, medication changes, poor sleep, acute illness. The health check-in collects exactly this data. PHQ-2/GDS-15 results, IADL flags, medication adherence, and sleep quality from the health persona should be shared with the cognitive persona via Redis signals so that assessment scores can be interpreted in context rather than in isolation.
+The clinical research identifies several conditions that produce cognitive scores mimicking decline when the underlying cause is actually reversible — depression, medication changes, poor sleep, acute illness. The health check-in collects exactly this data. **In v1**, the cross-persona signals available to the cognitive persona are: medication adherence and condition status from the health log, plus the onboarding `IadlAssessment` and `CognitiveSelfReport`. Depression / mood signals are deferred (see `depression-assessment-deferred.md`). Cross-persona delivery is via Redis (Phase 0 contract — see ADR-005 and the signal-independence taxonomy).
 
 ### As a longitudinal behavioral baseline
 
-IADL difficulties, self-reported cognitive changes, and mood trends collected across health check-ins over time form a behavioral baseline that supports the cognitive persona's drift detection. A declining MoCA score means something very different when IADL independence is also deteriorating vs when it is stable. The health check-in provides that longitudinal behavioral layer the cognitive assessment alone cannot capture.
+The onboarding IADL and self-reported cognitive change scores establish a behavioral baseline at intake. Subsequent health check-ins layer in adherence, symptom, and condition data over time. A declining MoCA score means something very different when IADL independence is also deteriorating vs when it is stable — the health surface provides the longitudinal behavioral layer the cognitive assessment alone cannot capture.
 
-This means the health and cognitive personas must share data bidirectionally — health signals inform cognitive score interpretation, and cognitive drift alerts increase the depth of IADL and self-reported change questions in subsequent health check-ins.
+This means the health and cognitive personas must share data bidirectionally — health signals inform cognitive score interpretation, and cognitive drift alerts can (in a later phase) trigger an `IadlSource = DRIFT_TRIGGERED` re-assessment via the caregiver.
