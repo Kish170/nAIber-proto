@@ -106,6 +106,9 @@ model ElderlyProfile {
   healthConditions      UserHealthCondition[]
   medications           UserMedication[]
   callEvents            CallEvent[]
+  iadlAssessments       IadlAssessment[]
+  cognitiveSelfReports  CognitiveSelfReport[]
+  indirectSignals       IndirectSignal[]
 
   @@map("elderly_profiles")
 }
@@ -218,6 +221,7 @@ model CallLog {
   cognitiveTestResult      CognitiveTestResult?
   conversationSummary      ConversationSummary?
   healthCheckLog           HealthCheckLog?
+  indirectSignals          IndirectSignal[]
 
   @@index([elderlyProfileId, scheduledTime])
   @@index([status])
@@ -401,6 +405,7 @@ model CognitiveTestResult {
   wellbeingCheckResponses Json?
   distressDetected        Boolean        @default(false)
   deferralReason          String?
+  sessionConfidence       Float?         // 0-1, model-aggregated from per-signal confidences. Nullable v1.
   completedAt             DateTime       @default(now())
   callLog                 CallLog?       @relation(fields: [callLogId], references: [id], onDelete: Cascade)
   elderlyProfile          ElderlyProfile @relation(fields: [elderlyProfileId], references: [id], onDelete: Cascade)
@@ -417,6 +422,8 @@ model CognitiveBaseline {
   rawValues        Json
   domainBaselines  Json
   version          Int
+  callsIncluded    Int            @default(0)
+  baselineLocked   Boolean        @default(false) // true after baselineCallTarget reached (default 3)
   createdAt        DateTime       @default(now())
   elderlyProfile   ElderlyProfile @relation(fields: [elderlyProfileId], references: [id], onDelete: Cascade)
 
@@ -437,6 +444,7 @@ model TrustedContact {
   createdAt              DateTime                   @default(now())
   updatedAt              DateTime                   @updatedAt
   submissions            TrustedContactSubmission[]
+  iadlAssessments        IadlAssessment[]
   elderlyProfile         ElderlyProfile             @relation(fields: [elderlyProfileId], references: [id], onDelete: Cascade)
 
   @@index([elderlyProfileId])
@@ -536,6 +544,81 @@ model HealthConditionLog {
   @@index([elderlyProfileId, createdAt])
   @@index([conditionId])
   @@map("health_condition_logs")
+}
+
+model IadlAssessment {
+  id                   String         @id @default(uuid())
+  elderlyProfileId     String
+  trustedContactId     String?        
+  source               IadlSource     @default(ONBOARDING)
+
+  telephoneUse         Int            
+  shopping             Int
+  foodPreparation      Int
+  housekeeping         Int
+  laundry              Int
+  transportation       Int
+  medicationManagement Int
+  finances             Int
+
+  totalScore           Int            
+  notes                String?
+
+  createdAt            DateTime       @default(now())
+
+  elderlyProfile       ElderlyProfile  @relation(fields: [elderlyProfileId], references: [id], onDelete: Cascade)
+  trustedContact       TrustedContact? @relation(fields: [trustedContactId], references: [id], onDelete: SetNull)
+
+  @@index([elderlyProfileId, createdAt])
+  @@index([trustedContactId])
+  @@map("iadl_assessments")
+}
+
+model CognitiveSelfReport {
+  id                              String           @id @default(uuid())
+  elderlyProfileId                String
+  source                          SelfReportSource @default(ONBOARDING)
+
+  forgetfulnessFrequency          Int
+  conversationDifficultyFrequency Int
+  repetitionFrequency             Int
+
+  totalConcernScore               Int
+  notes                           String?
+
+  createdAt                       DateTime         @default(now())
+
+  elderlyProfile                  ElderlyProfile   @relation(fields: [elderlyProfileId], references: [id], onDelete: Cascade)
+
+  @@index([elderlyProfileId, createdAt])
+  @@map("cognitive_self_reports")
+}
+
+model IndirectSignal {
+  id                  String         @id @default(uuid())
+  elderlyProfileId    String
+  callLogId           String
+  conversationId      String
+  callType            CallType       
+
+  signalType          SignalType
+  rawValue            Json          
+
+  confidence          Float         
+  confounders         Json  
+  provenance          Json      
+
+  sufficiencyMet      Boolean
+  insufficiencyReason String?    
+
+  createdAt           DateTime       @default(now())
+
+  elderlyProfile      ElderlyProfile @relation(fields: [elderlyProfileId], references: [id], onDelete: Cascade)
+  callLog             CallLog        @relation(fields: [callLogId], references: [id], onDelete: Cascade)
+
+  @@index([elderlyProfileId, signalType, createdAt])
+  @@index([callLogId])
+  @@map("indirect_signals")
 }
 
 enum Gender {
@@ -657,4 +740,25 @@ enum AdherenceRating {
   MOSTLY
   SOMETIMES
   RARELY
+}
+
+enum IadlSource {
+  ONBOARDING
+  DRIFT_TRIGGERED
+  SCHEDULED_REFRESH
+  CAREGIVER_INITIATED
+}
+
+enum SelfReportSource {
+  ONBOARDING
+  DRIFT_TRIGGERED
+  SCHEDULED_REFRESH
+}
+
+enum SignalType {
+  LEXICAL_DIVERSITY
+  SYNTACTIC_COMPLEXITY
+  SEMANTIC_COHERENCE
+  DISFLUENCY_RATE
+  RESPONSE_LATENCY
 }
