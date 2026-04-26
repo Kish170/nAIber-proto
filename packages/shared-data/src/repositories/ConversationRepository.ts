@@ -287,4 +287,42 @@ export class ConversationRepository {
             throw error;
         }
     }
+
+    static async findTopicsWithMentionCount(elderlyProfileId: string) {
+        try {
+            return await prismaClient.conversationTopic.findMany({
+                where: { elderlyProfileId },
+                select: {
+                    id: true,
+                    topicName: true,
+                    category: true,
+                    updatedAt: true,
+                    _count: {
+                        select: { conversationReferences: true }
+                    }
+                },
+                orderBy: {
+                    conversationReferences: { _count: 'desc' }
+                }
+            });
+        } catch (error) {
+            console.error('[ConversationRepository] Unable to get topics with mention count:', error);
+            throw error;
+        }
+    }
+
+    static async createCallEvent(data: {
+        elderlyProfileId: string;
+        conversationId: string;
+        eventType: string;
+        description: string;
+        severity?: string;
+    }) {
+        try {
+            return await prismaClient.callEvent.create({ data });
+        } catch (error) {
+            console.error('[ConversationRepository] Unable to create call event:', error);
+            throw error;
+        }
+    }
 }

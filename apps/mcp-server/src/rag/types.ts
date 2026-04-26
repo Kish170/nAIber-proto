@@ -11,6 +11,8 @@ export interface KGHighlightResult {
     createdAt: string;
     topicIds: string[];
     topicLabels: string[];
+    expansionSource?: 'direct' | 'related_topic';
+    viaRelatedTopicLabels?: string[];
 }
 
 export interface KGRelatedTopic {
@@ -27,6 +29,7 @@ export interface KGPersonResult {
     mentionCount: number;
     lastSeen: string;
     associatedTopicIds: string[];
+    expansionSource?: 'direct' | 'related_topic';
 }
 
 export interface KGHighlightContext {
@@ -50,6 +53,10 @@ export interface EnrichedMemory {
     conversationDate?: string;
     summaryText?: string;
     source: 'qdrant' | 'kg_discovery' | 'both';
+    // How this memory entered the KG result set (only set for kg_discovery / both)
+    expansionSource?: 'direct' | 'related_topic';
+    // Labels of the related topics that surfaced this memory (only when expansionSource = 'related_topic')
+    viaRelatedTopicLabels?: string[];
 }
 
 export interface KGRetrievalResult {

@@ -155,6 +155,47 @@ export class KGRetrievalService {
                 this.graphQuery.getPersonsForTopics(topTopicIds),
             ]);
 
+            for (const h of kgDiscoveredHighlights) h.expansionSource = 'direct';
+            for (const p of personsForTopics) p.expansionSource = 'direct';
+
+            if (relatedTopics.length > 0) {
+                const relatedTopicIds = relatedTopics.map(rt => rt.topicId);
+                const relatedTopicLabelMap = new Map(relatedTopics.map(rt => [rt.topicId, rt.label]));
+
+                const [relatedHighlights, relatedPersons] = await Promise.all([
+                    this.graphQuery.getHighlightsByTopicIds(
+                        relatedTopicIds,
+                        Math.ceil(this.config.kgHighlightLimit / 2)
+                    ),
+                    this.graphQuery.getPersonsForTopics(relatedTopicIds),
+                ]);
+
+                const directHighlightIds = new Set(kgDiscoveredHighlights.map(h => h.qdrantPointId));
+                let highlightsAdded = 0;
+                for (const h of relatedHighlights) {
+                    if (!directHighlightIds.has(h.qdrantPointId)) {
+                        h.expansionSource = 'related_topic';
+                        h.viaRelatedTopicLabels = h.topicIds
+                            .map(tid => relatedTopicLabelMap.get(tid))
+                            .filter((l): l is string => !!l);
+                        kgDiscoveredHighlights.push(h);
+                        highlightsAdded++;
+                    }
+                }
+
+                const directPersonIds = new Set(personsForTopics.map(p => p.personId));
+                let personsAdded = 0;
+                for (const p of relatedPersons) {
+                    if (!directPersonIds.has(p.personId)) {
+                        p.expansionSource = 'related_topic';
+                        personsForTopics.push(p);
+                        personsAdded++;
+                    }
+                }
+
+                console.log(`[KGRetrievalService] discoverFromKG: relatedTopicExpansion relatedTopics=${relatedTopics.length} highlightsAdded=${highlightsAdded} personsAdded=${personsAdded}`);
+            }
+
             console.log(`[KGRetrievalService] discoverFromKG: kgHighlights=${kgDiscoveredHighlights.length} relatedTopics=${relatedTopics.length} persons=${personsForTopics.length}`);
 
             return { rankedTopics, topTopicIds, kgDiscoveredHighlights, relatedTopics, personsForTopics };
@@ -206,6 +247,10 @@ export class KGRetrievalService {
                 existing.finalScore =
                     effectiveAlpha * existing.qdrantScore +
                     (1 - effectiveAlpha) * existing.kgScore;
+                if (!existing.expansionSource || kgH.expansionSource === 'direct') {
+                    existing.expansionSource = kgH.expansionSource;
+                    existing.viaRelatedTopicLabels = kgH.viaRelatedTopicLabels;
+                }
                 continue;
             }
 
@@ -221,6 +266,8 @@ export class KGRetrievalService {
                 persons: [],
                 conversationDate: kgH.createdAt,
                 source: 'kg_discovery',
+                expansionSource: kgH.expansionSource,
+                viaRelatedTopicLabels: kgH.viaRelatedTopicLabels,
             });
         }
 
@@ -232,7 +279,10 @@ export class KGRetrievalService {
         console.log(`[KGRetrievalService] mergeAndDeduplicate: total=${mergedMap.size} qdrant=${sourceBreakdown.fromQdrant} kg=${sourceBreakdown.fromKG} both=${sourceBreakdown.fromBoth}`);
 
         for (const mem of mergedMap.values()) {
-            console.log(`[KGRetrievalService]   ${mem.qdrantPointId.slice(0, 8)}... qdrantScore=${mem.qdrantScore.toFixed(4)} kgScore=${mem.kgScore.toFixed(4)} finalScore=${mem.finalScore.toFixed(4)} source=${mem.source}`);
+            const expansion = mem.expansionSource === 'related_topic'
+                ? ` via=[${(mem.viaRelatedTopicLabels ?? []).join(',')}]`
+                : '';
+            console.log(`[KGRetrievalService]   ${mem.qdrantPointId.slice(0, 8)}... qdrantScore=${mem.qdrantScore.toFixed(4)} kgScore=${mem.kgScore.toFixed(4)} finalScore=${mem.finalScore.toFixed(4)} source=${mem.source}${expansion}`);
         }
 
         return mergedMap;

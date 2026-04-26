@@ -105,6 +105,7 @@ model ElderlyProfile {
   trustedContacts       TrustedContact[]
   healthConditions      UserHealthCondition[]
   medications           UserMedication[]
+  callEvents            CallEvent[]
 
   @@map("elderly_profiles")
 }
@@ -273,6 +274,21 @@ model ConversationTopicReference {
   @@unique([conversationSummaryId, conversationTopicId])
   @@index([conversationTopicId])
   @@map("conversation_topic_references")
+}
+
+model CallEvent {
+  id               String         @id @default(uuid())
+  elderlyProfileId String
+  conversationId   String
+  eventType        String
+  description      String
+  severity         String?
+  detectedAt       DateTime       @default(now())
+  elderlyProfile   ElderlyProfile @relation(fields: [elderlyProfileId], references: [id], onDelete: Cascade)
+
+  @@index([elderlyProfileId, detectedAt])
+  @@index([conversationId])
+  @@map("call_events")
 }
 
 model HealthCheckLog {

@@ -11,7 +11,7 @@ import type {
 export class GraphQueryRepository {
 
     private async runQuery<T>(fn: (session: Session) => Promise<T>): Promise<T> {
-        const session = Neo4jClient.getInstance().session();
+        const session = Neo4jClient.getInstance().session() as unknown as Session;
         try {
             return await fn(session);
         } finally {
@@ -175,6 +175,35 @@ export class GraphQueryRepository {
             });
         },
         { name: 'neo4j_getInterestedInStrengths', run_type: 'chain' }
+    );
+
+    getSignificantHighlights = traceable(
+        async (userId: string, minScore: number = 7, limit: number = 10): Promise<{ qdrantPointId: string; text: string; importanceScore: number; conversationDate: string | null }[]> => {
+            return this.runQuery(async (session) => {
+                const result = await session.run(
+                    `MATCH (u:User {userId: $userId})-[:INITIATED]->(c:Conversation)-[:HAS_HIGHLIGHT]->(h:Highlight)
+                     WHERE h.importanceScore >= $minScore
+                     RETURN h.qdrantPointId   AS qdrantPointId,
+                            h.text            AS text,
+                            h.importanceScore AS importanceScore,
+                            c.date            AS conversationDate
+                     ORDER BY h.importanceScore DESC
+                     LIMIT $limit`,
+                    { userId, minScore, limit: neo4j.int(limit) }
+                );
+                const highlights = result.records.map(r => ({
+                    qdrantPointId: r.get('qdrantPointId'),
+                    text: r.get('text'),
+                    importanceScore: r.get('importanceScore'),
+                    conversationDate: r.get('conversationDate') ?? null,
+                }));
+
+                console.log(`[GraphQueryRepository] getSignificantHighlights: userId=${userId} minScore=${minScore} results=${highlights.length}`);
+
+                return highlights;
+            });
+        },
+        { name: 'neo4j_getSignificantHighlights', run_type: 'chain' }
     );
 
     getHighlightContext = traceable(

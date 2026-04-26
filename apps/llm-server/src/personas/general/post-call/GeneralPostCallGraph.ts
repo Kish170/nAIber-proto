@@ -47,6 +47,7 @@ export class GeneralPostCallGraph {
         this.graph.addNode("update_topics", this.updateTopics.bind(this));
         this.graph.addNode("store_embeddings", this.storeEmbeddings.bind(this));
         this.graph.addNode("extract_persons", this.extractPersons.bind(this));
+        this.graph.addNode("store_person_embeddings", this.storePersonEmbeddings.bind(this));
         this.graph.addNode("populate_kg_nodes", this.populateKGNodes.bind(this));
         this.graph.addNode("populate_kg_relationships", this.populateKGRelationships.bind(this));
 
@@ -55,7 +56,8 @@ export class GeneralPostCallGraph {
         this.graph.addEdge("match_topics", "update_topics");
         this.graph.addEdge("update_topics", "store_embeddings");
         this.graph.addEdge("store_embeddings", "extract_persons");
-        this.graph.addEdge("extract_persons", "populate_kg_nodes");
+        this.graph.addEdge("extract_persons", "store_person_embeddings");
+        this.graph.addEdge("store_person_embeddings", "populate_kg_nodes");
         this.graph.addEdge("populate_kg_nodes", "populate_kg_relationships");
         this.graph.addEdge("populate_kg_relationships", END);
 
@@ -191,6 +193,22 @@ export class GeneralPostCallGraph {
                 ),
             }));
 
+            const validationErrors: string[] = [];
+            if (!summary.summaryText || summary.summaryText.trim().length < 50) {
+                validationErrors.push(`summaryText too short (${summary.summaryText?.trim().length ?? 0} chars, min 50)`);
+            }
+            if (!Array.isArray(summary.topicsDiscussed) || summary.topicsDiscussed.length === 0) {
+                validationErrors.push('topicsDiscussed is empty or missing');
+            }
+            if (!Array.isArray(summary.keyHighlights) || summary.keyHighlights.length === 0) {
+                validationErrors.push('keyHighlights is empty or missing');
+            }
+            if (validationErrors.length > 0) {
+                const errorMsg = `Summary validation failed — skipping persistence: ${validationErrors.join('; ')}`;
+                console.error('[PostCallGraph]', errorMsg, { summaryPreview: JSON.stringify(summary).slice(0, 200) });
+                return { errors: [errorMsg] };
+            }
+
             const conversationSummary = await createSummary({
                 elderlyProfileId: state.userId,
                 conversationId: state.conversationId,
@@ -322,6 +340,12 @@ export class GeneralPostCallGraph {
                 return {};
             }
 
+            const topicMetadata = {
+                userId: state.userId,
+                conversationId: state.conversationId,
+                createdAt: new Date().toISOString(),
+            };
+
             for (const topicName of state.topicsToCreate) {
                 try {
                     const result = await this.embeddingService.generateEmbedding(topicName);
@@ -338,7 +362,12 @@ export class GeneralPostCallGraph {
                         conversationTopicId: newTopic.id
                     });
 
-                    console.log(`[PostCallGraph] Created new topic: "${topicName}"`);
+                    await this.vectorStore.addMemoriesWithIds(
+                        [{ text: topicName, embedding, id: crypto.randomUUID() }],
+                        { ...topicMetadata, type: 'topic', topicId: newTopic.id, label: topicName } as any
+                    );
+
+                    console.log(`[PostCallGraph] Created new topic: "${topicName}" (embedded in Qdrant)`);
                 } catch (error) {
                     const errorMsg = `Failed to create topic "${topicName}": ${error instanceof Error ? error.message : 'Unknown error'}`;
                     console.error('[PostCallGraph]', errorMsg);
@@ -349,7 +378,6 @@ export class GeneralPostCallGraph {
             for (const { oldName, newName, topicId, newEmbedding } of state.topicsToUpdate) {
                 try {
                     await updateConversationTopic(state.userId, oldName, newName);
-
 
                     await ConversationRepository.upsertTopic({
                         elderlyProfileId: state.userId,
@@ -362,7 +390,12 @@ export class GeneralPostCallGraph {
                         conversationTopicId: topicId
                     });
 
-                    console.log(`[PostCallGraph] Updated topic: "${oldName}" → "${newName}" (embedding replaced)`);
+                    await this.vectorStore.addMemoriesWithIds(
+                        [{ text: newName, embedding: newEmbedding, id: crypto.randomUUID() }],
+                        { ...topicMetadata, type: 'topic', topicId, label: newName } as any
+                    );
+
+                    console.log(`[PostCallGraph] Updated topic: "${oldName}" → "${newName}" (embedding replaced, Qdrant updated)`);
                 } catch (error) {
                     const errorMsg = `Failed to update topic "${oldName}": ${error instanceof Error ? error.message : 'Unknown error'}`;
                     console.error('[PostCallGraph]', errorMsg);
@@ -415,8 +448,22 @@ export class GeneralPostCallGraph {
             );
 
             await this.vectorStore.addMemoriesWithIds(highlightEntries, metadata);
+
+            const eventEntries = highlightEntries.filter((e: { importanceScore: number }) => e.importanceScore >= 7);
+            if (eventEntries.length > 0) {
+                await this.vectorStore.addMemoriesWithIds(
+                    eventEntries.map((e: { text: string; embedding: number[]; id: string }) => ({
+                        text: e.text,
+                        embedding: e.embedding,
+                        id: crypto.randomUUID(),
+                    })),
+                    { ...metadata, type: 'event' } as any
+                );
+            }
+
             console.log('[PostCallGraph] Embeddings stored:', JSON.stringify({
                 highlightCount: highlightEntries.length,
+                eventCount: eventEntries.length,
                 qdrantPointIds: highlightEntries.map((e: { id: string }) => e.id),
                 textLengths: highlightEntries.map((e: { text: string }) => e.text.length),
                 importanceScores: highlightEntries.map((e: { importanceScore: number }) => e.importanceScore),
@@ -454,6 +501,53 @@ export class GeneralPostCallGraph {
 
         } catch (error) {
             const errorMsg = `Failed to populate KG relationships: ${error instanceof Error ? error.message : 'Unknown error'}`;
+            console.error('[PostCallGraph]', errorMsg);
+            return { errors: [errorMsg] };
+        }
+    }
+
+    private async storePersonEmbeddings(state: PostCallStateType) {
+        try {
+            if (state.errors.length > 0) {
+                console.log('[PostCallGraph] Skipping person embeddings due to previous errors');
+                return {};
+            }
+
+            if (!state.extractedPersons || state.extractedPersons.length === 0) {
+                console.log('[PostCallGraph] No persons to embed');
+                return {};
+            }
+
+            const metadata = {
+                userId: state.userId,
+                conversationId: state.conversationId,
+                createdAt: new Date().toISOString(),
+            };
+
+            const personEntries = await Promise.all(
+                state.extractedPersons.map(async (person: { id: string; name: string; role?: string }) => {
+                    const text = `${person.name} — ${person.role ?? 'person'}`;
+                    const { embedding } = await this.embeddingService.generateEmbedding(text);
+                    return { text, embedding, id: crypto.randomUUID() };
+                })
+            );
+
+            await this.vectorStore.addMemoriesWithIds(
+                personEntries,
+                {
+                    ...metadata,
+                    type: 'person',
+                } as any
+            );
+
+            console.log('[PostCallGraph] Person embeddings stored:', JSON.stringify({
+                personCount: personEntries.length,
+                persons: state.extractedPersons.map((p: { name: string; role?: string }) => `${p.name} (${p.role ?? 'person'})`),
+            }));
+
+            return {};
+        } catch (error) {
+            const errorMsg = `Failed to store person embeddings: ${error instanceof Error ? error.message : 'Unknown error'}`;
             console.error('[PostCallGraph]', errorMsg);
             return { errors: [errorMsg] };
         }

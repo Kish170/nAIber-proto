@@ -79,6 +79,9 @@ export const retrieveMemoriesHandler = traceable(
                     topic: m.topicLabels.join(', '),
                     similarity: m.finalScore,
                     source: m.source,
+                    via: m.expansionSource === 'related_topic' && m.viaRelatedTopicLabels?.length
+                        ? `related topic: ${m.viaRelatedTopicLabels.join(', ')}`
+                        : undefined,
                 })),
                 relatedTopics: result.relatedTopics.map(t => ({
                     name: t.label,
@@ -87,6 +90,7 @@ export const retrieveMemoriesHandler = traceable(
                 persons: result.personsContext.map(p => ({
                     name: p.name,
                     relationship: p.role ?? '',
+                    via: p.expansionSource === 'related_topic' ? 'related topic expansion' : undefined,
                 })),
             };
         } catch (error) {
