@@ -524,24 +524,23 @@ export class GeneralPostCallGraph {
                 createdAt: new Date().toISOString(),
             };
 
-            const personEntries = await Promise.all(
-                state.extractedPersons.map(async (person: { id: string; name: string; role?: string }) => {
-                    const text = `${person.name} — ${person.role ?? 'person'}`;
-                    const { embedding } = await this.embeddingService.generateEmbedding(text);
-                    return { text, embedding, id: crypto.randomUUID() };
-                })
-            );
-
-            await this.vectorStore.addMemoriesWithIds(
-                personEntries,
-                {
-                    ...metadata,
-                    type: 'person',
-                } as any
-            );
+            for (const person of state.extractedPersons as { id: string; name: string; role?: string }[]) {
+                const text = `${person.name} — ${person.role ?? 'person'}`;
+                const { embedding } = await this.embeddingService.generateEmbedding(text);
+                await this.vectorStore.addMemoriesWithIds(
+                    [{ text, embedding, id: crypto.randomUUID() }],
+                    {
+                        ...metadata,
+                        type: 'person',
+                        personId: person.id,
+                        name: person.name,
+                        role: person.role ?? '',
+                    } as any
+                );
+            }
 
             console.log('[PostCallGraph] Person embeddings stored:', JSON.stringify({
-                personCount: personEntries.length,
+                personCount: state.extractedPersons.length,
                 persons: state.extractedPersons.map((p: { name: string; role?: string }) => `${p.name} (${p.role ?? 'person'})`),
             }));
 
