@@ -276,6 +276,63 @@ async function main() {
             }
         }
 
+        // --- Significant highlights (importanceScore >= 7) ---
+        console.log('\n--- Significant Highlights (importanceScore >= 7) ---');
+        const significantHighlights = await runQuery<{ text: string; score: number; qdrantPointId: string | null; date: string }>(driver,
+            `MATCH (u:User {userId: $userId})-[:HAS_CONVERSATION]->(c)-[:HAS_HIGHLIGHT]->(h:Highlight)
+             WHERE h.importanceScore >= 7
+             RETURN h.text AS text, h.importanceScore AS score, h.qdrantPointId AS qdrantPointId, h.createdAt AS date
+             ORDER BY h.importanceScore DESC`, { userId });
+
+        console.log(`Significant highlights: ${significantHighlights.length}`);
+        if (significantHighlights.length > 0) {
+            console.log('(These should each have a corresponding type=event entry in Qdrant)');
+            for (const h of significantHighlights) {
+                const pidPreview = h.qdrantPointId ? h.qdrantPointId.slice(0, 8) + '...' : 'NO_QDRANT_ID';
+                console.log(`  [score=${h.score}] [qdrant=${pidPreview}] "${h.text}"`);
+            }
+        } else {
+            console.log('None yet — events appear when importanceScore >= 7 highlights are stored');
+        }
+
+        // --- RELATED_TO lateral expansion readiness ---
+        console.log('\n--- RELATED_TO Lateral Expansion Readiness ---');
+        const relatedToReady = await runQuery<{
+            topicLabel: string;
+            relatedLabel: string;
+            strength: number;
+            relatedHighlightCount: number;
+        }>(driver,
+            `MATCH (u:User {userId: $userId})-[:MENTIONS]->(t:Topic)-[r:RELATED_TO]->(t2:Topic)
+             WHERE r.strength > 0.0
+             OPTIONAL MATCH (:Conversation)-[:HAS_HIGHLIGHT]->(h2:Highlight)-[:MENTIONS]->(t2)
+             WITH t.label AS topicLabel, t2.label AS relatedLabel, r.strength AS strength, count(DISTINCT h2) AS relatedHighlightCount
+             RETURN topicLabel, relatedLabel, strength, relatedHighlightCount
+             ORDER BY strength DESC, relatedHighlightCount DESC
+             LIMIT 10`, { userId });
+
+        if (relatedToReady.length === 0) {
+            console.log('No RELATED_TO edges with strength > 0 yet');
+            console.log('Lateral expansion activates once topics co-occur across 2+ conversations');
+        } else {
+            console.log(`Topic pairs eligible for lateral expansion (strength > 0):`);
+            for (const r of relatedToReady) {
+                const highlightNote = r.relatedHighlightCount > 0
+                    ? `${r.relatedHighlightCount} highlights available`
+                    : '⚠ no highlights in related topic — expansion would add nothing';
+                console.log(`  "${r.topicLabel}" → "${r.relatedLabel}" (strength=${r.strength?.toFixed(2)}) — ${highlightNote}`);
+            }
+        }
+
+        // Also show edges with strength = 0 (first co-occurrence, not yet active for expansion)
+        const firstCoOccurrence = await runQuery<{ count: number }>(driver,
+            `MATCH (u:User {userId: $userId})-[:MENTIONS]->(t:Topic)-[r:RELATED_TO]->(t2:Topic)
+             WHERE r.strength = 0.0
+             RETURN count(r) AS count`, { userId });
+        if ((firstCoOccurrence[0]?.count ?? 0) > 0) {
+            console.log(`  (${firstCoOccurrence[0]?.count} edges at strength=0.0 — first co-occurrence, need one more shared call to activate)`);
+        }
+
         console.log('\n=== AUDIT COMPLETE ===');
     } finally {
         await driver.close();

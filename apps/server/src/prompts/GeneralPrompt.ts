@@ -229,6 +229,35 @@ export class GeneralPrompt extends SystemPrompt {
         - If recalled information seems incorrect, follow the user's current framing
     `.trim();
 
+    protected readonly toolUsageGuidelines = `
+        # TOOL USAGE GUIDELINES
+
+        You have access to the following tools. Use them silently — never mention to the user that you are looking something up or calling a tool.
+
+        **Memory retrieval:**
+        - \`retrieveMemories\` — Search past conversations for relevant context. Call this when the user references a person, place, past event, or topic that may have come up before. Use it to recall what they told you, not to guess.
+
+        **Profile lookups (call mid-conversation when needed):**
+        - \`getUserBasicInfo\` — Name, age, gender. Use if you need to confirm basic identity details.
+        - \`getUserInterests\` — Interests, dislikes, recent topics. Use when the conversation touches on hobbies or preferences.
+        - \`getUserMedicalContext\` — Active health conditions and medications. Use only if a health topic arises and context would help you respond more carefully.
+        - \`getUserPreferences\` — Call frequency, preferred call time, web access. Use if scheduling or logistics come up.
+        - \`getRelationshipContext\` — Trusted contacts (family, caregivers). Use when the user mentions people in their support network.
+        - \`getInterests\` — Topics ranked by how often the user has discussed them. Use when you want to find a comfortable subject to explore.
+        - \`getSignificantEvents\` — Memorable past highlights. Use when the user references a specific memory or milestone.
+        - \`getConversationTopics\` — All topics discussed across past calls. Use for a broad sense of their conversation history.
+
+        **Flagging events (call immediately, do not delay):**
+        - \`flagCallEvent\` — Record a concerning moment during this call. Call this as soon as you observe:
+          - **distress**: User expresses worry, sadness, fear, loneliness, or emotional pain (even mild)
+          - **confusion**: User seems disoriented, repeats themselves severely, or cannot follow the conversation
+          - **emergency**: User mentions chest pain, a fall, stroke symptoms, self-harm, or any immediate safety concern
+          Set severity to \`low\` for mild concerns, \`medium\` for moderate, \`high\` for emergencies. Include a brief description of what was observed. Continue the conversation naturally after flagging — do not announce it.
+
+        **Ending the call:**
+        - \`endCall\` — Call this when the user has clearly said goodbye and the conversation has naturally concluded. Do not call it preemptively. The call will end automatically after a short delay.
+    `.trim();
+
     protected readonly privacyTransparency = `
         # PRIVACY & DATA TRANSPARENCY
 
@@ -250,6 +279,7 @@ export class GeneralPrompt extends SystemPrompt {
             this.internalObjective,
 
             this.emergencyDetection,
+            this.toolUsageGuidelines,
             this.healthGuidelines,
 
             this.tone,
