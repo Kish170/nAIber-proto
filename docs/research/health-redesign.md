@@ -21,7 +21,7 @@ These onboarding-time assessments serve a dual purpose: they form the baseline b
 
 - **PHQ-2 / GDS-15 depression assessment** — deferred entirely from v1. Adding it inline biases the health check toward a mental-health screen we don't have the clinical scaffolding to support, and the trigger logic (longitudinal mood signal across N sessions, separate `DEPRESSION_ASSESSMENT` call type) belongs to a later phase. Design intent captured in `docs/research/depression-assessment-deferred.md`.
 - **In-call IADL re-assessment** — for v1, IADL is collected once at onboarding from the caregiver. Drift-triggered or scheduled re-administration is reserved on the `IadlSource` enum but not implemented.
-- **Health → Cognitive signal sharing via Redis** — the cross-persona Redis contract is Phase 0 work (separate task) and not yet built.
+- **Live (mid-call) cross-persona signal reads** — no v1 use case. Cross-persona signal flow happens via the database: post-call BullMQ workers persist `IndirectSignal` rows and silver-tier health log rows; the dashboard and the next call's persona graph read from the DB. A Redis pub/sub contract was considered and dropped — it was solving a v1 problem we don't have.
 
 ## Change 2 — Conversation Flexibility via Medallion Data Collection
 
@@ -53,7 +53,7 @@ The cognitive persona uses the MoCA protocol to assess cognitive function throug
 
 ### As a confounding signal source
 
-The clinical research identifies several conditions that produce cognitive scores mimicking decline when the underlying cause is actually reversible — depression, medication changes, poor sleep, acute illness. The health check-in collects exactly this data. **In v1**, the cross-persona signals available to the cognitive persona are: medication adherence and condition status from the health log, plus the onboarding `IadlAssessment` and `CognitiveSelfReport`. Depression / mood signals are deferred (see `depression-assessment-deferred.md`). Cross-persona delivery is via Redis (Phase 0 contract — see ADR-005 and the signal-independence taxonomy).
+The clinical research identifies several conditions that produce cognitive scores mimicking decline when the underlying cause is actually reversible — depression, medication changes, poor sleep, acute illness. The health check-in collects exactly this data. **In v1**, the cross-persona signals available to the cognitive persona are: medication adherence and condition status from the health log, plus the onboarding `IadlAssessment` and `CognitiveSelfReport`. Depression / mood signals are deferred (see `depression-assessment-deferred.md`). Cross-persona delivery is via the database — post-call BullMQ workers persist signals; the dashboard and subsequent calls read those rows. No live (mid-call) cross-persona signal channel in v1.
 
 ### As a longitudinal behavioral baseline
 

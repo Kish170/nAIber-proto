@@ -646,7 +646,10 @@ Weights sum to 1.0.
 
 `weightedInformantIndex = informantConcernIndex × reliabilityWeight`
 
-**Interaction with stability index (displayed in parallel, never blended):**
+**Interaction with stability index (displayed in parallel, never blended into displayed scores):**
+
+> **Note (per ADR-006):** "Never blended" applies to *displayed* per-call scores and the dashboard discrepancy track described below. The cognitive baseline-establishment math (call 1's contribution weight, per C2) does consult `weightedInformantIndex` — that one carve-out is documented in `docs/decisions/adr-006-c2-iqcode-blending.md`. Raw `CognitiveTestResult` rows are still immutable.
+
 
 | Stability Status | Informant Concern | Action |
 |---|---|---|

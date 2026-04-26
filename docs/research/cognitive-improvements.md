@@ -16,6 +16,8 @@ The improvements are focused entirely on **scoring quality and clinical validity
 - First test performance is commonly depressed by anxiety in elderly users — using it as a permanent baseline anchors too low.
 - Implement baseline initialization that blends IQCODE-style informant priors (from onboarding data) with first test scores rather than treating first test as ground truth.
 
+**Policy locked in `docs/decisions/adr-006-c2-iqcode-blending.md`:** the prior produces a baseline-contribution weight (0.5 / 0.75 / 1.0) on call 1 only, sourced from the primary caregiver's `weightedInformantIndex`. Raw per-call cognitive scores remain immutable. See ADR-006 for the step function, no-data fallback, and rationale.
+
 ## 3. Reliable Change Index
 
 - Replace current arbitrary drift thresholds (0.80 / 0.65 / 0.50) with RCI computation per domain.

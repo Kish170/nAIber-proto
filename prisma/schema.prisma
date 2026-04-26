@@ -439,6 +439,7 @@ model TrustedContact {
   knownDurationYears     Int
   contactFrequency       ContactFrequency
   reliabilityTier        ReliabilityTier
+  isPrimary              Boolean                    @default(false) // Only the primary caregiver may submit IQCODE / TrustedContactSubmission. App enforces exactly one per elder.
   informantConcernIndex  Float?
   weightedInformantIndex Float?
   createdAt              DateTime                   @default(now())
@@ -448,6 +449,7 @@ model TrustedContact {
   elderlyProfile         ElderlyProfile             @relation(fields: [elderlyProfileId], references: [id], onDelete: Cascade)
 
   @@index([elderlyProfileId])
+  @@index([elderlyProfileId, isPrimary])
   @@map("trusted_contacts")
 }
 
