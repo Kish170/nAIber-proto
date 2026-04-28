@@ -3,6 +3,7 @@ import {
     CognitiveDomain,
     TaskResponse,
 } from '../tasks/TaskDefinitions.js';
+import type { EducationLevel } from '../../../../../../generated/prisma/index.js';
 
 export interface DomainScore {
     domain: CognitiveDomain;
@@ -30,6 +31,135 @@ export interface DriftResult {
     rollingMean: number;
     threshold: number;
 }
+
+type AgeBand = '60-69' | '70-79' | '80+';
+
+export interface DomainInterpretation {
+    delayedRecall: {
+        expectedRangeLow: number;    // normalized 0–1
+        expectedRangeHigh: number;
+        adjustmentFactor: number;
+        withinExpected: boolean;
+    };
+    letterFluency: {
+        expectedCountLow: number;    // raw word count
+        expectedCountHigh: number;
+        withinExpected: boolean | null;  // null if no fluency score yet
+    };
+}
+
+const DELAYED_RECALL_THRESHOLDS: Record<AgeBand, Record<string, { low: number; high: number; factor: number }>> = {
+    '60-69': {
+        'post-secondary': { low: 0.70, high: 1.00, factor: 1.00 },
+        'secondary':      { low: 0.60, high: 0.90, factor: 0.95 },
+        'primary':        { low: 0.50, high: 0.80, factor: 0.90 },
+    },
+    '70-79': {
+        'post-secondary': { low: 0.60, high: 0.90, factor: 0.95 },
+        'secondary':      { low: 0.50, high: 0.80, factor: 0.90 },
+        'primary':        { low: 0.40, high: 0.70, factor: 0.85 },
+    },
+    '80+': {
+        'post-secondary': { low: 0.50, high: 0.80, factor: 0.90 },
+        'secondary':      { low: 0.40, high: 0.70, factor: 0.85 },
+        'primary':        { low: 0.30, high: 0.60, factor: 0.80 },
+    },
+};
+
+const FLUENCY_EXPECTED_RANGES: Record<AgeBand, Record<string, { low: number; high: number }>> = {
+    '60-69': {
+        'post-secondary': { low: 14, high: 18 },
+        'secondary':      { low: 12, high: 16 },
+        'primary':        { low: 12, high: 16 },
+    },
+    '70-79': {
+        'post-secondary': { low: 12, high: 16 },
+        'secondary':      { low: 10, high: 14 },
+        'primary':        { low: 10, high: 14 },
+    },
+    '80+': {
+        'post-secondary': { low: 10, high: 14 },
+        'secondary':      { low: 8,  high: 12 },
+        'primary':        { low: 8,  high: 12 },
+    },
+};
+
+function resolveAgeBand(age: number | null | undefined): AgeBand {
+    if (!age || age < 70) return '60-69';
+    if (age < 80) return '70-79';
+    return '80+';
+}
+
+function resolveEducationKey(level: EducationLevel | null | undefined): string {
+    if (!level) return 'post-secondary';
+    if (level === 'NO_FORMAL_EDUCATION' || level === 'PRIMARY_OR_ELEMENTARY') return 'primary';
+    if (level === 'SECONDARY_OR_HIGH_SCHOOL') return 'secondary';
+    return 'post-secondary';
+}
+
+export function interpretDomainScores(
+    domainScores: DomainScores,
+    age: number | null | undefined,
+    educationLevel: EducationLevel | null | undefined,
+): DomainInterpretation {
+    const band = resolveAgeBand(age);
+    const edKey = resolveEducationKey(educationLevel);
+
+    const recallRow = DELAYED_RECALL_THRESHOLDS[band][edKey];
+    const fluencyRow = FLUENCY_EXPECTED_RANGES[band][edKey];
+
+    const recallNorm = domainScores.delayedRecall.normalized;
+    const fluencyRaw = domainScores.languageVerbalFluency?.rawScore ?? null;
+
+    return {
+        delayedRecall: {
+            expectedRangeLow: recallRow.low,
+            expectedRangeHigh: recallRow.high,
+            adjustmentFactor: recallRow.factor,
+            withinExpected: recallNorm >= recallRow.low,
+        },
+        letterFluency: {
+            expectedCountLow: fluencyRow.low,
+            expectedCountHigh: fluencyRow.high,
+            withinExpected: fluencyRaw !== null ? fluencyRaw >= fluencyRow.low : null,
+        },
+    };
+}
+
+export function computeFirstCallWeight(weightedInformantIndex: number | null | undefined): number {
+    if (weightedInformantIndex == null) return 0.75;  // no-data fallback per ADR-006
+    if (weightedInformantIndex < 0.3) return 0.5;
+    if (weightedInformantIndex < 0.7) return 0.75;
+    return 1.0;
+}
+
+export interface WeightedSession {
+    domainScores: Record<string, number>;  // normalized values keyed by domain name
+    weight: number;
+}
+
+export function computeWeightedBaseline(sessions: WeightedSession[]): Record<string, number> {
+    const domains = new Set<string>();
+    for (const s of sessions) {
+        for (const d of Object.keys(s.domainScores)) domains.add(d);
+    }
+
+    const result: Record<string, number> = {};
+    for (const domain of domains) {
+        let weightedSum = 0;
+        let totalWeight = 0;
+        for (const s of sessions) {
+            const v = s.domainScores[domain];
+            if (v !== undefined) {
+                weightedSum += s.weight * v;
+                totalWeight += s.weight;
+            }
+        }
+        result[domain] = totalWeight > 0 ? weightedSum / totalWeight : 0;
+    }
+    return result;
+}
+
 
 const DOMAIN_WEIGHTS: Record<string, number> = {
     [CognitiveDomain.DELAYED_RECALL]: 0.30,

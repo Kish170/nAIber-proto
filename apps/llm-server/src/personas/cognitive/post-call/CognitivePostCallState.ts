@@ -1,6 +1,6 @@
 import { Annotation } from '@langchain/langgraph';
 import type { TaskResponse, WellbeingResponse } from '../tasks/TaskDefinitions.js';
-import type { DomainScores } from '../scoring/ScoringEngine.js';
+import type { DomainScores, DomainInterpretation } from '../scoring/ScoringEngine.js';
 
 export const CognitivePostCallState = Annotation.Root({
     userId:                 Annotation<string>({ reducer: (_: string, b: string) => b, default: () => '' }),
@@ -21,6 +21,7 @@ export const CognitivePostCallState = Annotation.Root({
     error:                  Annotation<string>({ reducer: (_: string, b: string) => b, default: () => '' }),
     domainScores:           Annotation<DomainScores | null>({ reducer: (_: DomainScores | null, b: DomainScores | null) => b, default: () => null }),
     stabilityIndex:         Annotation<number>({ reducer: (_: number, b: number) => b, default: () => 0 }),
+    demographicInterpretation: Annotation<DomainInterpretation | null>({ reducer: (_: DomainInterpretation | null, b: DomainInterpretation | null) => b, default: () => null }),
 });
 
 export type CognitivePostCallStateType = typeof CognitivePostCallState.State;

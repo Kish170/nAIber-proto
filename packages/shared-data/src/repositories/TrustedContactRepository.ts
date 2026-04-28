@@ -89,4 +89,36 @@ export class TrustedContactRepository {
             throw error;
         }
     }
+
+    static async findPrimaryContact(elderlyProfileId: string) {
+        try {
+            const contacts = await prismaClient.trustedContact.findMany({
+                where: { elderlyProfileId, isPrimary: true },
+            });
+            if (contacts.length > 1) {
+                throw new Error(
+                    `[TrustedContactRepository] Data integrity error: ${contacts.length} contacts with isPrimary=true for elder ${elderlyProfileId}. Expected exactly one.`,
+                );
+            }
+            return contacts[0] ?? null;
+        } catch (error) {
+            console.error('[TrustedContactRepository] Unable to find primary contact:', error);
+            throw error;
+        }
+    }
+    
+    static async updatePrimaryConcernIndex(
+        elderlyProfileId: string,
+        index: number,
+        weightedIndex: number,
+    ) {
+        const primary = await TrustedContactRepository.findPrimaryContact(elderlyProfileId);
+        if (!primary) {
+            console.warn(
+                `[TrustedContactRepository] No isPrimary contact for elder ${elderlyProfileId} — updatePrimaryConcernIndex no-op`,
+            );
+            return null;
+        }
+        return TrustedContactRepository.updateConcernIndex(primary.id, index, weightedIndex);
+    }
 }

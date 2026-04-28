@@ -1,13 +1,18 @@
 import { StateGraph, END } from '@langchain/langgraph';
 import { CognitivePostCallState, CognitivePostCallStateType } from './CognitivePostCallState.js';
-import { CognitiveRepository } from '@naiber/shared-data';
+import { CognitiveRepository, TrustedContactRepository, UserRepository } from '@naiber/shared-data';
 import {
     computeDomainScores,
     computeStabilityIndex,
     computeFluencyPersonalBest,
-    computeBaselineUpdate,
     detectDrift,
+    interpretDomainScores,
+    computeFirstCallWeight,
+    computeWeightedBaseline,
+    DomainScores,
 } from '../scoring/ScoringEngine.js';
+
+const BASELINE_CALL_TARGET = 3;
 
 export class CognitivePostCallGraph {
     private compiledGraph: any;
@@ -41,6 +46,14 @@ export class CognitivePostCallGraph {
             const domainScores = computeDomainScores(state.taskResponses, fluencyPersonalBest);
             const stabilityIndex = computeStabilityIndex(domainScores, state.registrationQuality);
 
+            // C1: Compute demographic-adjusted interpretation thresholds
+            const profile = await UserRepository.findById(state.userId);
+            const demographicInterpretation = interpretDomainScores(
+                domainScores,
+                profile?.age ?? null,
+                profile?.educationLevel ?? null,
+            );
+
             console.log('[CognitivePostCall] Computed scores:', {
                 stabilityIndex,
                 orientation: domainScores.orientation.normalized,
@@ -49,9 +62,10 @@ export class CognitivePostCallGraph {
                 delayedRecall: domainScores.delayedRecall.normalized,
                 fluency: domainScores.languageVerbalFluency?.normalized ?? 'N/A',
                 abstraction: domainScores.abstractionReasoning.normalized,
+                demographicInterpretation,
             });
 
-            return { domainScores, stabilityIndex };
+            return { domainScores, stabilityIndex, demographicInterpretation };
         } catch (err: any) {
             console.error('[CognitivePostCall] Score computation failed:', err);
             return { error: err.message ?? 'Score computation failed' };
@@ -101,20 +115,60 @@ export class CognitivePostCallGraph {
             if (!domainScores) return {};
 
             const currentBaseline = await CognitiveRepository.getLatestBaseline(state.userId);
-            const currentVector = currentBaseline?.featureVector as Record<string, number> | null;
-            const currentVersion = currentBaseline?.version ?? 0;
 
-            const newVector = computeBaselineUpdate(currentVector, domainScores);
+            if (currentBaseline?.baselineLocked) {
+                console.log('[CognitivePostCall] Baseline locked — skipping update');
+                return {};
+            }
+
+            const callsIncludedPrev = currentBaseline?.callsIncluded ?? 0;
+            const callsIncluded = callsIncludedPrev + 1;
+
+            const primaryContact = await TrustedContactRepository.findPrimaryContact(state.userId);
+            const w1 = computeFirstCallWeight(primaryContact?.weightedInformantIndex ?? null);
+
+            // Incremental weighted mean: new_vector[d] = (prev[d] * prevTotalWeight + new[d] * wNew) / (prevTotalWeight + wNew)
+            // w1 applies only to call 1; calls 2+ have weight 1.0
+            // total_weight_prev = w1 + max(0, callsIncludedPrev - 1)
+            const wNew = callsIncluded === 1 ? w1 : 1.0;
+            const prevTotalWeight = callsIncludedPrev === 0 ? 0 : w1 + Math.max(0, callsIncludedPrev - 1);
+            const newTotalWeight = prevTotalWeight + wNew;
+
+            const prevVector = (currentBaseline?.featureVector ?? null) as Record<string, number> | null;
+            const currentNormalized = extractNormalizedScores(domainScores);
+
+            const newVector: Record<string, number> = {};
+            const allDomains = new Set([
+                ...Object.keys(currentNormalized),
+                ...(prevVector ? Object.keys(prevVector) : []),
+            ]);
+            for (const domain of allDomains) {
+                const prevVal = prevVector?.[domain] ?? 0;
+                const newVal = currentNormalized[domain] ?? 0;
+                newVector[domain] = prevTotalWeight === 0
+                    ? newVal
+                    : (prevVal * prevTotalWeight + newVal * wNew) / newTotalWeight;
+            }
+
+            const shouldLock = callsIncluded >= BASELINE_CALL_TARGET;
 
             await CognitiveRepository.createBaseline({
                 elderlyProfileId: state.userId,
                 featureVector: newVector,
                 rawValues: domainScores,
                 domainBaselines: newVector,
-                version: currentVersion + 1,
+                version: (currentBaseline?.version ?? 0) + 1,
+                callsIncluded,
+                baselineLocked: shouldLock,
             });
 
-            console.log('[CognitivePostCall] Baseline updated to version:', currentVersion + 1);
+            console.log('[CognitivePostCall] Baseline updated:', {
+                version: (currentBaseline?.version ?? 0) + 1,
+                callsIncluded,
+                baselineLocked: shouldLock,
+                w1,
+                wNew,
+            });
             return {};
         } catch (err: any) {
             console.error('[CognitivePostCall] Baseline update failed:', err);
@@ -155,4 +209,18 @@ export class CognitivePostCallGraph {
     compile() {
         return this.compiledGraph;
     }
+}
+
+function extractNormalizedScores(domainScores: DomainScores): Record<string, number> {
+    const out: Record<string, number> = {
+        orientation: domainScores.orientation.normalized,
+        attentionConcentration: domainScores.attentionConcentration.normalized,
+        workingMemory: domainScores.workingMemory.normalized,
+        delayedRecall: domainScores.delayedRecall.normalized,
+        abstractionReasoning: domainScores.abstractionReasoning.normalized,
+    };
+    if (domainScores.languageVerbalFluency) {
+        out.languageVerbalFluency = domainScores.languageVerbalFluency.normalized;
+    }
+    return out;
 }

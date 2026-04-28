@@ -28,6 +28,8 @@ export interface CognitiveBaselineCreateData {
     rawValues: object;
     domainBaselines: object;
     version: number;
+    callsIncluded: number;
+    baselineLocked: boolean;
 }
 
 export class CognitiveRepository {
@@ -85,6 +87,18 @@ export class CognitiveRepository {
             return await prismaClient.cognitiveBaseline.create({ data });
         } catch (error) {
             console.error('[CognitiveRepository] Unable to create baseline:', error);
+            throw error;
+        }
+    }
+
+    static async updateBaselineLock(id: string, callsIncluded: number, baselineLocked: boolean) {
+        try {
+            return await prismaClient.cognitiveBaseline.update({
+                where: { id },
+                data: { callsIncluded, baselineLocked },
+            });
+        } catch (error) {
+            console.error('[CognitiveRepository] Unable to update baseline lock:', error);
             throw error;
         }
     }
