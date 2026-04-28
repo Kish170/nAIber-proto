@@ -1,14 +1,16 @@
 import { Annotation } from '@langchain/langgraph';
+import type { CompletedWindow } from '../HealthCheckState.js';
 
 export interface ParsedAnswer {
     id: string;
     question: string;
-    category: string;
+    topic: string;
     type: string;
     relatedTo: string | null;
     slot: string | null;
     answer: string | null;
     isValid: boolean;
+    windowId: string;
 }
 
 export interface WellbeingData {
@@ -48,7 +50,17 @@ export const HealthPostCallState = Annotation.Root({
     userId:            Annotation<string>(keep<string>('')),
     conversationId:    Annotation<string>(keep<string>('')),
     callDate:          Annotation<string>(keep<string>('')),
+    callLogId:         Annotation<string | null>(keep<string | null>(null)),
+
+    completedWindows:  Annotation<CompletedWindow[]>(keep<CompletedWindow[]>([])),
     answers:           Annotation<ParsedAnswer[]>(keep<ParsedAnswer[]>([])),
+
+    openingSentiment:   Annotation<'WELL' | 'POORLY' | 'AMBIGUOUS' | null>(keep<'WELL' | 'POORLY' | 'AMBIGUOUS' | null>(null)),
+    openingConcern:     Annotation<string | null>(keep<string | null>(null)),
+    openingDisposition: Annotation<'PROCEEDED' | 'ENDED_NOT_READY' | 'REDIRECTED_GENERAL' | null>(keep<'PROCEEDED' | 'ENDED_NOT_READY' | 'REDIRECTED_GENERAL' | null>(null)),
+    openingEndReason:   Annotation<string | null>(keep<string | null>(null)),
+    openingCallLogId:   Annotation<string | null>(keep<string | null>(null)),
+
     wellbeingData:     Annotation<WellbeingData | null>(keep<WellbeingData | null>(null)),
     medicationEntries: Annotation<MedicationLogEntry[]>(keep<MedicationLogEntry[]>([])),
     conditionEntries:  Annotation<ConditionLogEntry[]>(keep<ConditionLogEntry[]>([])),

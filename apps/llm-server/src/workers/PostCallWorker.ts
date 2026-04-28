@@ -144,26 +144,21 @@ export class PostCallWorker {
 
         try {
             const tuple = await this.checkpointer.getTuple({ configurable: { thread_id: threadId } });
-            const rawAnswers: any[] = (tuple?.checkpoint?.channel_values?.healthCheckAnswers as any[]) ?? [];
+            const values = tuple?.checkpoint?.channel_values as any ?? {};
 
-            console.log(`[PostCallWorker] Found ${rawAnswers.length} answers in thread state`);
-
-            const answers = rawAnswers.map((a: any) => ({
-                id: a.question?.id ?? '',
-                question: a.question?.question ?? '',
-                category: a.question?.category ?? '',
-                type: a.question?.type ?? '',
-                relatedTo: a.question?.relatedTo ?? null,
-                slot: a.question?.slot ?? null,
-                answer: a.isValid ? a.validatedAnswer : null,
-                isValid: a.isValid
-            }));
+            const completedWindows = values.completedWindows ?? [];
+            console.log(`[PostCallWorker] Found ${completedWindows.length} completed windows in thread state`);
 
             const result = await this.healthPostCallGraph.invoke({
                 userId,
                 conversationId,
                 callDate: new Date().toISOString(),
-                answers
+                completedWindows,
+                openingSentiment: values.openingSentiment ?? null,
+                openingConcern: values.openingConcern ?? null,
+                openingDisposition: values.openingDisposition ?? null,
+                openingEndReason: values.openingEndReason ?? null,
+                openingCallLogId: values.openingCallLogId ?? null,
             });
 
             if (result.error) {
@@ -173,7 +168,7 @@ export class PostCallWorker {
             await this.checkpointer.deleteThread(threadId);
             console.log(`[PostCallWorker] Cleaned up thread: ${threadId}`);
 
-            return { success: true, conversationId, answersRecorded: answers.length };
+            return { success: true, conversationId, windowsProcessed: completedWindows.length };
         } catch (error) {
             console.error(`[PostCallWorker] Health check persistence failed for thread ${threadId}:`, error);
             throw error;

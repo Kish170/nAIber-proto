@@ -14,7 +14,7 @@ import {
     validateRecognition,
 } from "./tasks/TaskValidation.js";
 import { getDigitSet, getAbstractionSet } from "./tasks/ContentRotation.js";
-import { IntentClassifier } from "../health/validation/IntentClassifier.js";
+import { CognitiveIntentClassifier as IntentClassifier } from "./CognitiveIntentClassifier.js";
 import { TaskContextBuilder } from "./TaskContextBuilder.js";
 
 export interface TaskEvaluationResult {

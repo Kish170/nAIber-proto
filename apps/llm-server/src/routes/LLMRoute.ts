@@ -59,6 +59,8 @@ export function LLMRouter(checkpointer: BaseCheckpointSaver): Router {
         }
     }, 30_000);
 
+    const inFlight = new Map<string, Promise<any>>();
+
     const conversationGraphHandler = async (req: Request, res: Response) => {
         try {
             const request: ChatCompletionRequest = req.body;
@@ -169,11 +171,23 @@ export function LLMRouter(checkpointer: BaseCheckpointSaver): Router {
                 return new HumanMessage(content);
             });
 
-            const result = await supervisorGraph.graph.invoke({
-                messages: langchainMessages,
-                userId,
-                conversationId
-            });
+            let result: any;
+            if (inFlight.has(conversationId)) {
+                console.warn('[LLM Route] In-flight duplicate detected — reusing existing execution:', conversationId);
+                result = await inFlight.get(conversationId);
+            } else {
+                const graphPromise = supervisorGraph.graph.invoke({
+                    messages: langchainMessages,
+                    userId,
+                    conversationId
+                });
+                inFlight.set(conversationId, graphPromise);
+                try {
+                    result = await graphPromise;
+                } finally {
+                    inFlight.delete(conversationId);
+                }
+            }
 
             console.log('[LLM Route] SupervisorGraph result:', {
                 hasResponse: !!result.response,

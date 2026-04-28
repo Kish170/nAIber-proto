@@ -7,3 +7,4 @@ export * from './CallLogRepository.js';
 export * from './NotificationRepository.js';
 export * from './CognitiveRepository.js';
 export * from './TrustedContactRepository.js';
+export * from './HealthCallOpeningRepository.js';

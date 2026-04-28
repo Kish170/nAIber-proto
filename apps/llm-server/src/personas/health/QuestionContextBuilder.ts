@@ -1,204 +1,172 @@
-import { BaseMessage, SystemMessage } from "@langchain/core/messages";
-import { HealthCheckStateType, AgentDecision, HealthCheckAnswer } from "./HealthCheckState.js";
-import { QuestionData } from "./questions/index.js";
+import { BaseMessage, SystemMessage, HumanMessage } from "@langchain/core/messages";
+import type { HealthCheckStateType, DynamicQuestion, OpeningPhase, CompletedQuestion } from "./HealthCheckState.js";
 
 export class QuestionContextBuilder {
 
-    build(
-        question: QuestionData,
-        state: HealthCheckStateType
-    ): { systemPrompt: string; messageWindowSize: number } {
-        const decision = state.currentDecision;
-        const messageWindowSize = this.resolveMessageWindowSize(decision, state.questionAttempts);
+    buildOpening(phase: OpeningPhase, previousCallContext?: string): { systemPrompt: string; messageWindowSize: number } {
+        let ctx = `You are conducting a health check-in with an elderly person.\n\n`;
 
-        let ctx = `You are conducting a health check-in with an elderly patient.\n`;
-        ctx += `Progress: Question ${state.currentQuestionIndex + 1} of ${state.healthCheckQuestions.length}.\n\n`;
+        if (previousCallContext) {
+            ctx += `## Previous Visit Context\n${previousCallContext}\n`;
+            ctx += `Reference this when relevant — do not recite it verbatim.\n\n`;
+        }
+
+        switch (phase) {
+            case 'greeting':
+            case 'wellbeing_asked':
+                ctx += `## Opening\nAsk warmly: "How are you doing today?" — one sentence, conversational. Do not start the health questions yet.`;
+                return { systemPrompt: ctx, messageWindowSize: 0 };
+
+            case 'poorly_probing':
+                ctx += `## Wellbeing Concern\nThe elder indicated they are not feeling well. Gently probe: "I'm sorry to hear that — what's been going on?" — warm, brief, one question. Do not suggest diagnoses or advice.`;
+                return { systemPrompt: ctx, messageWindowSize: 4 };
+
+            case 'ready_check':
+                ctx += `## Ready Check\nAsk warmly if they are ready to begin the health check-in. One sentence — e.g. "Shall we go ahead with the health check-in, or would you prefer to leave it for today?"`;
+                return { systemPrompt: ctx, messageWindowSize: 4 };
+
+            default:
+                ctx += `## Opening\nAsk warmly how they are doing today.`;
+                return { systemPrompt: ctx, messageWindowSize: 4 };
+        }
+    }
+
+    buildConversation(
+        question: DynamicQuestion,
+        state: HealthCheckStateType,
+        mode: 'ask' | 'sub_question' | 'tangent_redirect'
+    ): { systemPrompt: string; messageWindowSize: number } {
+        const total = state.pendingQuestions.length + state.completedQuestions.length + 1;
+        const done = state.completedQuestions.length;
+
+        let ctx = `You are conducting a health check-in with an elderly person.\n`;
+        ctx += `Progress: ${done} of approximately ${total} topics covered.\n\n`;
 
         if (state.previousCallContext) {
             ctx += `## Previous Visit Context\n${state.previousCallContext}\n`;
-            ctx += `Use this when directly relevant. Reference prior data naturally — do not recite the full list.\n\n`;
+            ctx += `Reference only when directly relevant to the current topic.\n\n`;
         }
 
-        const validAnswers = state.healthCheckAnswers.filter((a: HealthCheckAnswer) => a.isValid);
-        if (validAnswers.length > 0) {
-            ctx += `## Recorded Responses So Far\n`;
-            validAnswers.forEach((a: HealthCheckAnswer) => {
-                ctx += `- ${a.question.question}: ${a.validatedAnswer}\n`;
+        if (state.completedQuestions.length > 0) {
+            ctx += `## Topics Covered So Far\n`;
+            state.completedQuestions.slice(-3).forEach((c: CompletedQuestion) => {
+                ctx += `- ${c.question.questionText} (${c.disposition})\n`;
             });
             ctx += `\n`;
         }
 
-        ctx += decision
-            ? this.buildDecisionContext(question, state, decision)
-            : this.buildStandardQuestion(question);
-
-        ctx += `\nBe warm, empathetic, and conversational throughout.`;
-
-        return { systemPrompt: ctx, messageWindowSize };
-    }
-
-    private buildDecisionContext(
-        question: QuestionData,
-        state: HealthCheckStateType,
-        decision: AgentDecision
-    ): string {
-        switch (decision.action) {
-            case 'next':
-            case 'skip':
-                return this.buildNextContext(question, state);
-            case 'followup':
-                return this.buildFollowUpContext(question, state, decision);
-            case 'confirm':
-                return this.buildConfirmContext(state, decision);
-            case 'retry':
-                return this.buildRetryContext(question, state);
-            case 'wrap_up':
-                return this.buildWrapUpContext(question, state);
-        }
-    }
-
-    private buildNextContext(question: QuestionData, state: HealthCheckStateType): string {
-        const lastValid = [...state.healthCheckAnswers].reverse().find((a: HealthCheckAnswer) => a.isValid);
-
-        if (!lastValid || lastValid.question.type !== 'boolean') {
-            return this.buildStandardQuestion(question);
+        if (state.currentWindowMessages.length > 0) {
+            ctx += `## Current Topic Window\nConversation so far on "${question.questionText}":\n`;
+            for (const msg of state.currentWindowMessages) {
+                const role = msg instanceof HumanMessage ? 'Elder' : 'You';
+                const content = typeof msg.content === 'string'
+                    ? msg.content
+                    : JSON.stringify(msg.content);
+                ctx += `${role}: ${content}\n`;
+            }
+            ctx += `\n`;
         }
 
-        let ctx = `## Transition\n`;
-        ctx += `Briefly and warmly acknowledge their answer in one short phrase (e.g., "Good to know" / "Got it"), then ask:\n\n`;
-        ctx += this.buildStandardQuestion(question);
-        return ctx;
-    }
-
-    private buildFollowUpContext(
-        question: QuestionData,
-        state: HealthCheckStateType,
-        decision: AgentDecision
-    ): string {
-        const parentAnswer = this.findParentAnswer(question, state);
-
-        let ctx = `## Follow-up Question\n`;
-        if (parentAnswer) {
-            ctx += `The patient was asked: "${parentAnswer.question.question}"\n`;
-            ctx += `They answered: "${parentAnswer.rawAnswer}"\n`;
-            ctx += `This triggered a follow-up because: ${decision.reasoning}\n\n`;
-        } else {
-            ctx += `Reason for follow-up: ${decision.reasoning}\n\n`;
+        switch (mode) {
+            case 'ask':
+                ctx += this.buildAskContext(question, state.subQuestionCount);
+                break;
+            case 'sub_question':
+                ctx += this.buildSubQuestionContext(question, state.subQuestionCount);
+                break;
+            case 'tangent_redirect':
+                ctx += `## Tangent Redirect\nThe elder went off-topic. Gently acknowledge and redirect back to the health check-in in one warm sentence. Do not re-ask the current question yet — just bring them back.`;
+                break;
         }
-        ctx += `Ask ONLY the following follow-up question in a warm, natural way:\n`;
-        ctx += `"${question.question}"\n\n`;
-        ctx += `Do not re-ask the original question. Do not explain that it's a follow-up.\n`;
-        return ctx;
+
+        ctx += `\n\nBe warm, patient, and conversational throughout.`;
+        return {
+            systemPrompt: ctx,
+            messageWindowSize: this.windowSize(mode, state.subQuestionCount)
+        };
     }
 
-    private buildConfirmContext(state: HealthCheckStateType, decision: AgentDecision): string {
-        return (
-            `## Confirmation Needed\n` +
-            `The patient said: "${state.rawAnswer}"\n` +
-            `This was interpreted as: "${Object.values(decision.extractedSlots)[0]}"\n` +
-            `Confidence was low (${decision.confidence.toFixed(2)}), so we need to verify before recording.\n\n` +
-            `Ask ONLY: "${decision.confirmQuestion}"\n\n` +
-            `If they confirm → you can move on. If they correct it → note the correction.\n` +
-            `Keep it very brief. Do not re-ask the original question.\n`
-        );
-    }
-
-    private buildRetryContext(question: QuestionData, state: HealthCheckStateType): string {
-        const previousAnswer = state.rawAnswer;
-
-        if (state.pendingClarification && state.clarificationContext) {
+    private buildAskContext(question: DynamicQuestion, subCount: number): string {
+        if (subCount > 0) {
             return (
-                `## Clarification Request\n` +
-                `The patient asked: "${state.clarificationContext}"\n\n` +
-                `First, answer their question briefly and warmly (1–2 sentences).\n` +
-                `Then gently re-ask:\n` +
-                `"${question.question}"\n`
+                `## Current Question (continuing)\n` +
+                `Topic: ${question.topic}\n` +
+                `Original question: "${question.questionText}"\n\n` +
+                `Based on what the elder has said so far (see Current Topic Window above), ` +
+                `ask ONE brief, neutral follow-up question to capture more useful detail. ` +
+                `Do not re-ask the original question. Max 20 words.`
             );
         }
 
-        const formatHint = this.getFormatHint(question);
+        let ctx = `## Current Question\nTopic: ${question.topic}\nType: ${question.questionType}\n\n`;
+
+        if (question.questionType === 'boolean' || question.topic === 'MEDICATION_ADHERENCE') {
+            ctx += `Ask EXACTLY the following question — do not add context or combine with other questions:\n`;
+        } else {
+            ctx += `Ask the following question in a warm, conversational way:\n`;
+        }
+
+        ctx += `"${question.questionText}"\n`;
+
+        if (question.questionType === 'scale') {
+            ctx += `\nExpect a number from 1–10.`;
+        }
+        if (question.source === 'tangent_created' || question.source === 'tangent_merged') {
+            ctx += `\nThis topic came up earlier in the conversation — acknowledge that naturally before asking.`;
+        }
+
+        return ctx;
+    }
+
+    private buildSubQuestionContext(question: DynamicQuestion, subCount: number): string {
+        if (subCount === 1) {
+            return (
+                `## Follow-up Probe\n` +
+                `Topic: ${question.topic}\n` +
+                `You have just collected an initial response about: "${question.questionText}".\n\n` +
+                `Ask one brief, open-ended follow-up question that naturally invites the elder to share more if they have it. ` +
+                `Do NOT suggest they should move on or that they are done — let them decide. ` +
+                `Do NOT re-ask the original question. Focus on something they touched on or left vague. ` +
+                `Max 15 words.`
+            );
+        }
         return (
-            `## Retry Needed\n` +
-            `The patient said: "${previousAnswer}"\n` +
-            `This could not be recorded as a valid answer for this question.\n\n` +
-            `${formatHint}\n\n` +
-            `Gently clarify what format you need and re-ask:\n` +
-            `"${question.question}"\n\n` +
-            `Be understanding — do not make them feel they answered incorrectly. Keep it brief.\n`
+            `## Sub-question (depth ${subCount})\n` +
+            `Topic: ${question.topic}\n` +
+            `Original question: "${question.questionText}"\n\n` +
+            `The elder has more to say on this topic. Ask ONE brief, neutral follow-up question ` +
+            `that captures more useful health detail. Do not diagnose, advise, or interpret severity. ` +
+            `If the elder signals they are done, acknowledge and move on. Max 20 words.`
         );
     }
 
-    private buildWrapUpContext(question: QuestionData, state: HealthCheckStateType): string {
-        const patientSaid = state.rawAnswer;
-
-        let ctx = `## Wrap-up Check\n`;
-        if (patientSaid) {
-            ctx += `The patient was just asked: "${question.question}"\n`;
-            ctx += `They said: "${patientSaid}"\n\n`;
-        } else {
-            ctx += `The patient has been discussing "${question.question}".\n\n`;
-        }
-        ctx += `Gently check if they have anything to add before moving on.\n`;
-        ctx += `Ask in one warm, brief sentence — for example: "Is there anything else you'd like to share about that, or shall we move on?"\n`;
-        ctx += `Do not re-ask the original question. Keep it natural and unhurried.\n`;
-        return ctx;
+    buildEndNotReady(endReason?: string): { systemPrompt: string; messageWindowSize: number } {
+        const ctx =
+            `You are ending a health check-in call because the elder indicated they are not ready today.\n` +
+            (endReason ? `Their reason: "${endReason}"\n\n` : '\n') +
+            `Write a warm, brief closing (1-2 sentences). Acknowledge their preference, wish them well, and say goodbye. ` +
+            `Do not express disappointment. Do not mention rescheduling unless they brought it up.`;
+        return { systemPrompt: ctx, messageWindowSize: 6 };
     }
 
-    private buildStandardQuestion(question: QuestionData): string {
-        let ctx = `## Current Question\n`;
-        ctx += `Type: ${question.type}\n`;
-        ctx += `Category: ${question.category}\n`;
-
-        if (question.type === 'scale') {
-            ctx += `Scale range: ${(question as any).min ?? 1}–${(question as any).max ?? 10}\n`;
-        }
-
-        if (question.type === 'boolean' || question.category === 'medication') {
-            ctx += `\nAsk EXACTLY the following question. Do not add context about other medications,`;
-            ctx += ` combine it with other questions, or introduce any new health topics:\n`;
-        } else {
-            ctx += `\nAsk the following question in a warm, conversational way:\n`;
-        }
-
-        ctx += `"${question.question}"\n`;
-        return ctx;
-    }
-
-    private findParentAnswer(question: QuestionData, state: HealthCheckStateType): HealthCheckAnswer | undefined {
-        const match = question.id.match(/^follow_up_(\d+)_/);
-        if (!match) return undefined;
-        const parentIndex = parseInt(match[1], 10);
-        return state.healthCheckAnswers.find((a: HealthCheckAnswer) => a.questionIndex === parentIndex);
-    }
-
-    private getFormatHint(question: QuestionData): string {
-        if (question.type === 'scale') {
-            return `Expected: a number from ${(question as any).min ?? 1} to ${(question as any).max ?? 10} (e.g., "7" or "about a 6").`;
-        }
-        if (question.type === 'boolean') {
-            return `Expected: a yes or no answer (e.g., "yes", "I did", "no, not today").`;
-        }
-        return `Expected: a brief description in your own words.`;
-    }
-
-    private resolveMessageWindowSize(decision: AgentDecision | null, questionAttempts: number): number {
-        if (!decision || decision.action === 'next' || decision.action === 'skip') {
-            return 4;
-        }
-
-        if (decision.action === 'retry' || decision.action === 'confirm') {
-            return Math.min(4 + questionAttempts * 2, 12);
-        }
-
-        if (decision.action === 'followup' || decision.action === 'wrap_up') {
-            return Math.min(6 + questionAttempts * 2, 12);
-        }
-        return 4;
+    buildFinalize(completedCount: number): { systemPrompt: string; messageWindowSize: number } {
+        const ctx =
+            `You are closing a health check-in call with an elderly person.\n` +
+            `${completedCount} health topic${completedCount !== 1 ? 's were' : ' was'} covered.\n\n` +
+            `Write a warm 1-2 sentence closing. Briefly acknowledge the check-in is done, thank them, and say goodbye. ` +
+            `Max 30 words. No lists or bullet points.`;
+        return { systemPrompt: ctx, messageWindowSize: 6 };
     }
 
     filterMessages(messages: BaseMessage[], windowSize: number): BaseMessage[] {
         return messages
             .filter((m: BaseMessage) => !(m instanceof SystemMessage))
             .slice(-windowSize);
+    }
+
+    private windowSize(mode: string, subCount: number): number {
+        if (mode === 'ask' && subCount === 0) return 4;
+        if (mode === 'sub_question') return Math.min(4 + subCount * 2, 12);
+        return 6;
     }
 }

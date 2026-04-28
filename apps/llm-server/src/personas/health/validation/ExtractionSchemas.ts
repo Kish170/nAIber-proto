@@ -59,6 +59,29 @@ export const FollowUpEvaluationSchema = z.object({
     reason: z.string().describe('One-line reason for this decision — used for logging only'),
 });
 
+export const DigDeeperSchema = z.object({
+    shouldContinue: z.boolean().describe(
+        'True if there is meaningfully more health detail to capture on this topic'
+    ),
+    reason: z.string().describe('One-line reason — used for logging only'),
+});
+
+export const OpeningClassificationSchema = z.object({
+    sentiment: z.enum(['WELL', 'POORLY', 'AMBIGUOUS']).describe(
+        'WELL = elder indicates they are doing fine; POORLY = elder signals distress, pain, or illness; AMBIGUOUS = unclear'
+    ),
+    confidence: z.number().min(0).max(1),
+});
+
+export const HealthRelevanceSchema = z.object({
+    isHealthRelated: z.boolean().describe('True if the topic is health-related (symptoms, medications, pain, sleep, mood, mobility, appetite, cognition)'),
+    suggestedTopic: z.enum([
+        'SYMPTOM', 'MEDICATION_SIDE_EFFECT', 'SLEEP', 'PAIN', 'MOOD',
+        'MOBILITY', 'APPETITE', 'COGNITION_SELF_REPORT', 'OTHER_HEALTH'
+    ]).nullable().describe('Best matching taxonomy slot, or null if not health-related'),
+    confidence: z.number().min(0).max(1),
+});
+
 export type ScaleExtractionResult = z.infer<typeof ScaleExtractionSchema>;
 export type BooleanExtractionResult = z.infer<typeof BooleanExtractionSchema>;
 export type IntentResult = z.infer<typeof IntentSchema>;
@@ -66,3 +89,29 @@ export type ConditionNormalisationResult = z.infer<typeof ConditionNormalisation
 export type SymptomNormalisationResult = z.infer<typeof SymptomNormalisationSchema>;
 export type GeneralNotesResult = z.infer<typeof GeneralNotesSchema>;
 export type FollowUpEvaluationResult = z.infer<typeof FollowUpEvaluationSchema>;
+export type DigDeeperResult = z.infer<typeof DigDeeperSchema>;
+export type OpeningClassificationResult = z.infer<typeof OpeningClassificationSchema>;
+export type HealthRelevanceResult = z.infer<typeof HealthRelevanceSchema>;
+
+export const TurnAnalysisSchema = z.object({
+    intent:           z.enum(['ANSWERING', 'REFUSING', 'ASKING']),
+    isOnTopic:        z.boolean(),
+    readyToAdvance:   z.boolean(),
+    sentiment:        z.enum(['positive', 'neutral', 'negative']),
+    engagement:       z.enum(['high', 'low']),
+
+    openingSentiment: z.enum(['WELL', 'POORLY', 'AMBIGUOUS']).optional(),
+    isHealthRelated:  z.boolean().optional(),
+    suggestedTopic:   z.string().nullable().optional(),
+
+    tangentAction:            z.enum(['redirect', 'merge_into_pending', 'create_new_pending']).optional(),
+    tangentTargetQuestionId:  z.string().nullable().optional(),
+    tangentNewTopic:          z.enum([
+        'SYMPTOM', 'MEDICATION_SIDE_EFFECT', 'SLEEP', 'PAIN', 'MOOD',
+        'MOBILITY', 'APPETITE', 'COGNITION_SELF_REPORT', 'OTHER_HEALTH'
+    ]).nullable().optional(),
+    tangentNewQuestionText:   z.string().nullable().optional(),
+});
+
+export type TurnAnalysisResult = z.infer<typeof TurnAnalysisSchema>;
+

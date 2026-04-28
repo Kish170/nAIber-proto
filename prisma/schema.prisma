@@ -221,6 +221,7 @@ model CallLog {
   cognitiveTestResult      CognitiveTestResult?
   conversationSummary      ConversationSummary?
   healthCheckLog           HealthCheckLog?
+  healthCallOpening        HealthCallOpening?
   indirectSignals          IndirectSignal[]
 
   @@index([elderlyProfileId, scheduledTime])
@@ -310,6 +311,44 @@ model HealthCheckLog {
 
   @@index([elderlyProfileId, createdAt])
   @@map("health_check_logs")
+}
+
+model HealthCallOpening {
+  id            String                       @id @default(uuid())
+  callLogId     String                       @unique
+  callLog       CallLog                      @relation(fields: [callLogId], references: [id], onDelete: Cascade)
+  sentiment     HealthCallOpeningSentiment
+  statedConcern String?
+  disposition   HealthCallOpeningDisposition
+  endReason     String?
+  createdAt     DateTime                     @default(now())
+
+  @@index([callLogId])
+  @@map("health_call_openings")
+}
+
+enum HealthCallOpeningSentiment {
+  WELL
+  POORLY
+  AMBIGUOUS
+}
+
+enum HealthCallOpeningDisposition {
+  PROCEEDED
+  ENDED_NOT_READY
+  REDIRECTED_GENERAL
+}
+
+enum HealthQuestionTopic {
+  SYMPTOM
+  MEDICATION_SIDE_EFFECT
+  SLEEP
+  PAIN
+  MOOD
+  MOBILITY
+  APPETITE
+  COGNITION_SELF_REPORT
+  OTHER_HEALTH
 }
 
 model HealthBaseline {
