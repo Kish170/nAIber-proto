@@ -2,9 +2,11 @@ import NextAuth from 'next-auth';
 import { PrismaAdapter } from '@auth/prisma-adapter';
 import { prisma } from './prisma';
 import { authConfig } from './auth.config';
+import { buildAuthProviders } from './auth.providers';
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
     ...authConfig,
+    providers: buildAuthProviders((email) => prisma.user.findUnique({ where: { email } })),
     adapter: PrismaAdapter(prisma),
     session: { strategy: 'jwt' },
     callbacks: {
