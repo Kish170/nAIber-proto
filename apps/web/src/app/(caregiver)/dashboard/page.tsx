@@ -1,7 +1,8 @@
 "use client"
 
 import Link from "next/link"
-import { Users, BarChart2, Calendar, Flag, PhoneCall, Heart } from "lucide-react"
+import { Users, BarChart2, Calendar, Flag, PhoneCall, Heart, Bell } from "lucide-react"
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from "recharts"
 
 import { EmptyState } from "@/components/common/empty-state"
 import { Badge } from "@/components/ui/badge"
@@ -71,6 +72,16 @@ export default function DashboardPage() {
     { enabled: !!elderlyId }
   )
 
+  const { data: domainTrends } = (trpc as any).cognitive.getDomainTrends.useQuery(
+    { elderlyProfileId: elderlyId!, count: 10 },
+    { enabled: !!elderlyId }
+  )
+
+  const { data: notifications } = (trpc as any).notifications.getForElderly.useQuery(
+    { elderlyProfileId: elderlyId!, limit: 5 },
+    { enabled: !!elderlyId }
+  )
+
   if (!elderlyId) {
     return (
       <div className="p-8 min-h-screen bg-ivory">
@@ -136,14 +147,14 @@ export default function DashboardPage() {
         <SectionCard>
           <SectionHeading>Stability overview</SectionHeading>
           {cogTrends && cogTrends.length >= 3 ? (
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-5">
               <div className="flex items-center gap-3">
                 <span className="text-sm text-warm-500">Latest stability index:</span>
                 <span className="text-lg font-display font-medium text-warm-900">
                   {latestStability != null ? latestStability.toFixed(2) : "—"}
                 </span>
               </div>
-              <div className="flex gap-1 items-end h-32">
+              <div className="flex gap-1 items-end h-20">
                 {cogTrends.map((result: any, i: number) => (
                   <div
                     key={result.id}
@@ -164,6 +175,37 @@ export default function DashboardPage() {
             </div>
           )}
         </SectionCard>
+
+        {domainTrends && domainTrends.length >= 3 && (
+          <SectionCard>
+            <SectionHeading>Domain trends</SectionHeading>
+            <ResponsiveContainer width="100%" height={200}>
+              <LineChart data={domainTrends.map((d: any, i: number) => {
+                const ds = d.domainScores as Record<string, { normalized: number }> | null
+                return {
+                  session: `S${i + 1}`,
+                  orientation: ds?.orientation?.normalized ?? null,
+                  attention: ds?.attentionConcentration?.normalized ?? null,
+                  workingMemory: ds?.workingMemory?.normalized ?? null,
+                  delayedRecall: ds?.delayedRecall?.normalized ?? null,
+                  language: ds?.languageVerbalFluency?.normalized ?? null,
+                  abstraction: ds?.abstractionReasoning?.normalized ?? null,
+                }
+              })}>
+                <XAxis dataKey="session" tick={{ fontSize: 11 }} />
+                <YAxis domain={[0, 1]} tick={{ fontSize: 11 }} />
+                <Tooltip formatter={(v: any) => typeof v === 'number' ? v.toFixed(2) : '—'} />
+                <Legend iconType="circle" iconSize={8} />
+                <Line type="monotone" dataKey="orientation" stroke="#4f9e8f" strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="attention" stroke="#e07b4a" strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="workingMemory" stroke="#7b68c8" strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="delayedRecall" stroke="#d94f5c" strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="language" stroke="#4a90d9" strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="abstraction" stroke="#8ab547" strokeWidth={2} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </SectionCard>
+        )}
 
         <SectionCard>
           <div className="flex items-center justify-between mb-4">
@@ -282,13 +324,37 @@ export default function DashboardPage() {
         </SectionCard>
 
         <SectionCard>
-          <SectionHeading>Active flags</SectionHeading>
-          <EmptyState
-            icon={Flag}
-            heading="No flags"
-            description="nAIber hasn't detected anything requiring attention."
-            compact
-          />
+          <div className="flex items-center gap-2 mb-4">
+            <h2 className="font-display font-medium text-warm-900 text-lg">Active flags</h2>
+            {notifications && notifications.length > 0 && (
+              <span className="text-xs bg-red-100 text-red-600 rounded-full px-2 py-0.5 font-medium">
+                {notifications.length}
+              </span>
+            )}
+          </div>
+          {notifications && notifications.length > 0 ? (
+            <div className="flex flex-col divide-y divide-border">
+              {notifications.map((n: any) => (
+                <div key={n.id} className="flex items-start gap-3 py-3">
+                  <Bell size={15} className="text-red-400 mt-0.5 shrink-0" />
+                  <div className="flex flex-col gap-0.5 flex-1 min-w-0">
+                    <p className="text-sm font-medium text-warm-900 truncate">{n.title}</p>
+                    <p className="text-xs text-warm-500">{n.body}</p>
+                  </div>
+                  <span className="text-xs text-warm-400 shrink-0">
+                    {new Date(n.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <EmptyState
+              icon={Flag}
+              heading="No flags"
+              description="nAIber hasn't detected anything requiring attention."
+              compact
+            />
+          )}
         </SectionCard>
 
       </div>

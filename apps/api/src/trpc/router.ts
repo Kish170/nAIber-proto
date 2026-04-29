@@ -6,6 +6,7 @@ import { sessionRouter } from '../routers/session.router.js';
 import { healthRouter } from '../routers/health.router.js';
 import { observationsRouter } from '../routers/observations.router.js';
 import { onboardingRouter } from '../routers/onboarding.router.js';
+import { notificationsRouter } from '../routers/notifications.router.js';
 
 export const appRouter = router({
     caregiver: caregiverRouter,
@@ -15,6 +16,7 @@ export const appRouter = router({
     health: healthRouter,
     observations: observationsRouter,
     onboarding: onboardingRouter,
+    notifications: notificationsRouter,
 });
 
 export type AppRouter = typeof appRouter;
