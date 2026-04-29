@@ -6,7 +6,6 @@
         "composite": true
     },
     "include": ["src/**/*"],
-    "exclude": ["src/**/*.test.ts"],
     "references": [
         { "path": "../../packages/shared-core" },
         { "path": "../../packages/shared-clients" },
