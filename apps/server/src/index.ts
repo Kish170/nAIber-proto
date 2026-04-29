@@ -1,5 +1,6 @@
 import express from 'express';
 import http from 'http';
+import cors from 'cors';
 import { CallController } from './controllers/CallController.js';
 import { createCallRouter } from './routes/CallRoutes.js';
 import { sessionManager } from './services/SessionManager.js';
@@ -20,6 +21,10 @@ if (ngrokUrls.baseUrl) {
 const app = express();
 const callController = new CallController();
 
+app.use(cors({
+  origin: process.env.FRONTEND_URL ?? 'http://localhost:3003',
+  credentials: true,
+}));
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
 app.use(createCallRouter(callController));

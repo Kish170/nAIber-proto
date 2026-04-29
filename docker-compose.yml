@@ -92,6 +92,8 @@ services:
 
       REDIS_URL: redis://redis:6379
 
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3003}
+
     ports:
       - "3000:3000"
     depends_on:

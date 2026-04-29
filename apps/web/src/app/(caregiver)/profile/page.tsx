@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import type { LucideIcon } from "lucide-react"
-import { User, Phone, Mail, Globe, Calendar, Clock, Heart, UserCheck } from "lucide-react"
+import { User, Phone, Mail, Globe, Calendar, Clock, Heart, UserCheck, PhoneCall } from "lucide-react"
 
 import { EmptyState } from "@/components/common/empty-state"
 import { Badge } from "@/components/ui/badge"
@@ -34,7 +34,27 @@ function InfoRow({ icon: Icon, label, value }: { icon: LucideIcon; label: string
 
 export default function ProfilePage() {
   const [inviteOpen, setInviteOpen] = useState(false)
+  const [callState, setCallState] = useState<{ type: string; status: 'idle' | 'calling' | 'success' | 'error' }>({ type: '', status: 'idle' })
   const elderlyId = useActiveUserStore((s) => s.selectedElderlyId)
+
+  async function initiateCall(type: 'general' | 'health' | 'cognitive') {
+    const pathMap = { general: '/call', health: '/call/health-check', cognitive: '/call/cognitive' }
+    const telephonyUrl = process.env.NEXT_PUBLIC_TELEPHONY_URL ?? 'http://localhost:3000'
+    setCallState({ type, status: 'calling' })
+    try {
+      const res = await fetch(`${telephonyUrl}${pathMap[type]}`, { method: 'POST' })
+      if (res.ok) {
+        setCallState({ type, status: 'success' })
+        setTimeout(() => setCallState({ type: '', status: 'idle' }), 4000)
+      } else {
+        setCallState({ type, status: 'error' })
+        setTimeout(() => setCallState({ type: '', status: 'idle' }), 4000)
+      }
+    } catch {
+      setCallState({ type, status: 'error' })
+      setTimeout(() => setCallState({ type: '', status: 'idle' }), 4000)
+    }
+  }
 
   const { data: profile, isLoading } = trpc.user.getById.useQuery(
     { id: elderlyId! },
@@ -175,6 +195,36 @@ export default function ProfilePage() {
               Invite another caregiver
             </Button>
           </div>
+        </SectionCard>
+
+        <SectionCard heading="Initiate call">
+          <p className="text-sm text-warm-500 mb-4">
+            Manually trigger a call to {profile.name}. The call will use the registered phone number.
+          </p>
+          <div className="flex gap-3 flex-wrap">
+            {(['general', 'health', 'cognitive'] as const).map((type) => {
+              const labels = { general: 'General call', health: 'Health check', cognitive: 'Cognitive assessment' }
+              const isActive = callState.type === type && callState.status === 'calling'
+              return (
+                <Button
+                  key={type}
+                  variant="outline"
+                  disabled={callState.status === 'calling'}
+                  onClick={() => initiateCall(type)}
+                  className="flex items-center gap-2"
+                >
+                  <PhoneCall size={14} />
+                  {isActive ? 'Calling…' : labels[type]}
+                </Button>
+              )
+            })}
+          </div>
+          {callState.status === 'success' && (
+            <p className="text-sm text-teal mt-3">Call initiated successfully.</p>
+          )}
+          {callState.status === 'error' && (
+            <p className="text-sm text-red-500 mt-3">Failed to initiate call. Check that the telephony server is running.</p>
+          )}
         </SectionCard>
 
       </div>
