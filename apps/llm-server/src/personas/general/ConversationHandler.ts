@@ -6,6 +6,7 @@ export interface Summary {
     summaryText: string;
     topicsDiscussed: string[];
     keyHighlights: string[];
+    callLogId?: string;
 }
 
 export interface CallLogData {
