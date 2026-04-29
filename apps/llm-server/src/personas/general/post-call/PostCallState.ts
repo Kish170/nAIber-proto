@@ -13,7 +13,11 @@ export const PostCallState = Annotation.Root({
 
     summaryId: Annotation<string | null>({
         value: (x: string | null, y: string | null) => y ?? x ?? null,
-        
+        default: () => null
+    }),
+
+    callLogId: Annotation<string | null>({
+        value: (x: string | null, y: string | null) => y ?? x ?? null,
         default: () => null
     }),
 
