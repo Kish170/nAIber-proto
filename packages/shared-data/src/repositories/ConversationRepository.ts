@@ -8,6 +8,7 @@ export interface Summary {
     summaryText: string;
     topicsDiscussed: string[];
     keyHighlights: string[];
+    callLogId?: string;
 }
 
 export interface CallLogData {
@@ -45,14 +46,16 @@ export class ConversationRepository {
                 update: {
                     summaryText: data.summaryText,
                     topicsDiscussed: [...data.topicsDiscussed],
-                    keyHighlights: [...data.keyHighlights]
+                    keyHighlights: [...data.keyHighlights],
+                    callLogId: data.callLogId
                 },
                 create: {
                     elderlyProfileId: data.elderlyProfileId,
                     conversationId: data.conversationId,
                     summaryText: data.summaryText,
                     topicsDiscussed: [...data.topicsDiscussed],
-                    keyHighlights: [...data.keyHighlights]
+                    keyHighlights: [...data.keyHighlights],
+                    callLogId: data.callLogId
                 }
             });
         } catch (error) {
