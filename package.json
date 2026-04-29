@@ -21,6 +21,7 @@
     "prisma:format": "npx prisma format",
     "prisma:reset": "npx prisma db push --force-reset && npm run seed",
     "seed": "tsx prisma/seed.ts",
+    "seed:demo": "tsx prisma/seed-demo.ts",
     "db:seed": "npm run seed",
     "db:reset": "npm run prisma:reset",
     "test:text": "tsx scripts/text-test.ts"
