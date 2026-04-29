@@ -25,7 +25,6 @@ COPY prisma ./prisma
 
 RUN npx prisma generate
 
-
 COPY packages/shared-core ./packages/shared-core
 COPY packages/shared-clients ./packages/shared-clients
 COPY packages/shared-services ./packages/shared-services
@@ -35,8 +34,12 @@ COPY apps/llm-server ./apps/llm-server
 RUN npm run build --workspace=@naiber/shared-core && \
     npm run build --workspace=@naiber/shared-clients && \
     npm run build --workspace=@naiber/shared-data && \
-    npm run build --workspace=@naiber/shared-services
+    npm run build --workspace=@naiber/shared-services && \
+    npm run build --workspace=@naiber/llm-server
 
 EXPOSE 3001
 
-CMD ["npx", "tsx", "watch", "apps/llm-server/src/index.ts"]
+HEALTHCHECK --interval=30s --timeout=3s --start-period=90s \
+  CMD curl -f http://localhost:3001/health || exit 1
+
+CMD ["node", "apps/llm-server/dist/index.js"]

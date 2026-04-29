@@ -92,8 +92,6 @@ services:
 
       REDIS_URL: redis://redis:6379
 
-    volumes:
-      - ./apps/server/src:/app/apps/server/src
     ports:
       - "3000:3000"
     depends_on:
@@ -107,7 +105,7 @@ services:
       interval: 30s
       timeout: 3s
       retries: 3
-      start_period: 40s
+      start_period: 90s
 
   llm-server:
     build:
@@ -150,8 +148,6 @@ services:
 
       MCP_SERVER_URL: http://mcp-server:3002
 
-    volumes:
-      - ./apps/llm-server/src:/app/apps/llm-server/src
     ports:
       - "3001:3001"
     depends_on:
@@ -167,7 +163,7 @@ services:
       interval: 30s
       timeout: 3s
       retries: 3
-      start_period: 40s
+      start_period: 90s
 
   api:
     build:
@@ -245,6 +241,39 @@ services:
       retries: 3
       start_period: 40s
 
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3002}
+        NEXT_PUBLIC_TELEPHONY_URL: ${NEXT_PUBLIC_TELEPHONY_URL:-http://localhost:3000}
+    container_name: naiber-web
+    environment:
+      NODE_ENV: production
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3003}
+      NEXTAUTH_SECRET: ${AUTH_SECRET}
+      AUTH_SECRET: ${AUTH_SECRET}
+      AUTH_GOOGLE_ID: ${AUTH_GOOGLE_ID}
+      AUTH_GOOGLE_SECRET: ${AUTH_GOOGLE_SECRET}
+      DEMO_AUTH_ENABLED: ${DEMO_AUTH_ENABLED:-false}
+      DEMO_USER_EMAIL: ${DEMO_USER_EMAIL:-}
+      DEMO_USER_PASSWORD: ${DEMO_USER_PASSWORD:-}
+      DATABASE_URL: ${DATABASE_URL}
+      DIRECT_URL: ${DIRECT_URL}
+    ports:
+      - "3003:3003"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3003/api/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 60s
 
 volumes:
   redis_data:
