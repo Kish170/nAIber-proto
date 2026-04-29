@@ -131,4 +131,26 @@ export class CognitiveRepository {
             throw error;
         }
     }
+
+    static async findDomainTrends(elderlyProfileId: string, count: number) {
+        try {
+            return await prismaClient.cognitiveTestResult.findMany({
+                where: {
+                    elderlyProfileId,
+                    isPartial: false,
+                    deferralReason: null,
+                },
+                select: {
+                    completedAt: true,
+                    stabilityIndex: true,
+                    domainScores: true,
+                },
+                orderBy: { completedAt: 'asc' },
+                take: count,
+            });
+        } catch (error) {
+            console.error('[CognitiveRepository] Unable to find domain trends:', error);
+            throw error;
+        }
+    }
 }

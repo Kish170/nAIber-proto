@@ -32,4 +32,13 @@ export const cognitiveRouter = router({
         .query(async ({ input }: { input: any }) => {
             return await CognitiveRepository.findRecentCompletedResults(input.elderlyProfileId, input.count);
         }),
+
+    getDomainTrends: caregiverProcedure
+        .input(z.object({
+            elderlyProfileId: z.string().uuid(),
+            count: z.number().min(2).max(20).default(10),
+        }))
+        .query(async ({ input }: { input: any }) => {
+            return await CognitiveRepository.findDomainTrends(input.elderlyProfileId, input.count);
+        }),
 });
