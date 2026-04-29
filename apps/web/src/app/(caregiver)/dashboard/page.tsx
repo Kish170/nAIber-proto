@@ -82,6 +82,11 @@ export default function DashboardPage() {
     { enabled: !!elderlyId }
   )
 
+  const { data: latestObservation } = (trpc as any).observations.getLatestSubmissionForElderly.useQuery(
+    { elderlyProfileId: elderlyId! },
+    { enabled: !!elderlyId }
+  )
+
   if (!elderlyId) {
     return (
       <div className="p-8 min-h-screen bg-ivory">
@@ -204,6 +209,36 @@ export default function DashboardPage() {
                 <Line type="monotone" dataKey="abstraction" stroke="#8ab547" strokeWidth={2} dot={false} />
               </LineChart>
             </ResponsiveContainer>
+          </SectionCard>
+        )}
+
+        {latestObservation && (latestObservation as any).informantConcernIndex != null && (
+          <SectionCard>
+            <SectionHeading>Informant observations (IQCODE)</SectionHeading>
+            <div className="flex items-center gap-8">
+              <div>
+                <p className="text-xs text-warm-500 mb-1">Concern index</p>
+                <p className="text-2xl font-display font-medium text-warm-900">
+                  {((latestObservation as any).informantConcernIndex as number).toFixed(2)}
+                </p>
+              </div>
+              {cogTrends && cogTrends.length > 0 && (latestObservation as any).informantConcernIndex != null && (() => {
+                const latestStab = cogTrends[0]?.stabilityIndex ?? null
+                const concern = (latestObservation as any).informantConcernIndex as number
+                const agreement = latestStab != null && Math.abs(latestStab - (1 - concern)) < 0.2
+                return (
+                  <div className="flex flex-col gap-1">
+                    <p className="text-xs text-warm-500">Agreement with AI assessment</p>
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full w-fit ${agreement ? 'bg-teal/10 text-teal' : 'bg-amber-50 text-amber-600'}`}>
+                      {agreement ? 'Aligned' : 'Divergent'}
+                    </span>
+                  </div>
+                )
+              })()}
+            </div>
+            <p className="text-xs text-warm-400 mt-3">
+              Last updated {latestObservation ? new Date((latestObservation as any).createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}
+            </p>
           </SectionCard>
         )}
 

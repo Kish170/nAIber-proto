@@ -40,4 +40,12 @@ export const observationsRouter = router({
         .query(async ({ input }: { input: any }) => {
             return await TrustedContactRepository.getSubmissionHistory(input.trustedContactId);
         }),
+
+    getLatestSubmissionForElderly: caregiverProcedure
+        .input(z.object({ elderlyProfileId: z.string().uuid() }))
+        .query(async ({ input }: { input: any }) => {
+            const contacts = await TrustedContactRepository.findByElderlyProfileId(input.elderlyProfileId);
+            if (!contacts || contacts.length === 0) return null;
+            return await TrustedContactRepository.getLatestSubmission(contacts[0].id);
+        }),
 });
