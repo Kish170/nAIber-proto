@@ -28,8 +28,12 @@ COPY apps/server ./apps/server
 RUN npm run build --workspace=@naiber/shared-core && \
     npm run build --workspace=@naiber/shared-clients && \
     npm run build --workspace=@naiber/shared-data && \
-    npm run build --workspace=@naiber/shared-services
+    npm run build --workspace=@naiber/shared-services && \
+    npm run build --workspace=@naiber/server
 
 EXPOSE 3000
 
-CMD ["npx", "tsx", "watch", "apps/server/src/index.ts"]
+HEALTHCHECK --interval=30s --timeout=3s --start-period=60s \
+  CMD curl -f http://localhost:3000/health || exit 1
+
+CMD ["node", "apps/server/dist/index.js"]
