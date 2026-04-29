@@ -9,6 +9,7 @@ import {
 import { EmbeddingService } from "@naiber/shared-services";
 import {
     createSummary,
+    createLog,
     getConversationTopics,
     createConversationTopic,
     updateConversationTopic,
@@ -209,19 +210,33 @@ export class GeneralPostCallGraph {
                 return { errors: [errorMsg] };
             }
 
+            const callLog = await createLog({
+                elderlyProfileId: state.userId,
+                scheduledTime: new Date(state.callDate),
+                endTime: new Date(),
+                status: 'COMPLETED',
+                outcome: 'COMPLETED',
+                elevenlabsConversationId: state.conversationId,
+                checkInCompleted: true
+            });
+
+            console.log('[PostCallGraph] CallLog created:', callLog.id);
+
             const conversationSummary = await createSummary({
                 elderlyProfileId: state.userId,
                 conversationId: state.conversationId,
                 summaryText: summary.summaryText,
                 topicsDiscussed: summary.topicsDiscussed,
-                keyHighlights: summary.keyHighlights.map((h: { text: string }) => h.text)
+                keyHighlights: summary.keyHighlights.map((h: { text: string }) => h.text),
+                callLogId: callLog.id
             });
 
             console.log('[PostCallGraph] Summary saved to PostgreSQL');
 
             return {
                 summary,
-                summaryId: conversationSummary.id
+                summaryId: conversationSummary.id,
+                callLogId: callLog.id
             };
 
         } catch (error) {
