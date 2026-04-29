@@ -36,7 +36,10 @@ const PORT = process.env.PORT || 3000;
 
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
-  console.log(`ElevenLabs webhook available at: https://4973188fcbd8.ngrok-free.app/api/elevenlabs-webhook`);
+  if (process.env.BASE_URL) {
+    console.log(`Base URL: ${process.env.BASE_URL}`);
+    console.log(`Stream URL: ${process.env.STREAM_URL}`);
+  }
 });
 
 let isShuttingDown = false;
