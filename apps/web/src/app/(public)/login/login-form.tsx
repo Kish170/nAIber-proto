@@ -1,19 +1,20 @@
 "use client"
 
-import { useState } from "react"
+import { type FormEvent, useState } from "react"
 import { signIn } from "next-auth/react"
 import { useSearchParams } from "next/navigation"
 
 import { Button } from "@/components/ui/button"
 import { Logo } from "@/components/common/logo"
-
-const demoEnabled = process.env.NEXT_PUBLIC_DEMO_AUTH_ENABLED === 'true'
+import { Input } from "@/components/ui/input"
+import { Separator } from "@/components/ui/separator"
 
 export function LoginForm() {
+  const isDemoAuthEnabled = process.env.NEXT_PUBLIC_DEMO_AUTH_ENABLED === "true"
   const [isLoading, setIsLoading] = useState(false)
-  const [demoEmail, setDemoEmail] = useState("")
-  const [demoPassword, setDemoPassword] = useState("")
-  const [demoError, setDemoError] = useState<string | null>(null)
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [credentialError, setCredentialError] = useState<string | null>(null)
   const searchParams = useSearchParams()
   const callbackUrl = searchParams.get("callbackUrl") ?? "/dashboard"
   const error = searchParams.get("error")
@@ -23,21 +24,37 @@ export function LoginForm() {
     signIn("google", { callbackUrl })
   }
 
-  async function handleDemoSignIn(e: React.FormEvent) {
-    e.preventDefault()
-    setDemoError(null)
+  async function handleDemoSignIn(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    if (!email || !password) {
+      setCredentialError("Please enter both email and password.")
+      return
+    }
+
     setIsLoading(true)
+    setCredentialError(null)
+
     const result = await signIn("credentials", {
-      email: demoEmail,
-      password: demoPassword,
+      email,
+      password,
+      callbackUrl,
       redirect: false,
     })
+
+    setIsLoading(false)
+
     if (result?.error) {
-      setDemoError("Invalid email or password.")
-      setIsLoading(false)
-    } else {
-      window.location.href = callbackUrl
+      setCredentialError("Invalid demo credentials. Please try again.")
+      return
     }
+
+    if (result?.url) {
+      window.location.href = result.url
+      return
+    }
+
+    window.location.href = callbackUrl
   }
 
   return (
@@ -64,36 +81,38 @@ export function LoginForm() {
             </p>
           )}
 
-          {demoEnabled && (
-            <form onSubmit={handleDemoSignIn} className="mb-4 space-y-3">
-              <input
+          {isDemoAuthEnabled && (
+            <form onSubmit={handleDemoSignIn} className="space-y-3 mb-4">
+              <Input
                 type="email"
                 placeholder="Email"
-                value={demoEmail}
-                onChange={(e) => setDemoEmail(e.target.value)}
-                className="w-full border border-warm-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal"
-                required
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
                 disabled={isLoading}
+                autoComplete="email"
               />
-              <input
+              <Input
                 type="password"
                 placeholder="Password"
-                value={demoPassword}
-                onChange={(e) => setDemoPassword(e.target.value)}
-                className="w-full border border-warm-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal"
-                required
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
                 disabled={isLoading}
+                autoComplete="current-password"
               />
-              {demoError && (
-                <p className="text-xs text-destructive">{demoError}</p>
+              {credentialError && (
+                <p className="text-xs text-destructive text-center">
+                  {credentialError}
+                </p>
               )}
               <Button
                 type="submit"
-                className="w-full bg-teal text-ivory hover:bg-teal-light"
+                className="w-full"
+                variant="outline"
                 disabled={isLoading}
               >
                 {isLoading ? "Signing in…" : "Sign in with demo account"}
               </Button>
+              <Separator />
             </form>
           )}
 
