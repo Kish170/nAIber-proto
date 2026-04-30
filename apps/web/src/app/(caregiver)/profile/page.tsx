@@ -10,6 +10,29 @@ import { Button } from "@/components/ui/button"
 import { InviteCaregiverDialog } from "@/components/caregiver/profile/invite-caregiver-dialog"
 import { useActiveUserStore } from "@/stores/active-user.store"
 import { trpc } from "@/lib/trpc"
+import { FREQUENCY_OPTIONS, type MedicationSchedule } from "@/types/onboarding"
+
+function formatFrequency(value: unknown): string {
+  if (value == null) return "—"
+  if (typeof value === "string") return value
+  if (typeof value !== "object") return "—"
+  const schedule = value as MedicationSchedule
+  const match = FREQUENCY_OPTIONS.find((option) => {
+    const a = option.schedule
+    return (
+      a.timesPerDay === schedule.timesPerDay &&
+      a.perWeek === schedule.perWeek &&
+      a.intervalDays === schedule.intervalDays &&
+      a.prn === schedule.prn
+    )
+  })
+  if (match) return match.label
+  if (schedule.timesPerDay) return `${schedule.timesPerDay}× daily`
+  if (schedule.perWeek) return `${schedule.perWeek}× per week`
+  if (schedule.intervalDays) return `Every ${schedule.intervalDays} days`
+  if (schedule.prn) return "As needed"
+  return "—"
+}
 
 function SectionCard({ heading, children }: { heading: string; children: React.ReactNode }) {
   return (
@@ -92,6 +115,12 @@ export default function ProfilePage() {
 
   const initial = profile.name.charAt(0).toUpperCase()
   const interests = profile.interests.length > 0 ? profile.interests.join(", ") : null
+  const medications = profile.medications as Array<{
+    id: string
+    name: string
+    dosage: string
+    frequency: unknown
+  }>
 
   return (
     <div className="p-8 min-h-screen bg-ivory">
@@ -159,16 +188,16 @@ export default function ProfilePage() {
           </SectionCard>
         )}
 
-        {profile.medications.length > 0 && (
+        {medications.length > 0 && (
           <SectionCard heading="Medications">
             <div className="flex flex-col divide-y divide-border">
-              {profile.medications.map((m) => (
+              {medications.map((m) => (
                 <div key={m.id} className="flex items-center justify-between py-2.5">
                   <div>
                     <span className="text-sm text-warm-900 font-medium">{m.name}</span>
                     <span className="text-xs text-warm-500 ml-2">{m.dosage}</span>
                   </div>
-                  <span className="text-xs text-warm-500">{m.frequency}</span>
+                  <span className="text-xs text-warm-500">{formatFrequency(m.frequency)}</span>
                 </div>
               ))}
             </div>

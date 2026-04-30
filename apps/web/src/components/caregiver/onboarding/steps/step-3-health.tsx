@@ -61,10 +61,14 @@ export function Step3Health() {
   }
 
   function addMedication() {
-    setMedications((prev) => [...prev, { name: "", dosage: "", frequency: "" }])
+    setMedications((prev) => [...prev, { name: "", dosage: "", frequency: {} }])
   }
 
-  function updateMedication(index: number, field: keyof Medication, value: string) {
+  function updateMedication(
+    index: number,
+    field: keyof Medication,
+    value: string | MedicationSchedule
+  ) {
     setMedications((prev) =>
       prev.map((med, i) => (i === index ? { ...med, [field]: value } : med))
     )

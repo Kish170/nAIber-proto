@@ -9,6 +9,7 @@ COPY tsconfig.json ./
 COPY packages/shared-core/package.json ./packages/shared-core/
 COPY packages/shared-clients/package.json ./packages/shared-clients/
 COPY packages/shared-data/package.json ./packages/shared-data/
+COPY apps/api/package.json ./apps/api/
 COPY apps/web/package.json ./apps/web/
 RUN npm ci
 
@@ -23,6 +24,7 @@ WORKDIR /app
 COPY packages/shared-core ./packages/shared-core
 COPY packages/shared-clients ./packages/shared-clients
 COPY packages/shared-data ./packages/shared-data
+COPY apps/api ./apps/api
 COPY apps/web ./apps/web
 
 ARG NEXT_PUBLIC_API_URL

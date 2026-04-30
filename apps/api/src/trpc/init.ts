@@ -7,14 +7,14 @@ export const router = t.router;
 export const publicProcedure = t.procedure;
 export const createCallerFactory = t.createCallerFactory;
 
-const isAuthed = t.middleware(({ ctx, next }: { ctx: Context; next: (opts?: unknown) => unknown }) => {
+const isAuthed = t.middleware(({ ctx, next }) => {
     if (!ctx.session) {
         throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Not authenticated' });
     }
     return next({ ctx: { session: ctx.session } });
 });
 
-const isCaregiver = t.middleware(({ ctx, next }: { ctx: Context; next: (opts?: unknown) => unknown }) => {
+const isCaregiver = t.middleware(({ ctx, next }) => {
     if (!ctx.session || ctx.session.role !== 'caregiver') {
         throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Caregiver access required' });
     }
@@ -24,7 +24,7 @@ const isCaregiver = t.middleware(({ ctx, next }: { ctx: Context; next: (opts?: u
     return next({ ctx: { session: ctx.session } });
 });
 
-const isElderly = t.middleware(({ ctx, next }: { ctx: Context; next: (opts?: unknown) => unknown }) => {
+const isElderly = t.middleware(({ ctx, next }) => {
     if (!ctx.session || ctx.session.role !== 'elderly') {
         throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Elderly user access required' });
     }
