@@ -14,7 +14,11 @@ await sessionManager.initialize();
 const ngrokUrls = await getNgrokUrls();
 if (ngrokUrls.baseUrl) {
   process.env.BASE_URL = ngrokUrls.baseUrl;
+}
+if (ngrokUrls.twilioUrl) {
   process.env.TWILIO_URL = ngrokUrls.twilioUrl;
+}
+if (ngrokUrls.streamUrl) {
   process.env.STREAM_URL = ngrokUrls.streamUrl;
 }
 

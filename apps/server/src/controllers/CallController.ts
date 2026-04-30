@@ -16,7 +16,13 @@ export class CallController {
         const agentNumber = process.env.TWILIO_NUMBER;
         const agentNumberId = process.env.ELEVENLABS_NUMBER_ID;
 
-        if (!elevenLabsApiKey || !agentID || !elevenLabsBaseUrl || !agentNumber || !agentNumberId) {
+        if (
+            !elevenLabsApiKey || elevenLabsApiKey.trim() === '' ||
+            !agentID || agentID.trim() === '' ||
+            !elevenLabsBaseUrl || elevenLabsBaseUrl.trim() === '' ||
+            !agentNumber || agentNumber.trim() === '' ||
+            !agentNumberId || agentNumberId.trim() === ''
+        ) {
             throw new Error('Missing required ElevenLabs environment variables');
         }
         this.elevenLabsConfigs = {
@@ -33,7 +39,13 @@ export class CallController {
         const baseUrl = process.env.TWILIO_URL
         const streamUrl = process.env.STREAM_URL
 
-        if (!accountSid || !authToken || !userNumber || !baseUrl || !streamUrl) {
+        if (
+            !accountSid || accountSid.trim() === '' ||
+            !authToken || authToken.trim() === '' ||
+            !userNumber || userNumber.trim() === '' ||
+            !baseUrl || baseUrl.trim() === '' ||
+            !streamUrl || streamUrl.trim() === ''
+        ) {
             throw new Error('Missing required Twilio environment variables');
         }
         this.userNumber = userNumber;
