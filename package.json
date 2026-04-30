@@ -24,7 +24,8 @@
     "seed:demo": "tsx prisma/seed-demo.ts",
     "db:seed": "npm run seed",
     "db:reset": "npm run prisma:reset",
-    "test:text": "tsx scripts/text-test.ts"
+    "test:text": "tsx scripts/text-test.ts",
+    "test:web": "npm run test --workspace=web"
   },
   "devDependencies": {
     "@types/node": "^18.19.118",
@@ -32,8 +33,7 @@
     "prisma": "^6.18.0",
     "ts-node": "^10.9.2",
     "tsx": "^4.20.3",
-    "typescript": "^5.9.3",
-    "vitest": "^4.1.5"
+    "typescript": "^5.9.3"
   },
   "author": "",
   "license": "ISC",
