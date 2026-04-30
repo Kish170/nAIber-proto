@@ -18,7 +18,7 @@ app.use('/admin/queues', BullBoardRouter());
 
 const server = http.createServer(app);
 
-const PORT = process.env.LLM_PORT || 3001;
+const PORT = process.env.PORT || 3001;
 const redisClient = RedisClient.getInstance();
 const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
 

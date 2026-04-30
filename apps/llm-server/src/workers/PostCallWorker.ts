@@ -60,7 +60,9 @@ export class PostCallWorker {
             {
                 connection: {
                     host: new URL(redisUrl).hostname,
-                    port: parseInt(new URL(redisUrl).port || '6379')
+                    port: parseInt(new URL(redisUrl).port || '6379'),
+                    password: new URL(redisUrl).password || undefined,
+                    username: new URL(redisUrl).username || undefined,
                 },
                 concurrency: 1,
                 limiter: {
