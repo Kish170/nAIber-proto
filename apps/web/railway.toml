@@ -13,3 +13,4 @@ restartPolicyMaxRetries = 3
 [build.args]
 NEXT_PUBLIC_API_URL = ""
 NEXT_PUBLIC_TELEPHONY_URL = ""
+NEXT_PUBLIC_DEMO_AUTH_ENABLED = ""

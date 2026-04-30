@@ -29,8 +29,15 @@ COPY apps/web ./apps/web
 
 ARG NEXT_PUBLIC_API_URL
 ARG NEXT_PUBLIC_TELEPHONY_URL
+ARG NEXT_PUBLIC_DEMO_AUTH_ENABLED
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_TELEPHONY_URL=$NEXT_PUBLIC_TELEPHONY_URL
+ENV NEXT_PUBLIC_DEMO_AUTH_ENABLED=$NEXT_PUBLIC_DEMO_AUTH_ENABLED
+
+WORKDIR /app
+RUN npm run build --workspace=@naiber/shared-core && \
+    npm run build --workspace=@naiber/shared-clients && \
+    npm run build --workspace=@naiber/shared-data
 
 WORKDIR /app/apps/web
 RUN npm run build
