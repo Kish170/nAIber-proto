@@ -1,17 +1,5 @@
-import type { Config } from "tailwindcss";
-
-const config: Config = {
-  content: [
-    "./src/app/**/*.{ts,tsx,js,jsx}",
-    "./src/components/**/*.{ts,tsx,js,jsx}",
-    "./src/pages/**/*.{ts,tsx,js,jsx}",
-    "./src/styles/**/*.css",
-    "../../packages/shared-core/src/**/*.{ts,tsx}",
-  ],
-  theme: {
-    extend: {},
-  },
-  plugins: [],
-};
-
-export default config;
+// Tailwind v4 uses CSS-first configuration.
+// Content paths are declared via `@source` in globals.css.
+// Theme tokens and plugins are configured via `@theme` and `@plugin` in globals.css.
+// This file is intentionally minimal.
+export default {};
