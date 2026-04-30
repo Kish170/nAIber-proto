@@ -5,7 +5,7 @@ import { RedisClient } from '@naiber/shared-clients';
 import { Neo4jClient } from '@naiber/shared-clients';
 import { createMcpServer } from './mcp/server.js';
 
-const PORT = parseInt(process.env.MCP_PORT ?? '3002', 10);
+const PORT = parseInt(process.env.PORT ?? process.env.MCP_PORT ?? '3002', 10);
 
 async function start() {
     // Connect Redis
@@ -20,7 +20,16 @@ async function start() {
         password: process.env.NEO4J_PASSWORD!,
         database: process.env.NEO4J_DATABASE,
     });
-    await Neo4jClient.getInstance().verifyConnectivity();
+    try {
+        await Promise.race([
+            Neo4jClient.getInstance().verifyConnectivity(),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Neo4j connection timeout')), 10000))
+        ]);
+        console.log('[mcp-server] Neo4j connected');
+    } catch (err) {
+        console.error('[mcp-server] Neo4j connection failed:', err);
+        console.warn('[mcp-server] Starting server without Neo4j connectivity');
+    }
 
     const app = express();
     app.use(express.json());
